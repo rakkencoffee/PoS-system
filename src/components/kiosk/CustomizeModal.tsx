@@ -98,7 +98,7 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
   const showIceOption = item.type === 'iced' || item.type === 'both';
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center">
+    <div className="fixed inset-0 z-100 flex items-end md:items-center justify-center">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/70 backdrop-blur-sm animate-fade-in"
@@ -110,14 +110,14 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
         style={{ background: 'var(--bg-secondary)' }}
       >
         {/* Header */}
-        <div className="sticky top-0 z-10 flex items-center justify-between p-5 border-b border-[var(--border-subtle)]"
+        <div className="sticky top-0 z-10 flex items-center justify-between p-5 border-b border-(--border-subtle)"
           style={{ background: 'var(--bg-secondary)' }}
         >
           <div>
-            <h2 className="text-xl font-bold text-[var(--text-primary)]">{item.name}</h2>
-            <p className="text-sm text-[var(--text-muted)]">{item.description}</p>
+            <h2 className="text-xl font-bold text-(--text-primary)">{item.name}</h2>
+            <p className="text-sm text-(--text-muted)">{item.description}</p>
           </div>
-          <button onClick={onClose} className="w-10 h-10 rounded-full bg-[var(--bg-card)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
+          <button onClick={onClose} className="w-10 h-10 rounded-full bg-(--bg-card) flex items-center justify-center text-(--text-secondary) hover:text-(--text-primary) transition-colors">
             ✕
           </button>
         </div>
@@ -126,7 +126,7 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
           {/* Size Selection */}
           {hasSizes && (
             <div>
-              <h3 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">Size</h3>
+              <h3 className="text-sm font-semibold text-(--text-secondary) uppercase tracking-wider mb-3">Size</h3>
               <div className="grid grid-cols-3 gap-3">
                 {item.sizes.map((size) => (
                   <button
@@ -134,8 +134,8 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
                     onClick={() => setSelectedSize(size.size)}
                     className={`py-3 rounded-xl text-center transition-all ${
                       selectedSize === size.size
-                        ? 'bg-gradient-to-r from-coffee-500 to-amber-600 text-white shadow-lg'
-                        : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border border-[var(--border-subtle)] hover:border-[var(--border-default)]'
+                        ? 'bg-linear-to-r from-coffee-500 to-amber-600 text-white shadow-lg'
+                        : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle) hover:border-(--border-default)'
                     }`}
                   >
                     <span className="block text-lg font-bold">{size.size}</span>
@@ -152,7 +152,7 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
 
           {/* Sugar Level */}
           <div>
-            <h3 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">
+            <h3 className="text-sm font-semibold text-(--text-secondary) uppercase tracking-wider mb-3">
               Sugar Level — {sugarLevel}%
             </h3>
             <div className="flex gap-2">
@@ -162,8 +162,8 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
                   onClick={() => setSugarLevel(level)}
                   className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
                     sugarLevel === level
-                      ? 'bg-gradient-to-r from-coffee-500 to-amber-600 text-white shadow-lg'
-                      : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border border-[var(--border-subtle)]'
+                      ? 'bg-linear-to-r from-coffee-500 to-amber-600 text-white shadow-lg'
+                      : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle)'
                   }`}
                 >
                   {level}%
@@ -175,7 +175,7 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
           {/* Ice Level */}
           {showIceOption && (
             <div>
-              <h3 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">Ice Level</h3>
+              <h3 className="text-sm font-semibold text-(--text-secondary) uppercase tracking-wider mb-3">Ice Level</h3>
               <div className="grid grid-cols-4 gap-2">
                 {iceLevels.map((ice) => (
                   <button
@@ -183,8 +183,8 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
                     onClick={() => setIceLevel(ice.key)}
                     className={`py-3 rounded-xl text-center transition-all ${
                       iceLevel === ice.key
-                        ? 'bg-gradient-to-r from-coffee-500 to-amber-600 text-white shadow-lg'
-                        : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border border-[var(--border-subtle)]'
+                        ? 'bg-linear-to-r from-coffee-500 to-amber-600 text-white shadow-lg'
+                        : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle)'
                     }`}
                   >
                     <span className="block text-lg">{ice.icon}</span>
@@ -201,19 +201,19 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
               onClick={() => setExtraShot(!extraShot)}
               className={`w-full flex items-center justify-between p-4 rounded-xl transition-all ${
                 extraShot
-                  ? 'bg-gradient-to-r from-coffee-500/20 to-amber-600/20 border border-coffee-500/50'
-                  : 'bg-[var(--bg-card)] border border-[var(--border-subtle)]'
+                  ? 'bg-linear-to-r from-coffee-500/20 to-amber-600/20 border border-coffee-500/50'
+                  : 'bg-(--bg-card) border border-(--border-subtle)'
               }`}
             >
               <div className="flex items-center gap-3">
                 <span className="text-2xl">💪</span>
                 <div className="text-left">
-                  <span className="font-medium text-[var(--text-primary)] block">Extra Shot</span>
-                  <span className="text-xs text-[var(--text-muted)]">Double the caffeine</span>
+                  <span className="font-medium text-(--text-primary) block">Extra Shot</span>
+                  <span className="text-xs text-(--text-muted)">Double the caffeine</span>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-[var(--text-secondary)]">+{formatCurrency(8000)}</span>
+                <span className="text-sm text-(--text-secondary)">+{formatCurrency(8000)}</span>
                 <div className={`w-12 h-7 rounded-full transition-all flex items-center px-1 ${
                   extraShot ? 'bg-coffee-500' : 'bg-coffee-800'
                 }`}>
@@ -228,7 +228,7 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
           {/* Toppings */}
           {toppings.length > 0 && (
             <div>
-              <h3 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">Toppings</h3>
+              <h3 className="text-sm font-semibold text-(--text-secondary) uppercase tracking-wider mb-3">Toppings</h3>
               <div className="grid grid-cols-2 gap-2">
                 {toppings.map((topping) => {
                   const isSelected = selectedToppings.find((t) => t.id === topping.id);
@@ -238,12 +238,12 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
                       onClick={() => toggleTopping(topping)}
                       className={`flex items-center justify-between p-3 rounded-xl transition-all ${
                         isSelected
-                          ? 'bg-gradient-to-r from-coffee-500/20 to-amber-600/20 border border-coffee-500/50'
-                          : 'bg-[var(--bg-card)] border border-[var(--border-subtle)]'
+                          ? 'bg-linear-to-r from-coffee-500/20 to-amber-600/20 border border-coffee-500/50'
+                          : 'bg-(--bg-card) border border-(--border-subtle)'
                       }`}
                     >
-                      <span className="text-sm text-[var(--text-primary)] font-medium">{topping.name}</span>
-                      <span className="text-xs text-[var(--text-muted)]">+{formatCurrency(topping.price)}</span>
+                      <span className="text-sm text-(--text-primary) font-medium">{topping.name}</span>
+                      <span className="text-xs text-(--text-muted)">+{formatCurrency(topping.price)}</span>
                     </button>
                   );
                 })}
@@ -253,18 +253,18 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
 
           {/* Quantity */}
           <div>
-            <h3 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">Quantity</h3>
+            <h3 className="text-sm font-semibold text-(--text-secondary) uppercase tracking-wider mb-3">Quantity</h3>
             <div className="flex items-center justify-center gap-6">
               <button
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="w-12 h-12 rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)] flex items-center justify-center text-xl text-[var(--text-primary)] hover:border-[var(--border-default)] transition-all active:scale-90"
+                className="w-12 h-12 rounded-full bg-(--bg-card) border border-(--border-subtle) flex items-center justify-center text-xl text-(--text-primary) hover:border-(--border-default) transition-all active:scale-90"
               >
                 −
               </button>
-              <span className="text-3xl font-bold text-[var(--text-primary)] w-12 text-center">{quantity}</span>
+              <span className="text-3xl font-bold text-(--text-primary) w-12 text-center">{quantity}</span>
               <button
                 onClick={() => setQuantity(quantity + 1)}
-                className="w-12 h-12 rounded-full bg-gradient-to-r from-coffee-500 to-amber-600 flex items-center justify-center text-xl text-white shadow-lg hover:shadow-xl transition-all active:scale-90"
+                className="w-12 h-12 rounded-full bg-linear-to-r from-coffee-500 to-amber-600 flex items-center justify-center text-xl text-white shadow-lg hover:shadow-xl transition-all active:scale-90"
               >
                 +
               </button>
@@ -273,7 +273,7 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 p-5 border-t border-[var(--border-subtle)]"
+        <div className="sticky bottom-0 p-5 border-t border-(--border-subtle)"
           style={{ background: 'var(--bg-secondary)' }}
         >
           <button

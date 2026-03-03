@@ -45,7 +45,7 @@ export default function MenuCard({ item, index, onSelect }: MenuCardProps) {
       style={{ animationDelay: `${index * 0.05}s`, opacity: 0 }}
     >
       {/* Image area */}
-      <div className="relative h-36 bg-gradient-to-br from-coffee-800/50 to-coffee-900/50 flex items-center justify-center overflow-hidden">
+      <div className="relative h-36 bg-linear-to-br from-coffee-800/50 to-coffee-900/50 flex items-center justify-center overflow-hidden">
         {item.image ? (
           <img
             src={item.image}
@@ -74,22 +74,22 @@ export default function MenuCard({ item, index, onSelect }: MenuCardProps) {
         </span>
 
         {/* Gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent" />
       </div>
 
       {/* Content */}
       <div className="p-4">
-        <h3 className="font-semibold text-[var(--text-primary)] text-sm leading-tight mb-1 line-clamp-1">
+        <h3 className="font-semibold text-(--text-primary) text-sm leading-tight mb-1 line-clamp-1">
           {item.name}
         </h3>
-        <p className="text-[var(--text-muted)] text-xs line-clamp-2 mb-3 min-h-[2rem]">
+        <p className="text-(--text-muted) text-xs line-clamp-2 mb-3 min-h-8">
           {item.description}
         </p>
         <div className="flex items-center justify-between">
           <span className="text-coffee-300 font-bold text-sm">
             {formatCurrency(item.price)}
           </span>
-          <span className="w-8 h-8 rounded-full bg-gradient-to-r from-coffee-500 to-amber-600 flex items-center justify-center text-white text-lg leading-none group-hover:scale-110 transition-transform">
+          <span className="w-8 h-8 rounded-full bg-linear-to-r from-coffee-500 to-amber-600 flex items-center justify-center text-white text-lg leading-none group-hover:scale-110 transition-transform">
             +
           </span>
         </div>

@@ -131,7 +131,7 @@ export default function MenuPage() {
             placeholder="Search menu..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-12 pr-4 py-3.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--coffee-500)] transition-colors"
+            className="w-full pl-12 pr-4 py-3.5 rounded-xl bg-(--bg-card) border border-(--border-subtle) text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:border-(--coffee-500) transition-colors"
           />
         </div>
 
@@ -143,8 +143,8 @@ export default function MenuPage() {
               onClick={() => setActiveFilter(filter.key)}
               className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
                 activeFilter === filter.key
-                  ? 'bg-gradient-to-r from-coffee-500 to-coffee-600 text-white shadow-md'
-                  : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border border-[var(--border-subtle)] hover:border-[var(--border-default)]'
+                  ? 'bg-linear-to-r from-coffee-500 to-coffee-600 text-white shadow-md'
+                  : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle) hover:border-(--border-default)'
               }`}
             >
               <span>{filter.icon}</span>

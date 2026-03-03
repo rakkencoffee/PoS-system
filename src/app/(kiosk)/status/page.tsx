@@ -81,20 +81,20 @@ function StatusContent() {
       <div className="text-center max-w-md w-full">
         {/* Status Icon */}
         <div className="mb-8 animate-scale-in">
-          <div className={`w-24 h-24 rounded-full bg-gradient-to-r ${status.color} flex items-center justify-center mx-auto shadow-2xl`}>
+          <div className={`w-24 h-24 rounded-full bg-linear-to-r ${status.color} flex items-center justify-center mx-auto shadow-2xl`}>
             <span className="text-4xl">{status.icon}</span>
           </div>
         </div>
 
         {/* Queue Number */}
         <div className="glass-card p-6 mb-6 animate-fade-in">
-          <p className="text-xs text-[var(--text-muted)] uppercase tracking-wider mb-1">Queue</p>
+          <p className="text-xs text-(--text-muted) uppercase tracking-wider mb-1">Queue</p>
           <p className="text-5xl font-black text-gradient">#{order.queueNumber}</p>
         </div>
 
         {/* Status */}
-        <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-1">{status.label}</h2>
-        <p className="text-[var(--text-muted)] mb-8">{status.desc}</p>
+        <h2 className="text-2xl font-bold text-(--text-primary) mb-1">{status.label}</h2>
+        <p className="text-(--text-muted) mb-8">{status.desc}</p>
 
         {/* Progress Steps */}
         <div className="glass-card p-6 mb-8 animate-fade-in delay-1" style={{ opacity: 0 }}>
@@ -102,7 +102,7 @@ function StatusContent() {
             {/* Progress line */}
             <div className="absolute top-4 left-8 right-8 h-0.5 bg-coffee-800">
               <div
-                className="h-full bg-gradient-to-r from-coffee-500 to-amber-500 transition-all duration-1000"
+                className="h-full bg-linear-to-r from-coffee-500 to-amber-500 transition-all duration-1000"
                 style={{ width: `${(currentStep / (steps.length - 1)) * 100}%` }}
               />
             </div>
@@ -115,14 +115,14 @@ function StatusContent() {
                 <div key={step} className="relative z-10 flex flex-col items-center">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all ${
                     isCurrent
-                      ? `bg-gradient-to-r ${stepStatus.color} text-white shadow-lg animate-pulse`
+                      ? `bg-linear-to-r ${stepStatus.color} text-white shadow-lg animate-pulse`
                       : isActive
                         ? 'bg-coffee-600 text-white'
                         : 'bg-coffee-800 text-coffee-500'
                   }`}>
                     {isActive ? '✓' : index + 1}
                   </div>
-                  <span className={`text-[10px] mt-2 ${isActive ? 'text-[var(--text-secondary)]' : 'text-[var(--text-muted)]'}`}>
+                  <span className={`text-[10px] mt-2 ${isActive ? 'text-(--text-secondary)' : 'text-(--text-muted)'}`}>
                     {stepStatus.label}
                   </span>
                 </div>
@@ -133,10 +133,10 @@ function StatusContent() {
 
         {/* Order Items */}
         <div className="glass-card p-5 mb-6 text-left animate-fade-in delay-2" style={{ opacity: 0 }}>
-          <h3 className="text-sm font-semibold text-[var(--text-secondary)] mb-3">Your Order</h3>
+          <h3 className="text-sm font-semibold text-(--text-secondary) mb-3">Your Order</h3>
           {order.items.map((item) => (
             <div key={item.id} className="flex justify-between py-1.5 text-sm">
-              <span className="text-[var(--text-primary)]">{item.quantity}x {item.menuItem.name} ({item.size})</span>
+              <span className="text-(--text-primary)">{item.quantity}x {item.menuItem.name} ({item.size})</span>
             </div>
           ))}
         </div>

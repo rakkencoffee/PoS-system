@@ -33,8 +33,8 @@ export default function CartPage() {
         </header>
         <div className="flex-1 flex flex-col items-center justify-center p-8">
           <span className="text-7xl mb-6 animate-float">🛒</span>
-          <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Your cart is empty</h2>
-          <p className="text-[var(--text-muted)] mb-8">Add some delicious items to get started!</p>
+          <h2 className="text-2xl font-bold text-(--text-primary) mb-2">Your cart is empty</h2>
+          <p className="text-(--text-muted) mb-8">Add some delicious items to get started!</p>
           <button onClick={() => router.push('/menu')} className="btn-primary px-8">
             Browse Menu
           </button>
@@ -54,7 +54,7 @@ export default function CartPage() {
             Back
           </button>
           <h1 className="text-xl font-bold text-gradient">Your Cart</h1>
-          <span className="text-sm text-[var(--text-muted)]">{itemCount} items</span>
+          <span className="text-sm text-(--text-muted)">{itemCount} items</span>
         </div>
       </header>
 
@@ -67,7 +67,7 @@ export default function CartPage() {
           >
             <div className="flex gap-4">
               {/* Icon */}
-              <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-coffee-700/50 to-coffee-900/50 flex items-center justify-center flex-shrink-0">
+              <div className="w-16 h-16 rounded-xl bg-linear-to-br from-coffee-700/50 to-coffee-900/50 flex items-center justify-center shrink-0">
                 {item.image ? (
                   <img src={item.image} alt={item.name} className="w-full h-full object-cover rounded-xl" />
                 ) : (
@@ -78,10 +78,10 @@ export default function CartPage() {
               {/* Details */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between">
-                  <h3 className="font-semibold text-[var(--text-primary)] truncate pr-2">{item.name}</h3>
+                  <h3 className="font-semibold text-(--text-primary) truncate pr-2">{item.name}</h3>
                   <button
                     onClick={() => removeItem(item.id)}
-                    className="text-[var(--text-muted)] hover:text-red-400 transition-colors p-1 -mt-1"
+                    className="text-(--text-muted) hover:text-red-400 transition-colors p-1 -mt-1"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -120,14 +120,14 @@ export default function CartPage() {
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                      className="w-8 h-8 rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-primary)] active:scale-90 transition-transform"
+                      className="w-8 h-8 rounded-full bg-(--bg-card) border border-(--border-subtle) flex items-center justify-center text-(--text-primary) active:scale-90 transition-transform"
                     >
                       −
                     </button>
-                    <span className="font-semibold text-[var(--text-primary)] w-6 text-center">{item.quantity}</span>
+                    <span className="font-semibold text-(--text-primary) w-6 text-center">{item.quantity}</span>
                     <button
                       onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                      className="w-8 h-8 rounded-full bg-gradient-to-r from-coffee-500 to-amber-600 flex items-center justify-center text-white active:scale-90 transition-transform"
+                      className="w-8 h-8 rounded-full bg-linear-to-r from-coffee-500 to-amber-600 flex items-center justify-center text-white active:scale-90 transition-transform"
                     >
                       +
                     </button>
@@ -140,10 +140,10 @@ export default function CartPage() {
       </div>
 
       {/* Bottom bar */}
-      <div className="sticky bottom-0 glass p-6 border-t border-[var(--border-subtle)]">
+      <div className="sticky bottom-0 glass p-6 border-t border-(--border-subtle)">
         <div className="max-w-3xl mx-auto space-y-4">
           <div className="flex items-center justify-between">
-            <span className="text-[var(--text-secondary)]">Total</span>
+            <span className="text-(--text-secondary)">Total</span>
             <span className="text-2xl font-bold text-gradient">{formatCurrency(cart.totalAmount)}</span>
           </div>
           <div className="flex gap-3">
@@ -155,7 +155,7 @@ export default function CartPage() {
             </button>
             <button
               onClick={() => router.push('/checkout')}
-              className="btn-primary flex-[2]"
+              className="btn-primary flex-2"
             >
               Checkout
             </button>

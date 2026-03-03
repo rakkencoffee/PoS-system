@@ -30,7 +30,7 @@ function SuccessContent() {
         {/* Success Animation */}
         <div className="mb-8 animate-scale-in">
           <div className="relative inline-block">
-            <div className="w-28 h-28 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 flex items-center justify-center mx-auto shadow-2xl shadow-green-500/30">
+            <div className="w-28 h-28 rounded-full bg-linear-to-r from-green-500 to-emerald-500 flex items-center justify-center mx-auto shadow-2xl shadow-green-500/30">
               <svg className="w-14 h-14 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
               </svg>
@@ -39,20 +39,20 @@ function SuccessContent() {
           </div>
         </div>
 
-        <h1 className="text-3xl font-bold text-[var(--text-primary)] mb-2 animate-fade-in-up">
+        <h1 className="text-3xl font-bold text-(--text-primary) mb-2 animate-fade-in-up">
           Payment Successful!
         </h1>
-        <p className="text-[var(--text-muted)] mb-8 animate-fade-in delay-1">
+        <p className="text-(--text-muted) mb-8 animate-fade-in delay-1">
           Your order has been placed
         </p>
 
         {/* Queue Number */}
         <div className="glass-card p-8 mb-8 animate-fade-in-up delay-2" style={{ opacity: 0 }}>
-          <p className="text-sm text-[var(--text-muted)] uppercase tracking-wider mb-2">Your Queue Number</p>
+          <p className="text-sm text-(--text-muted) uppercase tracking-wider mb-2">Your Queue Number</p>
           <div className="text-7xl font-black text-gradient mb-4">
             #{queue || '—'}
           </div>
-          <div className="flex items-center justify-center gap-2 text-[var(--text-secondary)]">
+          <div className="flex items-center justify-center gap-2 text-(--text-secondary)">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -62,19 +62,19 @@ function SuccessContent() {
 
         {/* Instructions */}
         <div className="glass-card p-5 mb-8 text-left animate-fade-in delay-3" style={{ opacity: 0 }}>
-          <h3 className="font-semibold text-[var(--text-primary)] mb-3 text-center">What&apos;s Next?</h3>
+          <h3 className="font-semibold text-(--text-primary) mb-3 text-center">What&apos;s Next?</h3>
           <div className="space-y-3">
             <div className="flex items-start gap-3">
-              <span className="w-6 h-6 rounded-full bg-coffee-700 flex items-center justify-center text-xs text-coffee-200 mt-0.5 flex-shrink-0">1</span>
-              <p className="text-sm text-[var(--text-secondary)]">Wait for your number to be called</p>
+              <span className="w-6 h-6 rounded-full bg-coffee-700 flex items-center justify-center text-xs text-coffee-200 mt-0.5 shrink-0">1</span>
+              <p className="text-sm text-(--text-secondary)">Wait for your number to be called</p>
             </div>
             <div className="flex items-start gap-3">
-              <span className="w-6 h-6 rounded-full bg-coffee-700 flex items-center justify-center text-xs text-coffee-200 mt-0.5 flex-shrink-0">2</span>
-              <p className="text-sm text-[var(--text-secondary)]">Check the screen for order status</p>
+              <span className="w-6 h-6 rounded-full bg-coffee-700 flex items-center justify-center text-xs text-coffee-200 mt-0.5 shrink-0">2</span>
+              <p className="text-sm text-(--text-secondary)">Check the screen for order status</p>
             </div>
             <div className="flex items-start gap-3">
-              <span className="w-6 h-6 rounded-full bg-coffee-700 flex items-center justify-center text-xs text-coffee-200 mt-0.5 flex-shrink-0">3</span>
-              <p className="text-sm text-[var(--text-secondary)]">Pick up your order when it&apos;s ready</p>
+              <span className="w-6 h-6 rounded-full bg-coffee-700 flex items-center justify-center text-xs text-coffee-200 mt-0.5 shrink-0">3</span>
+              <p className="text-sm text-(--text-secondary)">Pick up your order when it&apos;s ready</p>
             </div>
           </div>
         </div>

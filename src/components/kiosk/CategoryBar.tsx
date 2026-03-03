@@ -28,8 +28,8 @@ export default function CategoryBar({ categories, selected, onSelect }: Category
             onClick={() => onSelect(cat.slug)}
             className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-semibold whitespace-nowrap transition-all ${
               selected === cat.slug
-                ? 'bg-gradient-to-r from-coffee-500 to-amber-600 text-white shadow-lg shadow-coffee-500/25 scale-105'
-                : 'glass-card !rounded-2xl hover:!bg-[var(--bg-card-hover)]'
+                ? 'bg-linear-to-r from-coffee-500 to-amber-600 text-white shadow-lg shadow-coffee-500/25 scale-105'
+                : 'glass-card rounded-2xl! hover:bg-(--bg-card-hover)!'
             }`}
           >
             <span className="text-lg">{cat.icon}</span>

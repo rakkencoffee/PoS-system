@@ -25,25 +25,25 @@ export default function AdminLoginPage() {
         <div className="text-center mb-8">
           <span className="text-5xl mb-4 block">🔐</span>
           <h1 className="text-3xl font-bold text-gradient mb-2">Admin Panel</h1>
-          <p className="text-[var(--text-muted)]">StartFriday Coffee</p>
+          <p className="text-(--text-muted)">StartFriday Coffee</p>
         </div>
 
         <form onSubmit={handleLogin} className="glass-card p-6 space-y-4">
           <div>
-            <label className="block text-sm text-[var(--text-secondary)] mb-2">Password</label>
+            <label className="block text-sm text-(--text-secondary) mb-2">Password</label>
             <input
               type="password"
               value={password}
               onChange={(e) => { setPassword(e.target.value); setError(''); }}
               placeholder="Enter admin password"
-              className="w-full px-4 py-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--coffee-500)]"
+              className="w-full px-4 py-3 rounded-xl bg-(--bg-card) border border-(--border-subtle) text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:border-(--coffee-500)"
             />
             {error && <p className="text-red-400 text-sm mt-2">{error}</p>}
           </div>
           <button type="submit" className="btn-primary w-full">
             Login
           </button>
-          <p className="text-xs text-[var(--text-muted)] text-center">Demo password: admin123</p>
+          <p className="text-xs text-(--text-muted) text-center">Demo password: admin123</p>
         </form>
       </div>
     </div>
