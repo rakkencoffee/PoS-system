@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
+import MenuFormModal from '@/components/admin/MenuFormModal';
 
 interface OrderData {
   id: number;
@@ -20,11 +22,15 @@ interface OrderData {
 interface MenuItem {
   id: number;
   name: string;
+  description: string;
   price: number;
+  categoryId: number;
+  type: string;
   isAvailable: boolean;
   isBestSeller: boolean;
   isRecommended: boolean;
   category: { name: string };
+  sizes?: { size: string; priceAdjustment: number }[];
 }
 
 function formatCurrency(amount: number): string {
@@ -44,6 +50,9 @@ export default function AdminDashboard() {
   const [orders, setOrders] = useState<OrderData[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showMenuModal, setShowMenuModal] = useState(false);
+  const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+  const [deletingItem, setDeletingItem] = useState<MenuItem | null>(null);
 
   useEffect(() => {
     const auth = localStorage.getItem('admin_auth');
@@ -58,7 +67,7 @@ export default function AdminDashboard() {
     try {
       const [ordersRes, menuRes] = await Promise.all([
         fetch('/api/orders?today=true'),
-        fetch('/api/menu'),
+        fetch('/api/admin/menu'),
       ]);
       const ordersData = await ordersRes.json();
       const menuData = await menuRes.json();
@@ -110,6 +119,16 @@ export default function AdminDashboard() {
       );
     } catch (error) {
       console.error('Error updating item:', error);
+    }
+  };
+
+  const handleDelete = async (item: MenuItem) => {
+    try {
+      await fetch(`/api/menu/${item.id}`, { method: 'DELETE' });
+      setMenuItems((prev) => prev.filter((m) => m.id !== item.id));
+      setDeletingItem(null);
+    } catch (error) {
+      console.error('Error deleting item:', error);
     }
   };
 
@@ -250,12 +269,23 @@ export default function AdminDashboard() {
                 <div className="animate-fade-in">
                   <div className="flex items-center justify-between mb-6">
                     <h2 className="text-2xl font-bold text-(--text-primary)">Menu Management</h2>
-                    <button onClick={fetchData} className="btn-secondary flex items-center gap-2">
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                      Refresh
-                    </button>
+                    <div className="flex gap-3">
+                      <button onClick={fetchData} className="btn-secondary flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Refresh
+                      </button>
+                      <button
+                        onClick={() => { setEditingItem(null); setShowMenuModal(true); }}
+                        className="btn-primary flex items-center gap-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        Add Menu Item
+                      </button>
+                    </div>
                   </div>
 
                   <div className="glass-card overflow-hidden">
@@ -267,26 +297,33 @@ export default function AdminDashboard() {
                           <th className="text-left p-4 text-sm text-(--text-muted) font-medium">Price</th>
                           <th className="text-left p-4 text-sm text-(--text-muted) font-medium">Tags</th>
                           <th className="text-center p-4 text-sm text-(--text-muted) font-medium">Available</th>
+                          <th className="text-center p-4 text-sm text-(--text-muted) font-medium">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {menuItems.map((item) => (
-                          <tr key={item.id} className="border-b border-(--border-subtle) hover:bg-(--bg-card-hover) transition-colors">
+                          <tr key={item.id} className={`border-b border-(--border-subtle) hover:bg-(--bg-card-hover) transition-colors ${!item.isAvailable ? 'opacity-50' : ''}`}>
                             <td className="p-4">
                               <span className="font-medium text-(--text-primary)">{item.name}</span>
+                              {item.description && (
+                                <p className="text-xs text-(--text-muted) mt-0.5 max-w-[200px] truncate">{item.description}</p>
+                              )}
                             </td>
                             <td className="p-4 text-sm text-(--text-secondary)">{item.category.name}</td>
                             <td className="p-4 text-sm text-(--text-primary) font-medium">{formatCurrency(item.price)}</td>
                             <td className="p-4">
-                              <div className="flex gap-1">
+                              <div className="flex gap-1 flex-wrap">
                                 {item.isBestSeller && <span className="badge badge-best-seller text-[10px]">Best Seller</span>}
                                 {item.isRecommended && <span className="badge badge-recommended text-[10px]">Recommended</span>}
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-coffee-800/50 text-coffee-300">
+                                  {item.type === 'hot' ? '🔥' : item.type === 'iced' ? '🧊' : '☕'} {item.type}
+                                </span>
                               </div>
                             </td>
                             <td className="p-4 text-center">
                               <button
                                 onClick={() => toggleAvailability(item.id, item.isAvailable)}
-                                className={`w-12 h-7 rounded-full transition-all flex items-center px-1 ${
+                                className={`w-12 h-7 rounded-full transition-all flex items-center px-1 mx-auto ${
                                   item.isAvailable ? 'bg-green-500' : 'bg-coffee-800'
                                 }`}
                               >
@@ -295,11 +332,62 @@ export default function AdminDashboard() {
                                 }`} />
                               </button>
                             </td>
+                            <td className="p-4">
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  onClick={() => { setEditingItem(item); setShowMenuModal(true); }}
+                                  className="p-2 rounded-lg hover:bg-(--bg-card) text-(--text-muted) hover:text-(--text-primary) transition-all"
+                                  title="Edit"
+                                >
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
+                                </button>
+                                <button
+                                  onClick={() => setDeletingItem(item)}
+                                  className="p-2 rounded-lg hover:bg-red-500/10 text-(--text-muted) hover:text-red-400 transition-all"
+                                  title="Delete"
+                                >
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
+
+                  {/* Menu Form Modal */}
+                  <MenuFormModal
+                    isOpen={showMenuModal}
+                    onClose={() => { setShowMenuModal(false); setEditingItem(null); }}
+                    onSave={fetchData}
+                    editItem={editingItem}
+                  />
+
+                  {/* Delete Confirmation */}
+                  {deletingItem && createPortal(
+                    <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
+                      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setDeletingItem(null)} />
+                      <div className="relative glass-card p-6 max-w-sm mx-4 text-center animate-scale-in">
+                        <span className="text-4xl mb-4 block">🗑️</span>
+                        <h3 className="text-lg font-bold text-(--text-primary) mb-2">Delete {deletingItem.name}?</h3>
+                        <p className="text-sm text-(--text-muted) mb-6">This action cannot be undone. The item will be permanently removed.</p>
+                        <div className="flex gap-3">
+                          <button onClick={() => setDeletingItem(null)} className="flex-1 btn-secondary py-2.5">
+                            Cancel
+                          </button>
+                          <button onClick={() => handleDelete(deletingItem)} className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-semibold hover:bg-red-600 transition-all">
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>,
+                    document.body
+                  )}
                 </div>
               )}
 
