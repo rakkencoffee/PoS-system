@@ -1,0 +1,295 @@
+'use client';
+
+import { useEffect, useState, useCallback } from 'react';
+
+interface OrderData {
+  id: number;
+  queueNumber: number;
+  status: string;
+  totalAmount: number;
+  paymentMethod: string;
+  createdAt: string;
+  items: {
+    id: number;
+    menuItem: { name: string };
+    quantity: number;
+    size: string;
+    sugarLevel: number;
+    iceLevel: string;
+    extraShot: boolean;
+    notes: string;
+    toppings: { topping: { name: string } }[];
+  }[];
+}
+
+export default function KitchenPage() {
+  const [orders, setOrders] = useState<OrderData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState<number | null>(null);
+
+  const fetchOrders = useCallback(async () => {
+    try {
+      const res = await fetch('/api/orders?today=true');
+      const data = await res.json();
+      setOrders(data.filter((o: OrderData) => o.status !== 'COMPLETED'));
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
+
+  // Listen for SSE updates
+  useEffect(() => {
+    const eventSource = new EventSource('/api/orders/stream');
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'ORDER_CREATED') {
+          setOrders((prev) => [data.order, ...prev]);
+        } else if (data.type === 'ORDER_UPDATED') {
+          if (data.order.status === 'COMPLETED') {
+            setOrders((prev) => prev.filter((o) => o.id !== data.order.id));
+          } else {
+            setOrders((prev) =>
+              prev.map((o) => (o.id === data.order.id ? data.order : o))
+            );
+          }
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    };
+
+    return () => eventSource.close();
+  }, []);
+
+  const updateOrderStatus = async (orderId: number, newStatus: string) => {
+    setUpdating(orderId);
+    try {
+      await fetch(`/api/orders/${orderId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+    } catch (error) {
+      console.error('Error updating order:', error);
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  const statusColors: Record<string, string> = {
+    PENDING: 'from-yellow-500 to-amber-500',
+    PREPARING: 'from-blue-500 to-cyan-500',
+    READY: 'from-green-500 to-emerald-500',
+  };
+
+  const statusBg: Record<string, string> = {
+    PENDING: 'border-yellow-500/30 bg-yellow-500/5',
+    PREPARING: 'border-blue-500/30 bg-blue-500/5',
+    READY: 'border-green-500/30 bg-green-500/5',
+  };
+
+  const pendingOrders = orders.filter((o) => o.status === 'PENDING');
+  const preparingOrders = orders.filter((o) => o.status === 'PREPARING');
+  const readyOrders = orders.filter((o) => o.status === 'READY');
+
+  const formatTime = (dateStr: string) => {
+    return new Date(dateStr).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-coffee-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-[var(--text-muted)]">Loading orders...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const renderOrderCard = (order: OrderData) => (
+    <div
+      key={order.id}
+      className={`rounded-2xl border-2 p-5 transition-all animate-fade-in ${statusBg[order.status] || ''}`}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <span className={`text-3xl font-black bg-gradient-to-r ${statusColors[order.status]} bg-clip-text text-transparent`}>
+            #{order.queueNumber}
+          </span>
+          <div>
+            <span className={`badge text-[10px] ${
+              order.status === 'PENDING' ? 'badge-status-pending' :
+              order.status === 'PREPARING' ? 'badge-status-preparing' :
+              'badge-status-ready'
+            }`}>
+              {order.status}
+            </span>
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">{formatTime(order.createdAt)}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Items */}
+      <div className="space-y-2 mb-4">
+        {order.items.map((item) => (
+          <div key={item.id} className="bg-black/20 rounded-xl p-3">
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-[var(--text-primary)] text-sm">
+                {item.quantity}x {item.menuItem.name}
+              </span>
+              <span className="text-xs text-[var(--text-muted)] bg-coffee-800/50 px-2 py-0.5 rounded-full">
+                {item.size}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1 mt-1.5">
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-coffee-800/50 text-coffee-300">
+                Sugar {item.sugarLevel}%
+              </span>
+              {item.iceLevel !== 'none' && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-coffee-800/50 text-coffee-300">
+                  Ice: {item.iceLevel}
+                </span>
+              )}
+              {item.extraShot && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-900/50 text-amber-300">
+                  +Shot
+                </span>
+              )}
+              {item.toppings.map((t, i) => (
+                <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-coffee-800/50 text-coffee-300">
+                  {t.topping.name}
+                </span>
+              ))}
+            </div>
+            {item.notes && (
+              <p className="text-[10px] text-amber-400 mt-1">📝 {item.notes}</p>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-2">
+        {order.status === 'PENDING' && (
+          <button
+            onClick={() => updateOrderStatus(order.id, 'PREPARING')}
+            disabled={updating === order.id}
+            className="flex-1 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-semibold text-sm transition-all hover:shadow-lg hover:shadow-blue-500/25 active:scale-95 disabled:opacity-50"
+          >
+            {updating === order.id ? '...' : '👨‍🍳 Start Making'}
+          </button>
+        )}
+        {order.status === 'PREPARING' && (
+          <button
+            onClick={() => updateOrderStatus(order.id, 'READY')}
+            disabled={updating === order.id}
+            className="flex-1 py-3 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 text-white font-semibold text-sm transition-all hover:shadow-lg hover:shadow-green-500/25 active:scale-95 disabled:opacity-50"
+          >
+            {updating === order.id ? '...' : '✅ Mark Ready'}
+          </button>
+        )}
+        {order.status === 'READY' && (
+          <button
+            onClick={() => updateOrderStatus(order.id, 'COMPLETED')}
+            disabled={updating === order.id}
+            className="flex-1 py-3 rounded-xl bg-gradient-to-r from-gray-500 to-gray-600 text-white font-semibold text-sm transition-all hover:shadow-lg active:scale-95 disabled:opacity-50"
+          >
+            {updating === order.id ? '...' : '🎉 Complete'}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen p-6">
+      {/* Header */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gradient">Kitchen Display</h1>
+            <p className="text-[var(--text-muted)] text-sm mt-1">
+              {orders.length} active orders
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={fetchOrders}
+              className="btn-secondary flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Refresh
+            </button>
+            <div className="text-right">
+              <p className="text-xl font-semibold text-[var(--text-primary)]">
+                {new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 3-column layout */}
+      {orders.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20">
+          <span className="text-7xl mb-6">🍵</span>
+          <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-2">No Active Orders</h2>
+          <p className="text-[var(--text-muted)]">Waiting for new orders...</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Pending */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-3 h-3 rounded-full bg-yellow-500 animate-pulse" />
+              <h2 className="text-lg font-semibold text-yellow-400">
+                Pending ({pendingOrders.length})
+              </h2>
+            </div>
+            <div className="space-y-4">
+              {pendingOrders.map(renderOrderCard)}
+            </div>
+          </div>
+
+          {/* Preparing */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-3 h-3 rounded-full bg-blue-500 animate-pulse" />
+              <h2 className="text-lg font-semibold text-blue-400">
+                Preparing ({preparingOrders.length})
+              </h2>
+            </div>
+            <div className="space-y-4">
+              {preparingOrders.map(renderOrderCard)}
+            </div>
+          </div>
+
+          {/* Ready */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
+              <h2 className="text-lg font-semibold text-green-400">
+                Ready ({readyOrders.length})
+              </h2>
+            </div>
+            <div className="space-y-4">
+              {readyOrders.map(renderOrderCard)}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
