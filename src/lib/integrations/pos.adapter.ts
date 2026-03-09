@@ -286,7 +286,7 @@ export async function createOrder(
 
   // Calculate total
   let totalAmount = 0;
-  const orderItems: { menuItemId: number; quantity: number; size: string | null; price: number; notes: string }[] = [];
+  const orderItems: { menuItemId: number; quantity: number; size: string; subtotal: number; notes: string }[] = [];
   for (const item of items) {
     const menuItem = await prisma.menuItem.findUnique({
       where: { id: parseInt(item.productId) },
@@ -300,12 +300,13 @@ export async function createOrder(
       if (size) price += size.priceAdjustment;
     }
 
-    totalAmount += price * item.quantity;
+    const subtotal = price * item.quantity;
+    totalAmount += subtotal;
     orderItems.push({
       menuItemId: menuItem.id,
       quantity: item.quantity,
-      size: item.variantId || null,
-      price,
+      size: item.variantId || 'M',
+      subtotal,
       notes: item.note || '',
     });
   }

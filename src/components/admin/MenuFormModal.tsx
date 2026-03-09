@@ -12,6 +12,7 @@ interface Category {
 interface SizeInput {
   size: string;
   priceAdjustment: number;
+  enabled: boolean;
 }
 
 interface MenuFormData {
@@ -44,6 +45,15 @@ interface MenuFormModalProps {
   } | null;
 }
 
+// Food categories that don't need type/size options
+const FOOD_SLUGS = ['dessert', 'snack', 'main-course'];
+
+const defaultDrinkSizes: SizeInput[] = [
+  { size: 'Hot', priceAdjustment: 0, enabled: true },
+  { size: 'Ice', priceAdjustment: 2000, enabled: true },
+  { size: 'Upsize', priceAdjustment: 5000, enabled: true },
+];
+
 const defaultForm: MenuFormData = {
   name: '',
   description: '',
@@ -53,11 +63,7 @@ const defaultForm: MenuFormData = {
   isAvailable: true,
   isBestSeller: false,
   isRecommended: false,
-  sizes: [
-    { size: 'S', priceAdjustment: -5000 },
-    { size: 'M', priceAdjustment: 0 },
-    { size: 'L', priceAdjustment: 5000 },
-  ],
+  sizes: defaultDrinkSizes.map((s) => ({ ...s })),
 };
 
 export default function MenuFormModal({ isOpen, onClose, onSave, editItem }: MenuFormModalProps) {
@@ -75,6 +81,15 @@ export default function MenuFormModal({ isOpen, onClose, onSave, editItem }: Men
 
   useEffect(() => {
     if (editItem) {
+      // Build sizes: merge with defaults so all 3 are always shown
+      const existingSizes = editItem.sizes || [];
+      const sizes = defaultDrinkSizes.map((def) => {
+        const existing = existingSizes.find((s) => s.size === def.size);
+        return existing
+          ? { size: existing.size, priceAdjustment: existing.priceAdjustment, enabled: true }
+          : { ...def, enabled: false };
+      });
+
       setForm({
         name: editItem.name,
         description: editItem.description,
@@ -84,14 +99,17 @@ export default function MenuFormModal({ isOpen, onClose, onSave, editItem }: Men
         isAvailable: editItem.isAvailable,
         isBestSeller: editItem.isBestSeller,
         isRecommended: editItem.isRecommended,
-        sizes: editItem.sizes?.length
-          ? editItem.sizes.map((s) => ({ size: s.size, priceAdjustment: s.priceAdjustment }))
-          : defaultForm.sizes,
+        sizes,
       });
     } else {
       setForm(defaultForm);
     }
   }, [editItem, isOpen]);
+
+  // Determine if selected category is food
+  // Note: categories API may return string IDs, form.categoryId is number — compare as strings
+  const selectedCategory = categories.find((c) => String(c.id) === String(form.categoryId));
+  const isFood = selectedCategory ? FOOD_SLUGS.includes(selectedCategory.slug) : false;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,10 +125,17 @@ export default function MenuFormModal({ isOpen, onClose, onSave, editItem }: Men
       const url = editItem ? `/api/menu/${editItem.id}` : '/api/menu';
       const method = editItem ? 'PUT' : 'POST';
 
+      // For food items: no type, no sizes
+      const payload = {
+        ...form,
+        type: isFood ? 'none' : form.type,
+        sizes: isFood ? [] : form.sizes.filter((s) => s.enabled).map(({ size, priceAdjustment }) => ({ size, priceAdjustment })),
+      };
+
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) throw new Error('Failed to save');
@@ -124,10 +149,17 @@ export default function MenuFormModal({ isOpen, onClose, onSave, editItem }: Men
     }
   };
 
-  const updateSize = (index: number, field: keyof SizeInput, value: string | number) => {
+  const toggleSize = (index: number) => {
     setForm((prev) => ({
       ...prev,
-      sizes: prev.sizes.map((s, i) => (i === index ? { ...s, [field]: value } : s)),
+      sizes: prev.sizes.map((s, i) => (i === index ? { ...s, enabled: !s.enabled } : s)),
+    }));
+  };
+
+  const updateSizePrice = (index: number, value: number) => {
+    setForm((prev) => ({
+      ...prev,
+      sizes: prev.sizes.map((s, i) => (i === index ? { ...s, priceAdjustment: value } : s)),
     }));
   };
 
@@ -196,45 +228,83 @@ export default function MenuFormModal({ isOpen, onClose, onSave, editItem }: Men
             </div>
           </div>
 
-          {/* Type */}
-          <div>
-            <label className="block text-sm text-(--text-secondary) mb-1">Type</label>
-            <div className="flex gap-2">
-              {['hot', 'iced', 'both'].map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setForm({ ...form, type: t })}
-                  className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all ${
-                    form.type === t
-                      ? 'bg-linear-to-r from-[#c41525] to-[#A8131E] text-white'
-                      : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle)'
-                  }`}
-                >
-                  {t === 'hot' ? '🔥 Hot' : t === 'iced' ? '🧊 Iced' : '☕ Both'}
-                </button>
-              ))}
+          {/* Type (drinks only) */}
+          {!isFood && (
+            <div>
+              <label className="block text-sm text-(--text-secondary) mb-1">Type</label>
+              <div className="flex gap-2">
+                {['hot', 'iced', 'both'].map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setForm({ ...form, type: t })}
+                    className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all ${
+                      form.type === t
+                        ? 'bg-linear-to-r from-[#c41525] to-[#A8131E] text-white'
+                        : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle)'
+                    }`}
+                  >
+                    {t === 'hot' ? '🔥 Hot' : t === 'iced' ? '🧊 Iced' : '☕ Both'}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Sizes */}
-          <div>
-            <label className="block text-sm text-(--text-secondary) mb-2">Size Pricing</label>
-            <div className="grid grid-cols-3 gap-3">
-              {form.sizes.map((size, i) => (
-                <div key={size.size} className="bg-(--bg-card) border border-(--border-subtle) rounded-xl p-3 text-center">
-                  <span className="text-lg font-bold text-(--text-primary)">{size.size}</span>
-                  <input
-                    type="number"
-                    value={size.priceAdjustment}
-                    onChange={(e) => updateSize(i, 'priceAdjustment', Number(e.target.value))}
-                    className="w-full mt-2 px-2 py-1.5 rounded-lg bg-black/20 border border-(--border-subtle) text-(--text-primary) text-center text-sm focus:outline-none"
-                  />
-                  <span className="text-[10px] text-(--text-muted) mt-1 block">adjustment (Rp)</span>
-                </div>
-              ))}
+          {/* Variant Pricing (drinks only: Hot / Ice / Upsize) */}
+          {!isFood && (
+            <div>
+              <label className="block text-sm text-(--text-secondary) mb-2">Variant Pricing (Hot / Ice / Upsize)</label>
+              <div className="grid grid-cols-3 gap-3">
+                {form.sizes.map((size, i) => (
+                  <div key={size.size} className={`rounded-xl p-3 text-center transition-all ${
+                    size.enabled
+                      ? 'bg-(--bg-card) border border-(--border-subtle)'
+                      : 'bg-(--bg-card)/30 border border-transparent opacity-50'
+                  }`}>
+                    <button
+                      type="button"
+                      onClick={() => toggleSize(i)}
+                      className={`w-full text-lg font-bold mb-1 ${
+                        size.enabled ? 'text-(--text-primary)' : 'text-(--text-muted)'
+                      }`}
+                    >
+                      {size.size === 'Hot' ? '🔥' : size.size === 'Ice' ? '🧊' : '⬆️'} {size.size}
+                    </button>
+                    <div className={`flex items-center gap-1 justify-center mb-1 ${!size.enabled ? 'pointer-events-none' : ''}`}>
+                      <input
+                        type="checkbox"
+                        checked={size.enabled}
+                        onChange={() => toggleSize(i)}
+                        className="accent-[#A8131E]"
+                      />
+                      <span className="text-xs text-(--text-muted)">Active</span>
+                    </div>
+                    {size.enabled && (
+                      <>
+                        <input
+                          type="number"
+                          value={size.priceAdjustment}
+                          onChange={(e) => updateSizePrice(i, Number(e.target.value))}
+                          className="w-full mt-1 px-2 py-1.5 rounded-lg bg-black/20 border border-(--border-subtle) text-(--text-primary) text-center text-sm focus:outline-none"
+                        />
+                        <span className="text-[10px] text-(--text-muted) mt-1 block">adjustment (Rp)</span>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Info for food categories */}
+          {isFood && (
+            <div className="bg-(--bg-card) border border-(--border-subtle) rounded-xl p-3 text-center">
+              <p className="text-sm text-(--text-muted)">
+                🍽️ Food items don&apos;t have type or size variants
+              </p>
+            </div>
+          )}
 
           {/* Toggles */}
           <div className="grid grid-cols-3 gap-3">

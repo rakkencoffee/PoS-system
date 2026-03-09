@@ -356,7 +356,7 @@ export default function AdminDashboard() {
                           <th className="text-left p-4 text-sm text-(--text-muted) font-medium">Item</th>
                           <th className="text-left p-4 text-sm text-(--text-muted) font-medium">Category</th>
                           <th className="text-left p-4 text-sm text-(--text-muted) font-medium">Price</th>
-                          <th className="text-left p-4 text-sm text-(--text-muted) font-medium">Tags</th>
+                          <th className="text-left p-4 text-sm text-(--text-muted) font-medium">Tags / Variants</th>
                           <th className="text-center p-4 text-sm text-(--text-muted) font-medium">Available</th>
                           <th className="text-center p-4 text-sm text-(--text-muted) font-medium">Actions</th>
                         </tr>
@@ -385,9 +385,20 @@ export default function AdminDashboard() {
                               <div className="flex gap-1 flex-wrap">
                                 {item.isBestSeller && <span className="badge badge-best-seller text-[10px]">Best Seller</span>}
                                 {item.isRecommended && <span className="badge badge-recommended text-[10px]">Recommended</span>}
-                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/70">
-                                  {item.type === 'hot' ? '🔥' : item.type === 'iced' ? '🧊' : '☕'} {item.type}
-                                </span>
+                                {item.type !== 'none' && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/70">
+                                    {item.type === 'hot' ? '🔥' : item.type === 'iced' ? '🧊' : '☕'} {item.type}
+                                  </span>
+                                )}
+                                {item.sizes && item.sizes.length > 0 && (
+                                  <div className="flex gap-0.5">
+                                    {item.sizes.map((s: { size: string; priceAdjustment: number }) => (
+                                      <span key={s.size} className="text-[10px] px-1.5 py-0.5 rounded bg-[#A8131E]/20 text-[#ff6b6b]">
+                                        {s.size === 'Hot' ? '🔥' : s.size === 'Ice' ? '🧊' : '⬆️'}{s.size}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             </td>
                             <td className="p-4 text-center">

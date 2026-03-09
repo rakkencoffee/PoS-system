@@ -24,6 +24,8 @@ interface CustomizeModalProps {
     image: string;
     type: string;
     sizes: MenuItemSize[];
+    category?: { name: string; slug: string };
+    categorySlug?: string;
   };
   onClose: () => void;
 }
@@ -37,27 +39,45 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
+// Categories that show Optional Choice
+const OPTIONAL_CHOICE_CATEGORIES = ['coffee-based', 'milk-based'];
+
 export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
   const { addItem } = useCart();
-  const [toppings, setToppings] = useState<Topping[]>([]);
-  const [selectedSize, setSelectedSize] = useState('M');
+  const [optionalChoices, setOptionalChoices] = useState<Topping[]>([]);
+  const [selectedSize, setSelectedSize] = useState('');
   const [sugarLevel, setSugarLevel] = useState(100);
   const [iceLevel, setIceLevel] = useState('normal');
-  const [extraShot, setExtraShot] = useState(false);
-  const [selectedToppings, setSelectedToppings] = useState<Topping[]>([]);
+  const [selectedChoices, setSelectedChoices] = useState<Topping[]>([]);
   const [quantity, setQuantity] = useState(1);
 
+  const slug = item.category?.slug || item.categorySlug || '';
+  const FOOD_CATEGORIES = ['dessert', 'snack', 'main-course'];
+  const isFood = slug ? FOOD_CATEGORIES.includes(slug) : item.type === 'none';
+  const hasSizes = item.sizes.length > 0;
+  const isDrink = !isFood;
+  const showOptionalChoice = OPTIONAL_CHOICE_CATEGORIES.includes(slug);
+
   useEffect(() => {
-    fetch('/api/toppings')
-      .then((res) => res.json())
-      .then(setToppings)
-      .catch(console.error);
-  }, []);
+    if (showOptionalChoice) {
+      fetch('/api/toppings')
+        .then((res) => res.json())
+        .then(setOptionalChoices)
+        .catch(console.error);
+    }
+  }, [showOptionalChoice]);
+
+  // Set default selected size
+  useEffect(() => {
+    if (item.sizes.length > 0) {
+      // Default to first available size
+      setSelectedSize(item.sizes[0].size);
+    }
+  }, [item.sizes]);
 
   const sizeAdjustment = item.sizes.find((s) => s.size === selectedSize)?.priceAdjustment || 0;
-  const toppingsTotal = selectedToppings.reduce((sum, t) => sum + t.price, 0);
-  const extraShotPrice = extraShot ? 8000 : 0;
-  const unitPrice = item.price + sizeAdjustment + toppingsTotal + extraShotPrice;
+  const choicesTotal = selectedChoices.reduce((sum, t) => sum + t.price, 0);
+  const unitPrice = item.price + sizeAdjustment + choicesTotal;
   const totalPrice = unitPrice * quantity;
 
   const sugarLevels = [0, 25, 50, 75, 100];
@@ -68,11 +88,11 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
     { key: 'more', label: 'Extra', icon: '🧊🧊🧊' },
   ];
 
-  const toggleTopping = (topping: Topping) => {
-    setSelectedToppings((prev) =>
-      prev.find((t) => t.id === topping.id)
-        ? prev.filter((t) => t.id !== topping.id)
-        : [...prev, topping]
+  const toggleChoice = (choice: Topping) => {
+    setSelectedChoices((prev) =>
+      prev.find((t) => t.id === choice.id)
+        ? prev.filter((t) => t.id !== choice.id)
+        : [...prev, choice]
     );
   };
 
@@ -84,18 +104,27 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
       price: item.price,
       image: item.image,
       quantity,
-      size: selectedSize,
-      sugarLevel,
-      iceLevel,
-      extraShot,
-      toppings: selectedToppings.map((t) => ({ id: t.id, name: t.name, price: t.price })),
+      size: selectedSize || '-',
+      sugarLevel: isDrink ? sugarLevel : 100,
+      iceLevel: isDrink ? iceLevel : 'none',
+      extraShot: false,
+      toppings: selectedChoices.map((t) => ({ id: t.id, name: t.name, price: t.price })),
       subtotal: totalPrice,
     });
     onClose();
   };
 
-  const hasSizes = item.sizes.length > 0;
-  const showIceOption = item.type === 'iced' || item.type === 'both';
+  const showIceOption = isDrink && (item.type === 'iced' || item.type === 'both');
+
+  // Size label mapping
+  const sizeLabel = (size: string) => {
+    switch (size) {
+      case 'Hot': return '🔥 Hot';
+      case 'Ice': return '🧊 Ice';
+      case 'Upsize': return '⬆️ Upsize';
+      default: return size;
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-100 flex items-end md:items-center justify-center">
@@ -123,11 +152,13 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
         </div>
 
         <div className="p-5 space-y-6">
-          {/* Size Selection */}
+          {/* Size Selection (Hot / Ice / Upsize for drinks) */}
           {hasSizes && (
             <div>
-              <h3 className="text-sm font-semibold text-(--text-secondary) uppercase tracking-wider mb-3">Size</h3>
-              <div className="grid grid-cols-3 gap-3">
+              <h3 className="text-sm font-semibold text-(--text-secondary) uppercase tracking-wider mb-3">
+                {isDrink ? 'Variant' : 'Size'}
+              </h3>
+              <div className={`grid gap-3 ${item.sizes.length <= 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
                 {item.sizes.map((size) => (
                   <button
                     key={size.size}
@@ -138,7 +169,7 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
                         : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle) hover:border-(--border-default)'
                     }`}
                   >
-                    <span className="block text-lg font-bold">{size.size}</span>
+                    <span className="block text-lg font-bold">{sizeLabel(size.size)}</span>
                     <span className="block text-xs mt-1 opacity-80">
                       {size.priceAdjustment === 0
                         ? 'Base'
@@ -150,29 +181,31 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
             </div>
           )}
 
-          {/* Sugar Level */}
-          <div>
-            <h3 className="text-sm font-semibold text-(--text-secondary) uppercase tracking-wider mb-3">
-              Sugar Level — {sugarLevel}%
-            </h3>
-            <div className="flex gap-2">
-              {sugarLevels.map((level) => (
-                <button
-                  key={level}
-                  onClick={() => setSugarLevel(level)}
-                  className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                    sugarLevel === level
-                      ? 'bg-linear-to-r from-[#c41525] to-[#A8131E] text-white shadow-lg'
-                      : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle)'
-                  }`}
-                >
-                  {level}%
-                </button>
-              ))}
+          {/* Sugar Level (drinks only) */}
+          {isDrink && (
+            <div>
+              <h3 className="text-sm font-semibold text-(--text-secondary) uppercase tracking-wider mb-3">
+                Sugar Level — {sugarLevel}%
+              </h3>
+              <div className="flex gap-2">
+                {sugarLevels.map((level) => (
+                  <button
+                    key={level}
+                    onClick={() => setSugarLevel(level)}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                      sugarLevel === level
+                        ? 'bg-linear-to-r from-[#c41525] to-[#A8131E] text-white shadow-lg'
+                        : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle)'
+                    }`}
+                  >
+                    {level}%
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Ice Level */}
+          {/* Ice Level (drinks only, if applicable) */}
           {showIceOption && (
             <div>
               <h3 className="text-sm font-semibold text-(--text-secondary) uppercase tracking-wider mb-3">Ice Level</h3>
@@ -195,55 +228,32 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
             </div>
           )}
 
-          {/* Extra Shot */}
-          <div>
-            <button
-              onClick={() => setExtraShot(!extraShot)}
-              className={`w-full flex items-center justify-between p-4 rounded-xl transition-all ${
-                extraShot
-                  ? 'bg-linear-to-r from-[#A8131E]/20 to-[#8B0F19]/20 border border-[#A8131E]/50'
-                  : 'bg-(--bg-card) border border-(--border-subtle)'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">💪</span>
-                <div className="text-left">
-                  <span className="font-medium text-(--text-primary) block">Extra Shot</span>
-                  <span className="text-xs text-(--text-muted)">Double the caffeine</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-(--text-secondary)">+{formatCurrency(8000)}</span>
-                <div className={`w-12 h-7 rounded-full transition-all flex items-center px-1 ${
-                  extraShot ? 'bg-[#A8131E]' : 'bg-white/10'
-                }`}>
-                  <div className={`w-5 h-5 rounded-full bg-white transition-transform ${
-                    extraShot ? 'translate-x-5' : 'translate-x-0'
-                  }`} />
-                </div>
-              </div>
-            </button>
-          </div>
-
-          {/* Toppings */}
-          {toppings.length > 0 && (
+          {/* Optional Choice (Coffee & Milk Based only) */}
+          {showOptionalChoice && optionalChoices.length > 0 && (
             <div>
-              <h3 className="text-sm font-semibold text-(--text-secondary) uppercase tracking-wider mb-3">Toppings</h3>
-              <div className="grid grid-cols-2 gap-2">
-                {toppings.map((topping) => {
-                  const isSelected = selectedToppings.find((t) => t.id === topping.id);
+              <h3 className="text-sm font-semibold text-(--text-secondary) uppercase tracking-wider mb-3">Optional Choice</h3>
+              <div className="space-y-2">
+                {optionalChoices.map((choice) => {
+                  const isSelected = selectedChoices.find((t) => t.id === choice.id);
                   return (
                     <button
-                      key={topping.id}
-                      onClick={() => toggleTopping(topping)}
-                      className={`flex items-center justify-between p-3 rounded-xl transition-all ${
+                      key={choice.id}
+                      onClick={() => toggleChoice(choice)}
+                      className={`w-full flex items-center justify-between p-3.5 rounded-xl transition-all ${
                         isSelected
                           ? 'bg-linear-to-r from-[#A8131E]/20 to-[#8B0F19]/20 border border-[#A8131E]/50'
                           : 'bg-(--bg-card) border border-(--border-subtle)'
                       }`}
                     >
-                      <span className="text-sm text-(--text-primary) font-medium">{topping.name}</span>
-                      <span className="text-xs text-(--text-muted)">+{formatCurrency(topping.price)}</span>
+                      <div className="flex items-center gap-3">
+                        <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
+                          isSelected ? 'bg-[#A8131E] border-[#A8131E]' : 'border-white/30'
+                        }`}>
+                          {isSelected && <span className="text-white text-xs">✓</span>}
+                        </div>
+                        <span className="text-sm text-(--text-primary) font-medium">{choice.name}</span>
+                      </div>
+                      <span className="text-xs text-(--text-muted)">+{formatCurrency(choice.price)}</span>
                     </button>
                   );
                 })}
