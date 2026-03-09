@@ -296,7 +296,7 @@ export async function createOrder(
 
     let price = menuItem.price;
     if (item.variantId) {
-      const size = menuItem.sizes.find((s) => s.size === item.variantId);
+      const size = menuItem.sizes.find((s: { size: string; priceAdjustment: number }) => s.size === item.variantId);
       if (size) price += size.priceAdjustment;
     }
 
