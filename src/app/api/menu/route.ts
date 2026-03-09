@@ -20,7 +20,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(items);
   } catch (error) {
     console.error('Error fetching menu items:', error);
-    return NextResponse.json({ error: 'Failed to fetch menu items' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: 'Failed to fetch menu items', details: message }, { status: 500 });
   }
 }
 
