@@ -19,10 +19,10 @@ export default function WelcomePage() {
     >
       {/* Time display */}
       <div className="absolute top-8 right-8 text-right animate-fade-in">
-        <p className="text-4xl font-light text-coffee-200 tracking-wider">
+        <p className="text-4xl font-light text-white tracking-wider">
           {time.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
         </p>
-        <p className="text-sm text-coffee-400 mt-1">
+        <p className="text-sm text-white/60 mt-1">
           {time.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
         </p>
       </div>
@@ -33,7 +33,7 @@ export default function WelcomePage() {
         <div className="mb-8 animate-float">
           <div className="relative inline-block">
             <span className="text-8xl drop-shadow-2xl" role="img" aria-label="coffee">☕</span>
-            <div className="absolute -inset-4 rounded-full bg-amber-500/10 blur-2xl animate-pulse-glow" />
+            <div className="absolute -inset-4 rounded-full bg-red-500/15 blur-2xl animate-pulse-glow" />
           </div>
         </div>
 
@@ -41,10 +41,10 @@ export default function WelcomePage() {
         <h1 className="text-5xl md:text-6xl font-bold mb-4 animate-fade-in-up">
           <span className="text-gradient">StartFriday</span>
           <br />
-          <span className="text-coffee-200 font-light text-3xl md:text-4xl">Coffee</span>
+          <span className="text-white/90 font-light text-3xl md:text-4xl">Coffee</span>
         </h1>
 
-        <p className="text-coffee-400 text-lg mb-12 animate-fade-in delay-2">
+        <p className="text-white/60 text-lg mb-12 animate-fade-in delay-2">
           Freshly brewed, just for you
         </p>
 
@@ -54,7 +54,7 @@ export default function WelcomePage() {
             <button className="btn-primary text-xl px-16 py-5 rounded-2xl animate-pulse-glow">
               Tap to Order
             </button>
-            <span className="text-coffee-500 text-sm tracking-widest uppercase">
+            <span className="text-white/40 text-sm tracking-widest uppercase">
               Touch anywhere to start
             </span>
           </div>
@@ -62,10 +62,10 @@ export default function WelcomePage() {
       </div>
 
       {/* Bottom decoration */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-3 text-coffee-600 text-sm animate-fade-in delay-5">
-        <div className="w-8 h-px bg-coffee-700" />
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-3 text-white/40 text-sm animate-fade-in delay-5">
+        <div className="w-8 h-px bg-white/30" />
         <span>Self-Service Kiosk</span>
-        <div className="w-8 h-px bg-coffee-700" />
+        <div className="w-8 h-px bg-white/30" />
       </div>
     </div>
   );

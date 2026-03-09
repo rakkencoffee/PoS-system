@@ -1,8 +1,24 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
+
+declare global {
+  interface Window {
+    snap?: {
+      pay: (
+        token: string,
+        options: {
+          onSuccess?: (result: Record<string, unknown>) => void;
+          onPending?: (result: Record<string, unknown>) => void;
+          onError?: (result: Record<string, unknown>) => void;
+          onClose?: () => void;
+        }
+      ) => void;
+    };
+  }
+}
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('id-ID', {
@@ -13,19 +29,12 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-const paymentMethods = [
-  { key: 'QRIS', label: 'QRIS', icon: '📱', desc: 'Scan QR code to pay' },
-  { key: 'E-Wallet', label: 'E-Wallet', icon: '💳', desc: 'GoPay, OVO, DANA, etc.' },
-  { key: 'Debit/Credit', label: 'Debit / Credit', icon: '💲', desc: 'Tap or insert your card' },
-  { key: 'Cash', label: 'Cash', icon: '💵', desc: 'Pay at the counter' },
-];
-
 export default function CheckoutPage() {
   const router = useRouter();
   const { cart, clearCart, itemCount } = useCart();
-  const [selectedPayment, setSelectedPayment] = useState('QRIS');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [showPaymentSim, setShowPaymentSim] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState<string>('');
+  const [snapLoaded, setSnapLoaded] = useState(false);
   const checkoutInProgress = useRef(false);
 
   useEffect(() => {
@@ -34,44 +43,105 @@ export default function CheckoutPage() {
     }
   }, [itemCount, router]);
 
+  // Load Midtrans Snap.js dynamically
+  const loadSnapScript = useCallback(async () => {
+    if (window.snap) {
+      setSnapLoaded(true);
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/payment/config');
+      const config = await res.json();
+
+      const script = document.createElement('script');
+      script.src = config.snapUrl;
+      script.setAttribute('data-client-key', config.clientKey);
+      script.onload = () => setSnapLoaded(true);
+      script.onerror = () => console.error('Failed to load Midtrans Snap');
+      document.head.appendChild(script);
+    } catch (error) {
+      console.error('Error loading payment config:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSnapScript();
+  }, [loadSnapScript]);
+
   const handleCheckout = async () => {
     checkoutInProgress.current = true;
-    setShowPaymentSim(true);
+    setIsProcessing(true);
+    setPaymentStatus('Creating payment...');
 
-    // Simulate payment processing
-    setTimeout(async () => {
-      setIsProcessing(true);
+    try {
+      // 1. Create payment (order in POS + Midtrans Snap token)
+      const res = await fetch('/api/payment/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: cart.items.map((item) => ({
+            productId: String(item.menuItemId),
+            name: item.name,
+            price: item.subtotal / item.quantity,
+            quantity: item.quantity,
+            variantId: item.size,
+            note: [
+              item.sugarLevel && `Sugar: ${item.sugarLevel}`,
+              item.iceLevel && `Ice: ${item.iceLevel}`,
+              item.extraShot && 'Extra Shot',
+              item.toppings.length && `Toppings: ${item.toppings.map((t) => t.name).join(', ')}`,
+            ]
+              .filter(Boolean)
+              .join('; '),
+          })),
+          totalAmount: cart.totalAmount,
+        }),
+      });
 
-      try {
-        const res = await fetch('/api/orders', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            totalAmount: cart.totalAmount,
-            paymentMethod: selectedPayment,
-            items: cart.items.map((item) => ({
-              menuItemId: item.menuItemId,
-              quantity: item.quantity,
-              size: item.size,
-              sugarLevel: item.sugarLevel,
-              iceLevel: item.iceLevel,
-              extraShot: item.extraShot,
-              subtotal: item.subtotal,
-              toppingIds: item.toppings.map((t) => t.id),
-            })),
-          }),
+      if (!res.ok) throw new Error('Failed to create payment');
+
+      const { snapToken, orderId } = await res.json();
+
+      setPaymentStatus('Opening payment...');
+
+      // 2. Open Midtrans Snap popup
+      if (window.snap) {
+        window.snap.pay(snapToken, {
+          onSuccess: () => {
+            setPaymentStatus('Payment successful!');
+            clearCart();
+            router.push(`/success?orderId=${orderId}`);
+          },
+          onPending: () => {
+            setPaymentStatus('Waiting for payment...');
+            clearCart();
+            router.push(`/status?orderId=${orderId}&status=pending`);
+          },
+          onError: () => {
+            setPaymentStatus('');
+            setIsProcessing(false);
+            checkoutInProgress.current = false;
+            alert('Payment failed. Please try again.');
+          },
+          onClose: () => {
+            setPaymentStatus('');
+            setIsProcessing(false);
+            checkoutInProgress.current = false;
+          },
         });
-
-        const order = await res.json();
-        clearCart();
-        router.push(`/success?orderId=${order.id}&queue=${order.queueNumber}`);
-      } catch (error) {
-        console.error('Checkout error:', error);
-        setIsProcessing(false);
-        setShowPaymentSim(false);
-        alert('Payment failed. Please try again.');
+      } else {
+        // Fallback: redirect to Midtrans payment page
+        const { redirectUrl } = await res.json();
+        window.location.href = redirectUrl;
       }
-    }, 2000);
+    } catch (error) {
+      console.error('Checkout error:', error);
+      setIsProcessing(false);
+      setPaymentStatus('');
+      checkoutInProgress.current = false;
+      alert('Failed to create payment. Please try again.');
+    }
   };
 
   return (
@@ -112,37 +182,23 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        {/* Payment Method */}
-        <div className="animate-fade-in delay-1" style={{ opacity: 0 }}>
-          <h2 className="text-lg font-semibold text-(--text-primary) mb-4">Payment Method</h2>
-          <div className="space-y-3">
-            {paymentMethods.map((method) => (
-              <button
-                key={method.key}
-                onClick={() => setSelectedPayment(method.key)}
-                className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-all ${
-                  selectedPayment === method.key
-                    ? 'bg-linear-to-r from-coffee-500/20 to-amber-600/20 border-2 border-coffee-500/60 shadow-lg shadow-coffee-500/10'
-                    : 'glass-card'
-                }`}
+        {/* Payment Info */}
+        <div className="glass-card p-5 animate-fade-in">
+          <div className="flex items-center gap-3 mb-4">
+            <span className="text-2xl">🔒</span>
+            <div>
+              <h2 className="text-lg font-semibold text-(--text-primary)">Secure Payment</h2>
+              <p className="text-sm text-(--text-muted)">Powered by Midtrans</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            {['QRIS', 'GoPay', 'ShopeePay', 'DANA', 'OVO', 'Virtual Account'].map((method) => (
+              <span
+                key={method}
+                className="px-3 py-1.5 rounded-xl bg-(--bg-card) text-xs text-(--text-secondary) border border-(--border-subtle)"
               >
-                <span className="text-3xl">{method.icon}</span>
-                <div className="text-left flex-1">
-                  <span className="font-semibold text-(--text-primary) block">{method.label}</span>
-                  <span className="text-xs text-(--text-muted)">{method.desc}</span>
-                </div>
-                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                  selectedPayment === method.key
-                    ? 'border-coffee-500 bg-coffee-500'
-                    : 'border-(--border-default)'
-                }`}>
-                  {selectedPayment === method.key && (
-                    <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </div>
-              </button>
+                {method}
+              </span>
             ))}
           </div>
         </div>
@@ -153,59 +209,25 @@ export default function CheckoutPage() {
         <div className="max-w-3xl mx-auto">
           <button
             onClick={handleCheckout}
-            disabled={isProcessing}
+            disabled={isProcessing || !snapLoaded}
             className="btn-primary w-full py-5 text-lg rounded-2xl flex items-center justify-center gap-3"
           >
             {isProcessing ? (
               <>
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Processing...
+                {paymentStatus || 'Processing...'}
+              </>
+            ) : !snapLoaded ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Loading payment...
               </>
             ) : (
-              <>
-                Pay {formatCurrency(cart.totalAmount)}
-              </>
+              <>Pay {formatCurrency(cart.totalAmount)}</>
             )}
           </button>
         </div>
       </div>
-
-      {/* Payment Simulation Modal */}
-      {showPaymentSim && (
-        <div className="fixed inset-0 z-100 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
-          <div className="relative glass-card p-8 text-center max-w-sm mx-4 animate-scale-in">
-            {isProcessing ? (
-              <>
-                <div className="w-16 h-16 border-4 border-coffee-500 border-t-transparent rounded-full animate-spin mx-auto mb-6" />
-                <h3 className="text-xl font-bold text-(--text-primary) mb-2">Processing Payment</h3>
-                <p className="text-(--text-muted)">Please wait...</p>
-              </>
-            ) : (
-              <>
-                <div className="text-6xl mb-6 animate-pulse-glow inline-block">
-                  {selectedPayment === 'QRIS' ? '📱' : selectedPayment === 'E-Wallet' ? '💳' : selectedPayment === 'Cash' ? '💵' : '💲'}
-                </div>
-                <h3 className="text-xl font-bold text-(--text-primary) mb-2">
-                  {selectedPayment === 'QRIS' ? 'Scan QR Code' : selectedPayment === 'Cash' ? 'Pay at Counter' : 'Tap Your Card'}
-                </h3>
-                <p className="text-(--text-muted) mb-4">Simulating payment...</p>
-                <div className="w-48 h-48 mx-auto bg-white rounded-2xl p-4 mb-4 flex items-center justify-center">
-                  <div className="grid grid-cols-5 gap-1">
-                    {[...Array(25)].map((_, i) => (
-                      <div
-                        key={i}
-                        className={`w-6 h-6 rounded-sm ${Math.random() > 0.3 ? 'bg-black' : 'bg-white'}`}
-                      />
-                    ))}
-                  </div>
-                </div>
-                <p className="text-2xl font-bold text-gradient">{formatCurrency(cart.totalAmount)}</p>
-              </>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

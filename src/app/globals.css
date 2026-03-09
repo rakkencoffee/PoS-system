@@ -1,25 +1,26 @@
 @import "tailwindcss";
 
-/* ===== COFFEE SHOP DESIGN SYSTEM ===== */
+/* ===== STARTFRIDAY BRAND DESIGN SYSTEM ===== */
+/* Primary Brand Color: #A8131E */
 
 :root {
-  /* Primary Coffee Palette */
-  --coffee-50: #fdf8f0;
-  --coffee-100: #f5ead6;
-  --coffee-200: #e8d5b0;
-  --coffee-300: #d4b480;
-  --coffee-400: #c49a5c;
-  --coffee-500: #a67c4a;
-  --coffee-600: #8b5e34;
-  --coffee-700: #6d4526;
-  --coffee-800: #4e3120;
-  --coffee-900: #2d1b10;
-  --coffee-950: #1a0f08;
+  /* Primary Brand Palette */
+  --brand-50: #fef2f2;
+  --brand-100: #fee2e2;
+  --brand-200: #fca5a5;
+  --brand-300: #f87171;
+  --brand-400: #dc2626;
+  --brand-500: #A8131E;
+  --brand-600: #8B0F19;
+  --brand-700: #6E0C14;
+  --brand-800: #520910;
+  --brand-900: #3B060B;
+  --brand-950: #250407;
 
-  /* Accent - Warm Amber */
-  --amber-400: #fbbf24;
-  --amber-500: #f59e0b;
-  --amber-600: #d97706;
+  /* Accent - Gold */
+  --gold-400: #fbbf24;
+  --gold-500: #f59e0b;
+  --gold-600: #d97706;
 
   /* Status Colors */
   --success: #22c55e;
@@ -28,27 +29,27 @@
   --info: #3b82f6;
 
   /* Backgrounds */
-  --bg-primary: #0f0b08;
-  --bg-secondary: #1a1410;
-  --bg-card: rgba(30, 22, 16, 0.8);
-  --bg-card-hover: rgba(42, 32, 22, 0.9);
-  --bg-glass: rgba(30, 22, 16, 0.6);
+  --bg-primary: #1a0508;
+  --bg-secondary: #2a0a10;
+  --bg-card: rgba(40, 10, 16, 0.85);
+  --bg-card-hover: rgba(60, 16, 24, 0.92);
+  --bg-glass: rgba(40, 10, 16, 0.65);
 
   /* Text */
-  --text-primary: #f5ead6;
-  --text-secondary: #c4a882;
-  --text-muted: #8b7355;
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.8);
+  --text-muted: rgba(255, 255, 255, 0.5);
 
   /* Borders */
-  --border-subtle: rgba(196, 154, 92, 0.15);
-  --border-default: rgba(196, 154, 92, 0.25);
-  --border-strong: rgba(196, 154, 92, 0.4);
+  --border-subtle: rgba(255, 255, 255, 0.1);
+  --border-default: rgba(255, 255, 255, 0.2);
+  --border-strong: rgba(255, 255, 255, 0.35);
 
   /* Shadows */
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 20px rgba(196, 154, 92, 0.15);
+  --shadow-glow: 0 0 20px rgba(168, 19, 30, 0.3);
 
   /* Transitions */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -83,11 +84,11 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--coffee-700);
+  background: var(--brand-700);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--coffee-600);
+  background: var(--brand-600);
 }
 
 /* ===== ANIMATIONS ===== */
@@ -117,8 +118,8 @@ body {
 }
 
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 10px rgba(196, 154, 92, 0.2); }
-  50% { box-shadow: 0 0 25px rgba(196, 154, 92, 0.4); }
+  0%, 100% { box-shadow: 0 0 10px rgba(168, 19, 30, 0.3); }
+  50% { box-shadow: 0 0 30px rgba(168, 19, 30, 0.6); }
 }
 
 @keyframes shimmer {
@@ -208,7 +209,7 @@ body {
 
 /* ===== BUTTON STYLES ===== */
 .btn-primary {
-  background: linear-gradient(135deg, var(--coffee-500), var(--coffee-600));
+  background: linear-gradient(135deg, #c41525, #A8131E, #8B0F19);
   color: white;
   border: none;
   padding: 14px 28px;
@@ -222,8 +223,8 @@ body {
 }
 
 .btn-primary:hover {
-  background: linear-gradient(135deg, var(--coffee-400), var(--coffee-500));
-  box-shadow: var(--shadow-md), 0 0 20px rgba(166, 124, 74, 0.3);
+  background: linear-gradient(135deg, #dc2626, #c41525, #A8131E);
+  box-shadow: var(--shadow-md), 0 0 25px rgba(168, 19, 30, 0.4);
   transform: translateY(-1px);
 }
 
@@ -267,23 +268,32 @@ body {
 
 .btn-ghost:hover {
   color: var(--text-primary);
-  background: rgba(196, 154, 92, 0.1);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 /* ===== UTILITY ===== */
 .text-gradient {
-  background: linear-gradient(135deg, var(--coffee-200), var(--amber-400));
+  background: linear-gradient(135deg, #ffffff, #fbbf24);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
-.bg-gradient-coffee {
-  background: linear-gradient(135deg, var(--coffee-800), var(--bg-primary), var(--coffee-900));
+.bg-gradient-brand {
+  background: linear-gradient(135deg, var(--brand-800), var(--bg-primary), var(--brand-900));
 }
 
 .bg-gradient-warm {
-  background: linear-gradient(135deg, rgba(196, 154, 92, 0.1), rgba(251, 191, 36, 0.05));
+  background: linear-gradient(135deg, rgba(168, 19, 30, 0.15), rgba(139, 15, 25, 0.08));
+}
+
+/* Background image utility */
+.bg-brand-image {
+  background-image: url('/images/bg.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
 }
 
 .badge {
@@ -298,7 +308,7 @@ body {
 
 .badge-best-seller {
   background: rgba(251, 191, 36, 0.15);
-  color: var(--amber-400);
+  color: var(--gold-400);
   border: 1px solid rgba(251, 191, 36, 0.3);
 }
 

@@ -67,7 +67,7 @@ export default function CartPage() {
           >
             <div className="flex gap-4">
               {/* Icon */}
-              <div className="w-16 h-16 rounded-xl bg-linear-to-br from-coffee-700/50 to-coffee-900/50 flex items-center justify-center shrink-0">
+              <div className="w-16 h-16 rounded-xl bg-linear-to-br from-white/10 to-white/5 flex items-center justify-center shrink-0">
                 {item.image ? (
                   <img src={item.image} alt={item.name} className="w-full h-full object-cover rounded-xl" />
                 ) : (
@@ -91,24 +91,24 @@ export default function CartPage() {
 
                 {/* Customizations */}
                 <div className="flex flex-wrap gap-1.5 mt-1.5">
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-coffee-800/50 text-coffee-300">
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-white/70">
                     Size {item.size}
                   </span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-coffee-800/50 text-coffee-300">
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-white/70">
                     Sugar {item.sugarLevel}%
                   </span>
                   {item.iceLevel !== 'none' && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-coffee-800/50 text-coffee-300">
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-white/70">
                       Ice: {item.iceLevel}
                     </span>
                   )}
                   {item.extraShot && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-amber-900/50 text-amber-300">
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-[#A8131E]/30 text-red-200">
                       +Shot
                     </span>
                   )}
                   {item.toppings.map((t) => (
-                    <span key={t.id} className="text-xs px-2 py-0.5 rounded-full bg-coffee-800/50 text-coffee-300">
+                    <span key={t.id} className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-white/70">
                       {t.name}
                     </span>
                   ))}
@@ -116,7 +116,7 @@ export default function CartPage() {
 
                 {/* Price & Quantity */}
                 <div className="flex items-center justify-between mt-3">
-                  <span className="font-bold text-coffee-300">{formatCurrency(item.subtotal)}</span>
+                  <span className="font-bold text-white">{formatCurrency(item.subtotal)}</span>
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => updateQuantity(item.id, item.quantity - 1)}
@@ -127,7 +127,7 @@ export default function CartPage() {
                     <span className="font-semibold text-(--text-primary) w-6 text-center">{item.quantity}</span>
                     <button
                       onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                      className="w-8 h-8 rounded-full bg-linear-to-r from-coffee-500 to-amber-600 flex items-center justify-center text-white active:scale-90 transition-transform"
+                      className="w-8 h-8 rounded-full bg-linear-to-r from-[#c41525] to-[#A8131E] flex items-center justify-center text-white active:scale-90 transition-transform"
                     >
                       +
                     </button>

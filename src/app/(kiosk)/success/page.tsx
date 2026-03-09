@@ -65,15 +65,15 @@ function SuccessContent() {
           <h3 className="font-semibold text-(--text-primary) mb-3 text-center">What&apos;s Next?</h3>
           <div className="space-y-3">
             <div className="flex items-start gap-3">
-              <span className="w-6 h-6 rounded-full bg-coffee-700 flex items-center justify-center text-xs text-coffee-200 mt-0.5 shrink-0">1</span>
+              <span className="w-6 h-6 rounded-full bg-[#A8131E] flex items-center justify-center text-xs text-white mt-0.5 shrink-0">1</span>
               <p className="text-sm text-(--text-secondary)">Wait for your number to be called</p>
             </div>
             <div className="flex items-start gap-3">
-              <span className="w-6 h-6 rounded-full bg-coffee-700 flex items-center justify-center text-xs text-coffee-200 mt-0.5 shrink-0">2</span>
+              <span className="w-6 h-6 rounded-full bg-[#A8131E] flex items-center justify-center text-xs text-white mt-0.5 shrink-0">2</span>
               <p className="text-sm text-(--text-secondary)">Check the screen for order status</p>
             </div>
             <div className="flex items-start gap-3">
-              <span className="w-6 h-6 rounded-full bg-coffee-700 flex items-center justify-center text-xs text-coffee-200 mt-0.5 shrink-0">3</span>
+              <span className="w-6 h-6 rounded-full bg-[#A8131E] flex items-center justify-center text-xs text-white mt-0.5 shrink-0">3</span>
               <p className="text-sm text-(--text-secondary)">Pick up your order when it&apos;s ready</p>
             </div>
           </div>
@@ -103,7 +103,7 @@ export default function SuccessPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-coffee-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-12 h-12 border-4 border-[#A8131E] border-t-transparent rounded-full animate-spin" />
       </div>
     }>
       <SuccessContent />

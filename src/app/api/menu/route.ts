@@ -1,52 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { getMenuItems } from '@/lib/integrations/pos.adapter';
 
+/**
+ * GET /api/menu
+ *
+ * Fetches menu items from Olsera POS (if enabled) or local database.
+ * Supports filters: category, search, type, filter (best-seller/recommended)
+ */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const category = searchParams.get('category');
-    const search = searchParams.get('search');
-    const type = searchParams.get('type'); // hot, iced
-    const filter = searchParams.get('filter'); // best-seller, recommended
+    const category = searchParams.get('category') || undefined;
+    const search = searchParams.get('search') || undefined;
+    const type = searchParams.get('type') || undefined;
+    const filter = searchParams.get('filter') || undefined;
 
-    const where: Record<string, unknown> = {
-      isAvailable: true,
-    };
-
-    if (category) {
-      where.category = { slug: category };
-    }
-
-    if (search) {
-      where.OR = [
-        { name: { contains: search } },
-        { description: { contains: search } },
-      ];
-    }
-
-    if (type && type !== 'all') {
-      where.OR = [
-        { type: type },
-        { type: 'both' },
-      ];
-    }
-
-    if (filter === 'best-seller') {
-      where.isBestSeller = true;
-    } else if (filter === 'recommended') {
-      where.isRecommended = true;
-    }
-
-    const items = await prisma.menuItem.findMany({
-      where,
-      include: {
-        category: true,
-        sizes: {
-          orderBy: { size: 'asc' },
-        },
-      },
-      orderBy: { name: 'asc' },
-    });
+    const items = await getMenuItems({ category, search, type, filter });
 
     return NextResponse.json(items);
   } catch (error) {
@@ -55,8 +24,12 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/**
+ * POST /api/menu — Create menu item (admin, local DB only)
+ */
 export async function POST(request: NextRequest) {
   try {
+    const prisma = (await import('@/lib/prisma')).default;
     const body = await request.json();
     const item = await prisma.menuItem.create({
       data: {
@@ -69,14 +42,9 @@ export async function POST(request: NextRequest) {
         isBestSeller: body.isBestSeller ?? false,
         isRecommended: body.isRecommended ?? false,
         type: body.type || 'both',
-        sizes: body.sizes ? {
-          create: body.sizes,
-        } : undefined,
+        sizes: body.sizes ? { create: body.sizes } : undefined,
       },
-      include: {
-        category: true,
-        sizes: true,
-      },
+      include: { category: true, sizes: true },
     });
     return NextResponse.json(item, { status: 201 });
   } catch (error) {

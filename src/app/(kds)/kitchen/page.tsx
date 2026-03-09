@@ -108,7 +108,7 @@ export default function KitchenPage() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-coffee-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <div className="w-12 h-12 border-4 border-[#A8131E] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-(--text-muted)">Loading orders...</p>
         </div>
       </div>
@@ -147,26 +147,26 @@ export default function KitchenPage() {
               <span className="font-medium text-(--text-primary) text-sm">
                 {item.quantity}x {item.menuItem.name}
               </span>
-              <span className="text-xs text-(--text-muted) bg-coffee-800/50 px-2 py-0.5 rounded-full">
+              <span className="text-xs text-(--text-muted) bg-white/10 px-2 py-0.5 rounded-full">
                 {item.size}
               </span>
             </div>
             <div className="flex flex-wrap gap-1 mt-1.5">
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-coffee-800/50 text-coffee-300">
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/70">
                 Sugar {item.sugarLevel}%
               </span>
               {item.iceLevel !== 'none' && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-coffee-800/50 text-coffee-300">
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/70">
                   Ice: {item.iceLevel}
                 </span>
               )}
               {item.extraShot && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-900/50 text-amber-300">
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#A8131E]/30 text-red-200">
                   +Shot
                 </span>
               )}
               {item.toppings.map((t, i) => (
-                <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-coffee-800/50 text-coffee-300">
+                <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/70">
                   {t.topping.name}
                 </span>
               ))}

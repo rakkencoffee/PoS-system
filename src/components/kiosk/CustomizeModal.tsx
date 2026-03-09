@@ -10,14 +10,14 @@ interface Topping {
 }
 
 interface MenuItemSize {
-  id: number;
+  id?: number;
   size: string;
   priceAdjustment: number;
 }
 
 interface CustomizeModalProps {
   item: {
-    id: number;
+    id: number | string;
     name: string;
     description: string;
     price: number;
@@ -79,7 +79,7 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
   const handleAddToCart = () => {
     addItem({
       id: `${item.id}-${Date.now()}`,
-      menuItemId: item.id,
+      menuItemId: item.id as number | string,
       name: item.name,
       price: item.price,
       image: item.image,
@@ -134,7 +134,7 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
                     onClick={() => setSelectedSize(size.size)}
                     className={`py-3 rounded-xl text-center transition-all ${
                       selectedSize === size.size
-                        ? 'bg-linear-to-r from-coffee-500 to-amber-600 text-white shadow-lg'
+                        ? 'bg-linear-to-r from-[#c41525] to-[#A8131E] text-white shadow-lg'
                         : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle) hover:border-(--border-default)'
                     }`}
                   >
@@ -162,7 +162,7 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
                   onClick={() => setSugarLevel(level)}
                   className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
                     sugarLevel === level
-                      ? 'bg-linear-to-r from-coffee-500 to-amber-600 text-white shadow-lg'
+                      ? 'bg-linear-to-r from-[#c41525] to-[#A8131E] text-white shadow-lg'
                       : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle)'
                   }`}
                 >
@@ -183,7 +183,7 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
                     onClick={() => setIceLevel(ice.key)}
                     className={`py-3 rounded-xl text-center transition-all ${
                       iceLevel === ice.key
-                        ? 'bg-linear-to-r from-coffee-500 to-amber-600 text-white shadow-lg'
+                        ? 'bg-linear-to-r from-[#c41525] to-[#A8131E] text-white shadow-lg'
                         : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle)'
                     }`}
                   >
@@ -201,7 +201,7 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
               onClick={() => setExtraShot(!extraShot)}
               className={`w-full flex items-center justify-between p-4 rounded-xl transition-all ${
                 extraShot
-                  ? 'bg-linear-to-r from-coffee-500/20 to-amber-600/20 border border-coffee-500/50'
+                  ? 'bg-linear-to-r from-[#A8131E]/20 to-[#8B0F19]/20 border border-[#A8131E]/50'
                   : 'bg-(--bg-card) border border-(--border-subtle)'
               }`}
             >
@@ -215,7 +215,7 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
               <div className="flex items-center gap-2">
                 <span className="text-sm text-(--text-secondary)">+{formatCurrency(8000)}</span>
                 <div className={`w-12 h-7 rounded-full transition-all flex items-center px-1 ${
-                  extraShot ? 'bg-coffee-500' : 'bg-coffee-800'
+                  extraShot ? 'bg-[#A8131E]' : 'bg-white/10'
                 }`}>
                   <div className={`w-5 h-5 rounded-full bg-white transition-transform ${
                     extraShot ? 'translate-x-5' : 'translate-x-0'
@@ -238,7 +238,7 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
                       onClick={() => toggleTopping(topping)}
                       className={`flex items-center justify-between p-3 rounded-xl transition-all ${
                         isSelected
-                          ? 'bg-linear-to-r from-coffee-500/20 to-amber-600/20 border border-coffee-500/50'
+                          ? 'bg-linear-to-r from-[#A8131E]/20 to-[#8B0F19]/20 border border-[#A8131E]/50'
                           : 'bg-(--bg-card) border border-(--border-subtle)'
                       }`}
                     >
@@ -264,7 +264,7 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
               <span className="text-3xl font-bold text-(--text-primary) w-12 text-center">{quantity}</span>
               <button
                 onClick={() => setQuantity(quantity + 1)}
-                className="w-12 h-12 rounded-full bg-linear-to-r from-coffee-500 to-amber-600 flex items-center justify-center text-xl text-white shadow-lg hover:shadow-xl transition-all active:scale-90"
+                className="w-12 h-12 rounded-full bg-linear-to-r from-[#c41525] to-[#A8131E] flex items-center justify-center text-xl text-white shadow-lg hover:shadow-xl transition-all active:scale-90"
               >
                 +
               </button>

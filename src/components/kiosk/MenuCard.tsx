@@ -1,14 +1,14 @@
 'use client';
 
 interface MenuItemSize {
-  id: number;
+  id?: number;
   size: string;
   priceAdjustment: number;
 }
 
 interface MenuCardProps {
   item: {
-    id: number;
+    id: number | string;
     name: string;
     description: string;
     price: number;
@@ -45,7 +45,7 @@ export default function MenuCard({ item, index, onSelect }: MenuCardProps) {
       style={{ animationDelay: `${index * 0.05}s`, opacity: 0 }}
     >
       {/* Image area */}
-      <div className="relative h-36 bg-linear-to-br from-coffee-800/50 to-coffee-900/50 flex items-center justify-center overflow-hidden">
+      <div className="relative h-36 bg-linear-to-br from-white/5 to-white/[0.02] flex items-center justify-center overflow-hidden">
         {item.image ? (
           <img
             src={item.image}
@@ -86,10 +86,10 @@ export default function MenuCard({ item, index, onSelect }: MenuCardProps) {
           {item.description}
         </p>
         <div className="flex items-center justify-between">
-          <span className="text-coffee-300 font-bold text-sm">
+          <span className="text-white font-bold text-sm">
             {formatCurrency(item.price)}
           </span>
-          <span className="w-8 h-8 rounded-full bg-linear-to-r from-coffee-500 to-amber-600 flex items-center justify-center text-white text-lg leading-none group-hover:scale-110 transition-transform">
+          <span className="w-8 h-8 rounded-full bg-linear-to-r from-[#c41525] to-[#A8131E] flex items-center justify-center text-white text-lg leading-none group-hover:scale-110 transition-transform">
             +
           </span>
         </div>

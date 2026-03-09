@@ -9,29 +9,31 @@ import CustomizeModal from '@/components/kiosk/CustomizeModal';
 import CartSummary from '@/components/kiosk/CartSummary';
 
 interface Category {
-  id: number;
+  id: number | string;
   name: string;
   slug: string;
   icon: string;
 }
 
 interface MenuItemSize {
-  id: number;
+  id?: number;
   size: string;
   priceAdjustment: number;
 }
 
 interface MenuItem {
-  id: number;
+  id: number | string;
   name: string;
   description: string;
   price: number;
   image: string;
-  categoryId: number;
+  categoryId?: number | string;
+  categoryName?: string;
+  categorySlug?: string;
   isBestSeller: boolean;
   isRecommended: boolean;
   type: string;
-  category: Category;
+  category?: Category;
   sizes: MenuItemSize[];
 }
 
@@ -111,7 +113,7 @@ export default function MenuPage() {
             </svg>
             Cart
             {itemCount > 0 && (
-              <span className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-amber-500 text-black text-xs font-bold flex items-center justify-center animate-scale-in">
+              <span className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-[#A8131E] text-white text-xs font-bold flex items-center justify-center animate-scale-in">
                 {itemCount}
               </span>
             )}
@@ -123,7 +125,7 @@ export default function MenuPage() {
       <div className="px-6 py-4 max-w-7xl mx-auto w-full">
         {/* Search bar */}
         <div className="relative mb-4">
-          <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-coffee-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <input
@@ -131,7 +133,7 @@ export default function MenuPage() {
             placeholder="Search menu..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-12 pr-4 py-3.5 rounded-xl bg-(--bg-card) border border-(--border-subtle) text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:border-(--coffee-500) transition-colors"
+            className="w-full pl-12 pr-4 py-3.5 rounded-xl bg-(--bg-card) border border-(--border-subtle) text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:border-[#A8131E] transition-colors"
           />
         </div>
 
@@ -143,7 +145,7 @@ export default function MenuPage() {
               onClick={() => setActiveFilter(filter.key)}
               className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
                 activeFilter === filter.key
-                  ? 'bg-linear-to-r from-coffee-500 to-coffee-600 text-white shadow-md'
+                  ? 'bg-linear-to-r from-[#c41525] to-[#A8131E] text-white shadow-md'
                   : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle) hover:border-(--border-default)'
               }`}
             >
@@ -167,10 +169,10 @@ export default function MenuPage() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-4">
             {[...Array(8)].map((_, i) => (
               <div key={i} className="glass-card h-64 animate-pulse">
-                <div className="h-32 bg-coffee-800/50 rounded-t-2xl" />
+                <div className="h-32 bg-white/5 rounded-t-2xl" />
                 <div className="p-4 space-y-3">
-                  <div className="h-4 bg-coffee-800/50 rounded w-3/4" />
-                  <div className="h-3 bg-coffee-800/50 rounded w-1/2" />
+                  <div className="h-4 bg-white/5 rounded w-3/4" />
+                  <div className="h-3 bg-white/5 rounded w-1/2" />
                 </div>
               </div>
             ))}
@@ -178,8 +180,8 @@ export default function MenuPage() {
         ) : menuItems.length === 0 ? (
           <div className="text-center py-20">
             <span className="text-6xl mb-4 block">🔍</span>
-            <p className="text-coffee-400 text-lg">No items found</p>
-            <p className="text-coffee-600 text-sm mt-1">Try adjusting your filters</p>
+            <p className="text-white/60 text-lg">No items found</p>
+            <p className="text-white/40 text-sm mt-1">Try adjusting your filters</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-4">

@@ -33,6 +33,13 @@ interface MenuItem {
   sizes?: { size: string; priceAdjustment: number }[];
 }
 
+interface Category {
+  id: number;
+  name: string;
+  slug: string;
+  icon: string;
+}
+
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('id-ID', {
     style: 'currency',
@@ -53,6 +60,9 @@ export default function AdminDashboard() {
   const [showMenuModal, setShowMenuModal] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [deletingItem, setDeletingItem] = useState<MenuItem | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [menuSearch, setMenuSearch] = useState('');
+  const [menuCategoryFilter, setMenuCategoryFilter] = useState<string>('all');
 
   useEffect(() => {
     const auth = localStorage.getItem('admin_auth');
@@ -61,6 +71,13 @@ export default function AdminDashboard() {
       return;
     }
   }, [router]);
+
+  useEffect(() => {
+    fetch('/api/categories')
+      .then((res) => res.json())
+      .then(setCategories)
+      .catch(console.error);
+  }, []);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -155,7 +172,7 @@ export default function AdminDashboard() {
                 onClick={() => setActiveTab(tab.key)}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all ${
                   activeTab === tab.key
-                    ? 'bg-linear-to-r from-coffee-500/20 to-amber-600/20 text-(--text-primary) border border-coffee-500/30'
+                    ? 'bg-linear-to-r from-[#A8131E]/20 to-[#8B0F19]/20 text-(--text-primary) border border-[#A8131E]/30'
                     : 'text-(--text-secondary) hover:bg-(--bg-card)'
                 }`}
               >
@@ -184,7 +201,7 @@ export default function AdminDashboard() {
         <main className="flex-1 p-8">
           {loading ? (
             <div className="flex items-center justify-center py-20">
-              <div className="w-12 h-12 border-4 border-coffee-500 border-t-transparent rounded-full animate-spin" />
+              <div className="w-12 h-12 border-4 border-[#A8131E] border-t-transparent rounded-full animate-spin" />
             </div>
           ) : (
             <>
@@ -222,14 +239,14 @@ export default function AdminDashboard() {
                       <div className="space-y-3">
                         {bestSellers.map(([name, count], index) => (
                           <div key={name} className="flex items-center gap-3">
-                            <span className="w-6 h-6 rounded-full bg-coffee-700 flex items-center justify-center text-xs text-coffee-200">
+                            <span className="w-6 h-6 rounded-full bg-[#A8131E] flex items-center justify-center text-xs text-white">
                               {index + 1}
                             </span>
                             <span className="flex-1 text-(--text-primary)">{name}</span>
                             <span className="text-sm text-(--text-muted)">{count} sold</span>
-                            <div className="w-24 h-2 rounded-full bg-coffee-800 overflow-hidden">
+                            <div className="w-24 h-2 rounded-full bg-white/10 overflow-hidden">
                               <div
-                                className="h-full bg-linear-to-r from-coffee-500 to-amber-500 rounded-full"
+                                className="h-full bg-linear-to-r from-[#A8131E] to-[#c41525] rounded-full"
                                 style={{ width: `${(count / bestSellers[0][1]) * 100}%` }}
                               />
                             </div>
@@ -288,6 +305,50 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
+                  {/* Search & Category Filter */}
+                  <div className="flex flex-col gap-3 mb-4">
+                    <div className="relative">
+                      <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      <input
+                        type="text"
+                        placeholder="Search menu by name or description..."
+                        value={menuSearch}
+                        onChange={(e) => setMenuSearch(e.target.value)}
+                        className="w-full pl-12 pr-4 py-3 rounded-xl bg-(--bg-card) border border-(--border-subtle) text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:border-[#A8131E] transition-colors"
+                      />
+                    </div>
+                    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                      <button
+                        onClick={() => setMenuCategoryFilter('all')}
+                        className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
+                          menuCategoryFilter === 'all'
+                            ? 'bg-linear-to-r from-[#c41525] to-[#A8131E] text-white shadow-md'
+                            : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle) hover:border-(--border-default)'
+                        }`}
+                      >
+                        🍽️ All ({menuItems.length})
+                      </button>
+                      {categories.map((cat) => {
+                        const count = menuItems.filter((m) => m.category.name === cat.name).length;
+                        return (
+                          <button
+                            key={cat.slug}
+                            onClick={() => setMenuCategoryFilter(cat.name)}
+                            className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
+                              menuCategoryFilter === cat.name
+                                ? 'bg-linear-to-r from-[#c41525] to-[#A8131E] text-white shadow-md'
+                                : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle) hover:border-(--border-default)'
+                            }`}
+                          >
+                            {cat.icon} {cat.name} ({count})
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   <div className="glass-card overflow-hidden">
                     <table className="w-full">
                       <thead>
@@ -301,7 +362,16 @@ export default function AdminDashboard() {
                         </tr>
                       </thead>
                       <tbody>
-                        {menuItems.map((item) => (
+                        {menuItems
+                          .filter((item) => {
+                            const matchSearch = menuSearch === '' ||
+                              item.name.toLowerCase().includes(menuSearch.toLowerCase()) ||
+                              item.description.toLowerCase().includes(menuSearch.toLowerCase());
+                            const matchCategory = menuCategoryFilter === 'all' ||
+                              item.category.name === menuCategoryFilter;
+                            return matchSearch && matchCategory;
+                          })
+                          .map((item) => (
                           <tr key={item.id} className={`border-b border-(--border-subtle) hover:bg-(--bg-card-hover) transition-colors ${!item.isAvailable ? 'opacity-50' : ''}`}>
                             <td className="p-4">
                               <span className="font-medium text-(--text-primary)">{item.name}</span>
@@ -315,7 +385,7 @@ export default function AdminDashboard() {
                               <div className="flex gap-1 flex-wrap">
                                 {item.isBestSeller && <span className="badge badge-best-seller text-[10px]">Best Seller</span>}
                                 {item.isRecommended && <span className="badge badge-recommended text-[10px]">Recommended</span>}
-                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-coffee-800/50 text-coffee-300">
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/70">
                                   {item.type === 'hot' ? '🔥' : item.type === 'iced' ? '🧊' : '☕'} {item.type}
                                 </span>
                               </div>
@@ -324,7 +394,7 @@ export default function AdminDashboard() {
                               <button
                                 onClick={() => toggleAvailability(item.id, item.isAvailable)}
                                 className={`w-12 h-7 rounded-full transition-all flex items-center px-1 mx-auto ${
-                                  item.isAvailable ? 'bg-green-500' : 'bg-coffee-800'
+                                  item.isAvailable ? 'bg-green-500' : 'bg-white/10'
                                 }`}
                               >
                                 <div className={`w-5 h-5 rounded-full bg-white transition-transform ${
@@ -370,7 +440,7 @@ export default function AdminDashboard() {
 
                   {/* Delete Confirmation */}
                   {deletingItem && createPortal(
-                    <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
+                    <div className="fixed inset-0 z-9999 flex items-center justify-center" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
                       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setDeletingItem(null)} />
                       <div className="relative glass-card p-6 max-w-sm mx-4 text-center animate-scale-in">
                         <span className="text-4xl mb-4 block">🗑️</span>
@@ -426,7 +496,7 @@ export default function AdminDashboard() {
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {order.items.map((item) => (
-                              <span key={item.id} className="text-xs px-2 py-1 rounded-full bg-coffee-800/50 text-coffee-300">
+                              <span key={item.id} className="text-xs px-2 py-1 rounded-full bg-white/10 text-white/70">
                                 {item.quantity}x {item.menuItem.name}
                               </span>
                             ))}

@@ -69,7 +69,7 @@ function StatusContent() {
   if (!order) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-coffee-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-12 h-12 border-4 border-[#A8131E] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -100,9 +100,9 @@ function StatusContent() {
         <div className="glass-card p-6 mb-8 animate-fade-in delay-1" style={{ opacity: 0 }}>
           <div className="flex items-center justify-between relative">
             {/* Progress line */}
-            <div className="absolute top-4 left-8 right-8 h-0.5 bg-coffee-800">
+            <div className="absolute top-4 left-8 right-8 h-0.5 bg-white/10">
               <div
-                className="h-full bg-linear-to-r from-coffee-500 to-amber-500 transition-all duration-1000"
+                className="h-full bg-linear-to-r from-[#A8131E] to-[#c41525] transition-all duration-1000"
                 style={{ width: `${(currentStep / (steps.length - 1)) * 100}%` }}
               />
             </div>
@@ -117,8 +117,8 @@ function StatusContent() {
                     isCurrent
                       ? `bg-linear-to-r ${stepStatus.color} text-white shadow-lg animate-pulse`
                       : isActive
-                        ? 'bg-coffee-600 text-white'
-                        : 'bg-coffee-800 text-coffee-500'
+                        ? 'bg-[#A8131E] text-white'
+                        : 'bg-white/10 text-white/40'
                   }`}>
                     {isActive ? '✓' : index + 1}
                   </div>
@@ -153,7 +153,7 @@ export default function StatusPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-coffee-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-12 h-12 border-4 border-[#A8131E] border-t-transparent rounded-full animate-spin" />
       </div>
     }>
       <StatusContent />

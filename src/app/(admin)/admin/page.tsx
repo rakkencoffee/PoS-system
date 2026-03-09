@@ -36,7 +36,7 @@ export default function AdminLoginPage() {
               value={password}
               onChange={(e) => { setPassword(e.target.value); setError(''); }}
               placeholder="Enter admin password"
-              className="w-full px-4 py-3 rounded-xl bg-(--bg-card) border border-(--border-subtle) text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:border-(--coffee-500)"
+              className="w-full px-4 py-3 rounded-xl bg-(--bg-card) border border-(--border-subtle) text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:border-[#A8131E]"
             />
             {error && <p className="text-red-400 text-sm mt-2">{error}</p>}
           </div>

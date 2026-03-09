@@ -1,7 +1,7 @@
 'use client';
 
 interface Category {
-  id: number;
+  id: number | string;
   name: string;
   slug: string;
   icon: string;
@@ -28,7 +28,7 @@ export default function CategoryBar({ categories, selected, onSelect }: Category
             onClick={() => onSelect(cat.slug)}
             className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-semibold whitespace-nowrap transition-all ${
               selected === cat.slug
-                ? 'bg-linear-to-r from-coffee-500 to-amber-600 text-white shadow-lg shadow-coffee-500/25 scale-105'
+                ? 'bg-linear-to-r from-[#c41525] to-[#A8131E] text-white shadow-lg shadow-red-900/30 scale-105'
                 : 'glass-card rounded-2xl! hover:bg-(--bg-card-hover)!'
             }`}
           >

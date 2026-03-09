@@ -134,7 +134,7 @@ export default function MenuFormModal({ isOpen, onClose, onSave, editItem }: Men
   if (!isOpen) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
+    <div className="fixed inset-0 z-9999 flex items-center justify-center" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative glass-card p-6 w-full max-w-xl max-h-[85vh] overflow-y-auto animate-scale-in mx-4">
         <div className="flex items-center justify-between mb-6">
@@ -153,7 +153,7 @@ export default function MenuFormModal({ isOpen, onClose, onSave, editItem }: Men
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               placeholder="e.g. Cafe Latte"
-              className="w-full px-4 py-2.5 rounded-xl bg-(--bg-card) border border-(--border-subtle) text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:border-(--coffee-500)"
+              className="w-full px-4 py-2.5 rounded-xl bg-(--bg-card) border border-(--border-subtle) text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:border-[#A8131E]"
             />
           </div>
 
@@ -165,7 +165,7 @@ export default function MenuFormModal({ isOpen, onClose, onSave, editItem }: Men
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               placeholder="Short description..."
               rows={2}
-              className="w-full px-4 py-2.5 rounded-xl bg-(--bg-card) border border-(--border-subtle) text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:border-(--coffee-500) resize-none"
+              className="w-full px-4 py-2.5 rounded-xl bg-(--bg-card) border border-(--border-subtle) text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:border-[#A8131E] resize-none"
             />
           </div>
 
@@ -178,7 +178,7 @@ export default function MenuFormModal({ isOpen, onClose, onSave, editItem }: Men
                 value={form.price || ''}
                 onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
                 placeholder="28000"
-                className="w-full px-4 py-2.5 rounded-xl bg-(--bg-card) border border-(--border-subtle) text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:border-(--coffee-500)"
+                className="w-full px-4 py-2.5 rounded-xl bg-(--bg-card) border border-(--border-subtle) text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:border-[#A8131E]"
               />
             </div>
             <div>
@@ -186,7 +186,7 @@ export default function MenuFormModal({ isOpen, onClose, onSave, editItem }: Men
               <select
                 value={form.categoryId}
                 onChange={(e) => setForm({ ...form, categoryId: Number(e.target.value) })}
-                className="w-full px-4 py-2.5 rounded-xl bg-(--bg-card) border border-(--border-subtle) text-(--text-primary) focus:outline-none focus:border-(--coffee-500)"
+                className="w-full px-4 py-2.5 rounded-xl bg-(--bg-card) border border-(--border-subtle) text-(--text-primary) focus:outline-none focus:border-[#A8131E]"
               >
                 <option value={0}>Select category</option>
                 {categories.map((cat) => (
@@ -207,7 +207,7 @@ export default function MenuFormModal({ isOpen, onClose, onSave, editItem }: Men
                   onClick={() => setForm({ ...form, type: t })}
                   className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all ${
                     form.type === t
-                      ? 'bg-linear-to-r from-coffee-500 to-amber-600 text-white'
+                      ? 'bg-linear-to-r from-[#c41525] to-[#A8131E] text-white'
                       : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle)'
                   }`}
                 >
