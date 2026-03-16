@@ -69,7 +69,8 @@ html {
 }
 
 body {
-  background: var(--bg-primary);
+  background: url('/images/bg.webp') center center/cover no-repeat fixed;
+  background-color: var(--bg-primary); /* Fallback */
   color: var(--text-primary);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   overflow-x: hidden;
@@ -289,7 +290,7 @@ body {
 
 /* Background image utility */
 .bg-brand-image {
-  background-image: url('/images/bg.png');
+  background-image: url('/images/bg.webp');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;

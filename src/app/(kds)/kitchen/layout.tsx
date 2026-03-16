@@ -7,7 +7,7 @@ export default function KDSLayout({
     <div
       className="min-h-screen relative"
       style={{
-        backgroundImage: "url('/images/bg.png')",
+        backgroundImage: "url('/images/bg.webp')",
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
