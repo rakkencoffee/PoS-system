@@ -10,6 +10,11 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "StartFriday Coffee - Self Service",
   description: "Self-service ordering system for StartFriday Coffee Shop",
+  icons: {
+    icon: '/rakken-icon.svg',
+    shortcut: '/rakken-icon.svg',
+    apple: '/rakken-icon.svg',
+  },
 };
 
 export default function RootLayout({
