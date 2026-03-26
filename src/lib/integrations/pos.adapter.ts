@@ -331,8 +331,9 @@ export async function updateOrderPaymentStatus(
   status: 'paid' | 'failed' | 'expired'
 ): Promise<void> {
   if (USE_OLSERA && orderId.startsWith('OLSERA-')) {
-    const olseraId = parseInt(orderId.replace('OLSERA-', ''));
-    await olsera.updateOrderStatus(olseraId, status);
+    // POS Open APIs (like Olsera) typically rely on the Cashier to mark 
+    // Open Orders as "Completed" and input the exact payment amount at the physical store.
+    console.log(`[Olsera POS] Midtrans status for ${orderId} is ${status}. Wait for Cashier to complete.`);
     return;
   }
 
