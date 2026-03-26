@@ -61,20 +61,27 @@ function slugify(str: string): string {
 }
 
 function mapOlseraProduct(product: OlseraProduct, groups: OlseraProductGroup[]): NormalizedMenuItem {
-  const groupId = product.product_group_id;
+  const groupId = product.product_group_id || product.klasifikasi_id || product.category_id;
   const group = groups.find((g) => g.id === groupId);
-  const groupName = group?.name || product.product_group_name || product.group_name || 'Other';
+  const groupName = String(group?.name || product.klasifikasi || product.category_name || product.product_group_name || product.group_name || 'Other');
   const groupSlug = slugify(groupName);
 
-  const price = product.sell_price || product.price || 0;
+  // Price in Olsera API might be returned as string "10000.00", so we parse it
+  const rawPrice = product.sell_price || product.price || 0;
+  const price = typeof rawPrice === 'string' ? parseFloat(rawPrice) : Number(rawPrice);
+  
   const variants = product.variants || [];
 
   // Map variants to sizes if they look like size variants
   const sizes = variants.length > 0
-    ? variants.map((v) => ({
-        size: v.name,
-        priceAdjustment: (v.sell_price || v.price || price) - price,
-      }))
+    ? variants.map((v) => {
+        const vPrice = typeof v.sell_price !== 'undefined' ? v.sell_price : (v.price || 0);
+        const parsedVPrice = typeof vPrice === 'string' ? parseFloat(vPrice) : Number(vPrice);
+        return {
+          size: v.name,
+          priceAdjustment: parsedVPrice - price,
+        };
+      })
     : [];
 
   return {
@@ -83,7 +90,8 @@ function mapOlseraProduct(product: OlseraProduct, groups: OlseraProductGroup[]):
     description: product.description || '',
     price,
     image: product.photo_md || product.photo || product.image || '',
-    isAvailable: product.is_active === true || product.is_active === 1,
+    // "pos_hidden": 0 means it's available in POS
+    isAvailable: product.pos_hidden === 0 || product.is_active === 1 || product.is_active === true,
     isBestSeller: false,
     isRecommended: false,
     type: 'both',
@@ -92,11 +100,14 @@ function mapOlseraProduct(product: OlseraProduct, groups: OlseraProductGroup[]):
     categorySlug: groupSlug,
     sizes,
     olseraProductId: product.id || product.product_id,
-    olseraVariants: variants.map((v) => ({
-      id: v.id || v.variant_id || 0,
-      name: v.name,
-      price: v.sell_price || v.price || 0,
-    })),
+    olseraVariants: variants.map((v) => {
+      const vPrice = typeof v.sell_price !== 'undefined' ? v.sell_price : (v.price || 0);
+      return {
+        id: v.id || v.variant_id || 0,
+        name: v.name,
+        price: typeof vPrice === 'string' ? parseFloat(vPrice) : Number(vPrice),
+      };
+    }),
   };
 }
 

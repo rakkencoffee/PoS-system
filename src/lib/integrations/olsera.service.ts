@@ -53,48 +53,19 @@ async function getAccessToken(): Promise<string> {
 }
 
 /**
- * Get the store alias (used in URL paths)
- */
-async function getStoreAlias(): Promise<string> {
-  if (cachedStoreAlias) return cachedStoreAlias;
-
-  const token = await getAccessToken();
-  const res = await fetch(`${OLSERA_API_BASE}/api/open-api/v1/en/store`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/json',
-    },
-  });
-
-  if (!res.ok) {
-    throw new Error(`Failed to get store list: ${res.status}`);
-  }
-
-  const data = await res.json();
-  // Find our store or use first one
-  const stores = data.data || data;
-  const store = Array.isArray(stores)
-    ? stores.find((s: { id: number }) => String(s.id) === String(OLSERA_STORE_ID)) || stores[0]
-    : stores;
-
-  cachedStoreAlias = store?.alias || store?.store_alias || store?.url || '';
-  if (!cachedStoreAlias) {
-    throw new Error('Could not determine store alias from Olsera API');
-  }
-
-  return cachedStoreAlias;
-}
-
-/**
  * Make authenticated API call to Olsera
  */
 async function olseraFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const token = await getAccessToken();
-  const storeAlias = await getStoreAlias();
 
-  const url = `${OLSERA_API_BASE}/${storeAlias}/api/open-api/v1/en${path}`;
+  // Add a timestamp parameter to aggressively bypass any Next.js disk caching
+  const separator = path.includes('?') ? '&' : '?';
+  const url = `${OLSERA_API_BASE}/api/open-api/v1/en${path}${separator}_t=${Date.now()}`;
+
+  console.log(`[Olsera API] Fetching: ${url}`);
 
   return fetch(url, {
+    cache: 'no-store', // Prevent Next.js from caching
     ...options,
     headers: {
       Authorization: `Bearer ${token}`,
@@ -183,10 +154,9 @@ export async function createOrder(currencyId: number = 1): Promise<{ order_id: n
   formData.append('currency_id', String(currencyId));
 
   const token = await getAccessToken();
-  const storeAlias = await getStoreAlias();
 
   const res = await fetch(
-    `${OLSERA_API_BASE}/${storeAlias}/api/open-api/v1/en/order/openorder`,
+    `${OLSERA_API_BASE}/api/open-api/v1/en/order/openorder`,
     {
       method: 'POST',
       headers: {
@@ -225,10 +195,9 @@ export async function addItemToOrder(
   if (note) formData.append('note', note);
 
   const token = await getAccessToken();
-  const storeAlias = await getStoreAlias();
 
   const res = await fetch(
-    `${OLSERA_API_BASE}/${storeAlias}/api/open-api/v1/en/order/openorder/additem`,
+    `${OLSERA_API_BASE}/api/open-api/v1/en/order/openorder/additem`,
     {
       method: 'POST',
       headers: {
@@ -261,10 +230,9 @@ export async function updateOrderStatus(
   formData.append('status', status);
 
   const token = await getAccessToken();
-  const storeAlias = await getStoreAlias();
 
   const res = await fetch(
-    `${OLSERA_API_BASE}/${storeAlias}/api/open-api/v1/en/order/openorder/status`,
+    `${OLSERA_API_BASE}/api/open-api/v1/en/order/openorder/status`,
     {
       method: 'POST',
       headers: {

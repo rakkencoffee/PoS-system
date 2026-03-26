@@ -28,43 +28,23 @@ export async function POST(request: NextRequest) {
     // Generate unique order ID
     const orderId = `SF-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
 
-    // 1. Try to create order in local DB
-    let dbOrderId: number | null = null;
+    // 1. Try to create order in POS (Olsera or local DB depending on USE_OLSERA)
+    let dbOrderId: string | null = null;
     try {
-      const prisma = (await import('@/lib/prisma')).default;
-
-      // Get queue number
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const lastOrder = await prisma.order.findFirst({
-        where: { createdAt: { gte: todayStart } },
-        orderBy: { queueNumber: 'desc' },
-      });
-      const queueNumber = (lastOrder?.queueNumber || 0) + 1;
-
-      const order = await prisma.order.create({
-        data: {
-          queueNumber,
-          totalAmount,
-          paymentMethod: 'MIDTRANS',
-          status: 'PENDING',
-          items: {
-            create: items.map((item: { productId: string; quantity: number; variantId?: string; price: number; name: string }) => ({
-              menuItemId: parseInt(item.productId) || 1,
-              quantity: item.quantity,
-              size: item.variantId || 'M',
-              price: item.price,
-              subtotal: item.price * item.quantity,
-              notes: '',
-            })),
-          },
-        },
-      });
-
-      dbOrderId = order.id;
-    } catch (dbError) {
-      console.warn('Could not create DB order (non-fatal):', dbError);
-      // Continue — Midtrans payment can proceed without local DB order
+      const posAdapter = await import('@/lib/integrations/pos.adapter');
+      const adapterOrder = await posAdapter.createOrder(
+        items.map((item: any) => ({
+          productId: item.productId,
+          variantId: item.variantId,
+          quantity: item.quantity,
+          note: item.note,
+        }))
+      );
+      dbOrderId = adapterOrder.orderId;
+      console.log('Successfully created POS order:', dbOrderId);
+    } catch (posError) {
+      console.warn('Could not create POS order (non-fatal):', posError);
+      // Continue — Midtrans payment can proceed without POS order
     }
 
     // 2. Create Midtrans Snap token
