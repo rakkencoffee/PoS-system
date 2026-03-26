@@ -55,7 +55,7 @@ async function getAccessToken(): Promise<string> {
 /**
  * Make authenticated API call to Olsera
  */
-async function olseraFetch(path: string, options: RequestInit = {}): Promise<Response> {
+async function olseraFetch(path: string, options: RequestInit = {}, retryCount = 0): Promise<Response> {
   const token = await getAccessToken();
 
   // Add a timestamp parameter to aggressively bypass any Next.js disk caching
@@ -64,7 +64,7 @@ async function olseraFetch(path: string, options: RequestInit = {}): Promise<Res
 
   console.log(`[Olsera API] Fetching: ${url}`);
 
-  return fetch(url, {
+  const res = await fetch(url, {
     cache: 'no-store', // Prevent Next.js from caching
     ...options,
     headers: {
@@ -74,6 +74,15 @@ async function olseraFetch(path: string, options: RequestInit = {}): Promise<Res
       ...options.headers,
     },
   });
+
+  // If unauthorized, clear cached token and retry exactly once
+  if (res.status === 401 && retryCount === 0) {
+    console.warn('[Olsera API] Token expired or invalid. Refreshing token and retrying...');
+    cachedToken = null; 
+    return olseraFetch(path, options, 1);
+  }
+
+  return res;
 }
 
 // ──────────────────────────────
