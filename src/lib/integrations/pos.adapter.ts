@@ -49,9 +49,14 @@ export interface NormalizedCategory {
 
 const CATEGORY_ICONS: Record<string, string> = {
   coffee: '☕',
+  'coffee-based': '☕',
   'non-coffee': '🧋',
+  'milk-based': '🥛',
+  refreshment: '🍹',
   pastry: '🍰',
+  dessert: '🧁',
   snack: '🍿',
+  'main-course': '🍝',
   'add-ons': '✨',
   default: '📦',
 };
