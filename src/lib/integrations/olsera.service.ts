@@ -148,7 +148,7 @@ export async function getProductGroups(): Promise<OlseraProductGroup[]> {
 /**
  * Create an open order in Olsera
  */
-export async function createOrder(currencyId: number = 1): Promise<{ order_id: number; [key: string]: unknown }> {
+export async function createOrder(currencyId: string | number = 'IDR'): Promise<{ order_id: number; [key: string]: unknown }> {
   const formData = new URLSearchParams();
   formData.append('order_date', new Date().toISOString().split('T')[0]);
   formData.append('currency_id', String(currencyId));
