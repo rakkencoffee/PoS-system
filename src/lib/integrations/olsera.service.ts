@@ -149,9 +149,9 @@ export async function getProductGroups(): Promise<OlseraProductGroup[]> {
  * Create an open order in Olsera
  */
 export async function createOrder(
-  items: { productId: string; variantId?: string; quantity: number; note?: string }[] = [],
+  items: { productId: string; variantId?: string; quantity: number; price?: number; note?: string }[] = [],
   currencyId: string | number = 'IDR'
-): Promise<{ order_id: number; [key: string]: unknown }> {
+): Promise<{ id: number; order_id?: number; [key: string]: unknown }> {
   const formData = new URLSearchParams();
   formData.append('order_date', new Date().toISOString().split('T')[0]);
   formData.append('currency_id', String(currencyId));
@@ -159,6 +159,7 @@ export async function createOrder(
   items.forEach((item, index) => {
     formData.append(`items[${index}][product_id]`, item.productId);
     formData.append(`items[${index}][qty]`, String(item.quantity));
+    if (item.price) formData.append(`items[${index}][price]`, String(item.price));
     if (item.variantId) {
       formData.append(`items[${index}][variant_id]`, item.variantId);
     }

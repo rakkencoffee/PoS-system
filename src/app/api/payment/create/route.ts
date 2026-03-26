@@ -37,6 +37,7 @@ export async function POST(request: NextRequest) {
           productId: item.productId,
           variantId: item.variantId,
           quantity: item.quantity,
+          price: item.price,
           note: item.note,
         }))
       );

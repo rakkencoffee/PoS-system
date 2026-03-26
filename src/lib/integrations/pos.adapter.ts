@@ -259,12 +259,12 @@ export async function getCategories(): Promise<NormalizedCategory[]> {
  * Create order in POS system
  */
 export async function createOrder(
-  items: { productId: string; variantId?: string; quantity: number; note?: string }[]
+  items: { productId: string; variantId?: string; quantity: number; price?: number; note?: string }[]
 ): Promise<{ orderId: string; olseraOrderId?: number }> {
   if (USE_OLSERA) {
     // 1. Create open order with items
     const order = await olsera.createOrder(items);
-    const orderId = order.order_id;
+    const orderId = order.id || order.order_id;
 
     return {
       orderId: `OLSERA-${orderId}`,
