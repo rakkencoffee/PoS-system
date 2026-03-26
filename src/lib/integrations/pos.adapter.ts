@@ -262,20 +262,9 @@ export async function createOrder(
   items: { productId: string; variantId?: string; quantity: number; note?: string }[]
 ): Promise<{ orderId: string; olseraOrderId?: number }> {
   if (USE_OLSERA) {
-    // 1. Create open order
-    const order = await olsera.createOrder();
+    // 1. Create open order with items
+    const order = await olsera.createOrder(items);
     const orderId = order.order_id;
-
-    // 2. Add items to order
-    for (const item of items) {
-      await olsera.addItemToOrder(
-        orderId,
-        parseInt(item.productId),
-        item.variantId ? parseInt(item.variantId) : null,
-        item.quantity,
-        item.note
-      );
-    }
 
     return {
       orderId: `OLSERA-${orderId}`,
