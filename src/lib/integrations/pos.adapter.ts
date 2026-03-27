@@ -71,8 +71,8 @@ function mapOlseraProduct(product: OlseraProduct, groups: OlseraProductGroup[]):
   const groupName = String(group?.name || product.klasifikasi || product.category_name || product.product_group_name || product.group_name || 'Other');
   const groupSlug = slugify(groupName);
 
-  // Price in Olsera API: "price" is Harga Jual Toko, "sell_price" is Harga Jual Online
-  const rawPrice = product.price != null ? product.price : (product.sell_price || 0);
+  // Price in Olsera API: "sell_price_pos" is Harga Jual Toko, "sell_price" is Harga Jual Online
+  const rawPrice = product.sell_price_pos != null ? product.sell_price_pos : (product.sell_price || 0);
   const price = typeof rawPrice === 'string' ? parseFloat(rawPrice) : Number(rawPrice);
   
   const variants = product.variants || [];
@@ -80,7 +80,7 @@ function mapOlseraProduct(product: OlseraProduct, groups: OlseraProductGroup[]):
   // Map variants to sizes if they look like size variants
   const sizes = variants.length > 0
     ? variants.map((v) => {
-        const vPrice = v.price != null ? v.price : (v.sell_price || 0);
+        const vPrice = v.sell_price_pos != null ? v.sell_price_pos : (v.sell_price || 0);
         const parsedVPrice = typeof vPrice === 'string' ? parseFloat(vPrice) : Number(vPrice);
         return {
           size: v.name,
@@ -106,7 +106,7 @@ function mapOlseraProduct(product: OlseraProduct, groups: OlseraProductGroup[]):
     sizes,
     olseraProductId: product.id || product.product_id,
     olseraVariants: variants.map((v) => {
-      const vPrice = v.price != null ? v.price : (v.sell_price || 0);
+      const vPrice = v.sell_price_pos != null ? v.sell_price_pos : (v.sell_price || 0);
       return {
         id: v.id || v.variant_id || 0,
         name: v.name,
