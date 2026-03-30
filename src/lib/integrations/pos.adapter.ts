@@ -256,9 +256,20 @@ export async function getMenuItems(filters?: {
  * Get all categories
  */
 export async function getCategories(): Promise<NormalizedCategory[]> {
+  // Custom display order: lower number = higher priority (shown first)
+  const CATEGORY_ORDER: Record<string, number> = {
+    'coffee-based': 1,
+    'milk-based': 2,
+    'main-course': 3,
+    'dessert': 4,
+    'snack': 5,
+    'refreshment': 6,
+  };
+
   if (USE_OLSERA) {
     const groups = await olsera.getProductGroups();
-    return groups.map(mapOlseraGroup);
+    const mapped = groups.map(mapOlseraGroup);
+    return mapped.sort((a, b) => (CATEGORY_ORDER[a.slug] ?? 99) - (CATEGORY_ORDER[b.slug] ?? 99));
   }
 
   // Fallback: use Prisma

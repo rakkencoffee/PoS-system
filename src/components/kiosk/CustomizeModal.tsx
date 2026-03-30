@@ -163,19 +163,19 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
               <h3 className="text-sm font-semibold text-(--text-secondary) uppercase tracking-wider mb-3">
                 {isDrink ? 'Variant' : 'Size'}
               </h3>
-              <div className={`grid gap-3 ${item.sizes.length <= 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+              <div className={`grid gap-2 ${item.sizes.length <= 2 ? 'grid-cols-2' : item.sizes.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
                 {item.sizes.map((size) => (
                   <button
                     key={size.size}
                     onClick={() => setSelectedSize(size.size)}
-                    className={`py-3 rounded-xl text-center transition-all ${
+                    className={`py-2.5 rounded-xl text-center transition-all ${
                       selectedSize === size.size
                         ? 'bg-linear-to-r from-[#c41525] to-[#A8131E] text-white shadow-lg'
                         : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle) hover:border-(--border-default)'
                     }`}
                   >
-                    <span className="block text-lg font-bold">{sizeLabel(size.size)}</span>
-                    <span className="block text-xs mt-1 opacity-80">
+                    <span className="block text-sm font-bold">{sizeLabel(size.size)}</span>
+                    <span className="block text-[10px] mt-0.5 opacity-80">
                       {size.priceAdjustment === 0
                         ? 'Base'
                         : `${size.priceAdjustment > 0 ? '+' : ''}${formatCurrency(size.priceAdjustment)}`}
@@ -214,19 +214,19 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
           {showIceOption && (
             <div>
               <h3 className="text-sm font-semibold text-(--text-secondary) uppercase tracking-wider mb-3">Ice Level</h3>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="flex gap-2">
                 {iceLevels.map((ice) => (
                   <button
                     key={ice.key}
                     onClick={() => setIceLevel(ice.key)}
-                    className={`py-3 rounded-xl text-center transition-all ${
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
                       iceLevel === ice.key
                         ? 'bg-linear-to-r from-[#c41525] to-[#A8131E] text-white shadow-lg'
                         : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle)'
                     }`}
                   >
-                    <span className="block text-lg">{ice.icon}</span>
-                    <span className="block text-xs mt-1">{ice.label}</span>
+                    <span className="mr-1">{ice.icon}</span>
+                    {ice.label}
                   </button>
                 ))}
               </div>

@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
+import { useDebouncedCallback } from 'use-debounce';
 import CategoryBar from '@/components/kiosk/CategoryBar';
 import MenuCard from '@/components/kiosk/MenuCard';
 import CustomizeModal from '@/components/kiosk/CustomizeModal';
@@ -41,9 +42,10 @@ export default function MenuPage() {
   const router = useRouter();
   const { itemCount } = useCart();
   const [categories, setCategories] = useState<Category[]>([]);
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [allItems, setAllItems] = useState<MenuItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<string>('all');
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,29 +57,45 @@ export default function MenuPage() {
       .catch(console.error);
   }, []);
 
+  // Best practice: useDebouncedCallback from 'use-debounce'
+  // Only updates the internal search state after 500ms of no typing
+  const handleSearch = useDebouncedCallback((term: string) => {
+    setDebouncedSearch(term);
+  }, 500);
+
+  // Fetch products from API only when category changes
   const fetchMenu = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
     if (selectedCategory !== 'all') params.set('category', selectedCategory);
-    if (searchQuery) params.set('search', searchQuery);
-    if (activeFilter === 'best-seller') params.set('filter', 'best-seller');
-    if (activeFilter === 'recommended') params.set('filter', 'recommended');
-    if (activeFilter === 'hot' || activeFilter === 'iced') params.set('type', activeFilter);
 
     try {
       const res = await fetch(`/api/menu?${params.toString()}`);
       const data = await res.json();
-      setMenuItems(data);
+      if (Array.isArray(data)) {
+        setAllItems(data);
+      }
     } catch (error) {
       console.error('Error fetching menu:', error);
     } finally {
       setLoading(false);
     }
-  }, [selectedCategory, searchQuery, activeFilter]);
+  }, [selectedCategory]);
 
   useEffect(() => {
     fetchMenu();
   }, [fetchMenu]);
+
+  // Client-side filtering using useMemo (no extra useEffect needed)
+  const menuItems = useMemo(() => {
+    if (!debouncedSearch) return allItems;
+    const q = debouncedSearch.toLowerCase();
+    return allItems.filter(
+      (item) =>
+        item.name.toLowerCase().includes(q) ||
+        item.description.toLowerCase().includes(q)
+    );
+  }, [debouncedSearch, allItems]);
 
   const filters = [
     { key: 'all', label: 'All', icon: '🍽️' },
@@ -139,7 +157,10 @@ export default function MenuPage() {
             type="text"
             placeholder="Search menu..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              handleSearch(e.target.value);
+            }}
             className="w-full pl-12 pr-4 py-3.5 rounded-xl bg-(--bg-card) border border-(--border-subtle) text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:border-[#A8131E] transition-colors"
           />
         </div>
