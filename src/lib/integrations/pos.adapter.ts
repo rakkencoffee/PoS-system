@@ -67,8 +67,15 @@ function slugify(str: string): string {
 
 function mapOlseraProduct(product: OlseraProduct, groups: OlseraProductGroup[]): NormalizedMenuItem {
   const groupId = product.product_group_id || product.klasifikasi_id || product.category_id;
-  const group = groups.find((g) => g.id === groupId);
-  const groupName = String(group?.name || product.klasifikasi || product.category_name || product.product_group_name || product.group_name || 'Other');
+  const group = groups.find((g) => String(g.id) === String(groupId));
+  const groupName = String(
+    group?.name || 
+    product.klasifikasi || 
+    product.category_name || 
+    product.product_group_name || 
+    product.group_name || 
+    'Other'
+  );
   const groupSlug = slugify(groupName);
 
   // Price in Olsera API: "sell_price_pos" is Harga Jual Toko, "sell_price" is Harga Jual Online
@@ -96,7 +103,7 @@ function mapOlseraProduct(product: OlseraProduct, groups: OlseraProductGroup[]):
     price,
     image: product.photo_md || product.photo || product.image || '',
     // "pos_hidden": 0 means it's available in POS
-    isAvailable: product.pos_hidden === 0 || product.is_active === 1 || product.is_active === true,
+    isAvailable: Number(product.pos_hidden) === 0 || Number(product.is_active) === 1 || product.is_active === true,
     isBestSeller: false,
     isRecommended: false,
     type: 'both',
