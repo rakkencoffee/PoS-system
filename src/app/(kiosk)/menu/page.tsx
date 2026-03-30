@@ -93,7 +93,14 @@ export default function MenuPage() {
       <header className="glass sticky top-0 z-50 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <button
-            onClick={() => router.push('/')}
+            onClick={() => {
+              if (selectedCategory !== 'all' || searchQuery !== '') {
+                setSelectedCategory('all');
+                setSearchQuery('');
+              } else {
+                router.push('/');
+              }
+            }}
             className="btn-ghost flex items-center gap-2"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -158,46 +165,85 @@ export default function MenuPage() {
         */}
       </div>
 
-      {/* Category Bar */}
-      <CategoryBar
-        categories={categories}
-        selected={selectedCategory}
-        onSelect={setSelectedCategory}
-      />
-
-      {/* Menu Grid */}
-      <div className="flex-1 px-6 pb-32 max-w-7xl mx-auto w-full">
-        {loading ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-4">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="glass-card h-64 animate-pulse">
-                <div className="h-32 bg-white/5 rounded-t-2xl" />
-                <div className="p-4 space-y-3">
-                  <div className="h-4 bg-white/5 rounded w-3/4" />
-                  <div className="h-3 bg-white/5 rounded w-1/2" />
+      {selectedCategory === 'all' && !searchQuery ? (
+        /* Category Selection View */
+        <div className="flex-1 px-6 pb-32 max-w-7xl mx-auto w-full">
+          <h2 className="text-xl font-bold text-(--text-primary) mb-4">Select Category</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {categories.map((category) => (
+              <button
+                key={category.id}
+                onClick={() => setSelectedCategory(category.slug)}
+                className="flex items-center p-4 rounded-2xl glass-card border border-(--border-subtle) hover:border-[#A8131E] transition-all shadow-sm group text-left"
+                style={{ background: 'var(--bg-secondary)' }}
+              >
+                <div className="w-16 h-16 rounded-xl bg-white/5 flex items-center justify-center text-4xl group-hover:scale-110 transition-transform">
+                  {category.icon || '📦'}
                 </div>
+                <div className="ml-4 flex-1">
+                  <h3 className="text-lg font-bold text-(--text-primary)">{category.name}</h3>
+                  <p className="text-sm text-(--text-muted) capitalize">{category.slug.replace('-', ' ')}</p>
+                </div>
+                <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-(--text-secondary) group-hover:bg-[#A8131E] group-hover:text-white transition-colors">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        /* Menu Items View */
+        <>
+          {/* Category Title */}
+          <div className="pt-2 pb-0 px-6 max-w-7xl mx-auto w-full">
+            <h2 className="text-2xl font-bold text-(--text-primary) capitalize">
+              {searchQuery ? `Search Results: "${searchQuery}"` : selectedCategory.replace('-', ' ')}
+            </h2>
+          </div>
+
+          {/* Menu Grid */}
+          <div className="flex-1 px-6 pb-32 max-w-7xl mx-auto w-full mt-4">
+            {loading ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {[...Array(8)].map((_, i) => (
+                  <div key={i} className="glass-card h-64 animate-pulse">
+                    <div className="h-32 bg-white/5 rounded-t-2xl" />
+                    <div className="p-4 space-y-3">
+                      <div className="h-4 bg-white/5 rounded w-3/4" />
+                      <div className="h-3 bg-white/5 rounded w-1/2" />
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            ) : menuItems.length === 0 ? (
+              <div className="text-center py-20">
+                <span className="text-6xl mb-4 block">🔍</span>
+                <p className="text-white/60 text-lg">No items found</p>
+                <p className="text-white/40 text-sm mt-1">Try adjusting your search</p>
+                <button 
+                  onClick={() => { setSearchQuery(''); setSelectedCategory('all'); }}
+                  className="mt-6 px-6 py-2 rounded-full border border-(--border-subtle) hover:bg-white/5 transition-colors"
+                >
+                  Clear Filters
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {menuItems.map((item, index) => (
+                  <MenuCard
+                    key={item.id}
+                    item={item}
+                    index={index}
+                    onSelect={() => setSelectedItem(item)}
+                  />
+                ))}
+              </div>
+            )}
           </div>
-        ) : menuItems.length === 0 ? (
-          <div className="text-center py-20">
-            <span className="text-6xl mb-4 block">🔍</span>
-            <p className="text-white/60 text-lg">No items found</p>
-            <p className="text-white/40 text-sm mt-1">Try adjusting your filters</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-4">
-            {menuItems.map((item, index) => (
-              <MenuCard
-                key={item.id}
-                item={item}
-                index={index}
-                onSelect={() => setSelectedItem(item)}
-              />
-            ))}
-          </div>
-        )}
-      </div>
+        </>
+      )}
 
       {/* Cart Summary Bar */}
       {itemCount > 0 && <CartSummary />}
