@@ -87,8 +87,8 @@ export default function CheckoutPage() {
             quantity: item.quantity,
             variantId: item.size,
             note: [
-              item.sugarLevel && `Sugar: ${item.sugarLevel}`,
-              item.iceLevel && `Ice: ${item.iceLevel}`,
+              item.sugarLevel && item.sugarLevel !== 'normal' && `Sugar: ${item.sugarLevel}`,
+              item.iceLevel && item.iceLevel !== 'normal' && `Ice: ${item.iceLevel}`,
               item.extraShot && 'Extra Shot',
               item.toppings.length && `Toppings: ${item.toppings.map((t) => t.name).join(', ')}`,
             ]

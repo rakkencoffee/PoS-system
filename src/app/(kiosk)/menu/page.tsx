@@ -137,7 +137,8 @@ export default function MenuPage() {
           />
         </div>
 
-        {/* Filter chips */}
+        {/* Filter chips (Temporarily Disabled) */}
+        {/*
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
           {filters.map((filter) => (
             <button
@@ -154,6 +155,7 @@ export default function MenuPage() {
             </button>
           ))}
         </div>
+        */}
       </div>
 
       {/* Category Bar */}

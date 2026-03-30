@@ -8,7 +8,7 @@ export interface CartItem {
   image: string;
   quantity: number;
   size: string;
-  sugarLevel: number;
+  sugarLevel: string;
   iceLevel: string;
   extraShot: boolean;
   toppings: { id: number; name: string; price: number }[];
@@ -38,7 +38,7 @@ export interface OrderEvent {
       menuItem: { name: string };
       quantity: number;
       size: string;
-      sugarLevel: number;
+      sugarLevel: string;
       iceLevel: string;
       extraShot: boolean;
       subtotal: number;

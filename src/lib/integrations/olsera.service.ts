@@ -172,6 +172,9 @@ export async function createOrder(
     if (item.variantId) {
       formData.append(`items[${index}][variant_id]`, item.variantId);
     }
+    if (item.note) {
+      formData.append(`items[${index}][notes]`, item.note);
+    }
   });
 
   const token = await getAccessToken();

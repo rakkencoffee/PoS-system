@@ -14,7 +14,24 @@ interface OrderData {
     menuItem: { name: string };
     quantity: number;
     size: string;
-    sugarLevel: number;
+    sugarLevel: string;
+    iceLevel: string;
+    extraShot: boolean;
+    notes: string;
+    toppings: { topping: { name: string } }[];
+  }[];
+}
+
+interface NewOrderPayload {
+  queueNumber: number;
+  paymentMethod: string;
+  items: {
+    menuItemId: number;
+    quantity: number;
+    price: number;
+    subtotal: number;
+    size: string;
+    sugarLevel: string;
     iceLevel: string;
     extraShot: boolean;
     notes: string;
@@ -152,9 +169,11 @@ export default function KitchenPage() {
               </span>
             </div>
             <div className="flex flex-wrap gap-1 mt-1.5">
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/70">
-                Sugar {item.sugarLevel}%
-              </span>
+              {item.sugarLevel !== 'normal' && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/70">
+                  Sugar {item.sugarLevel}
+                </span>
+              )}
               {item.iceLevel !== 'none' && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/70">
                   Ice: {item.iceLevel}

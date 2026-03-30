@@ -66,25 +66,25 @@ export async function POST(request: NextRequest) {
             menuItemId: number;
             quantity: number;
             size: string;
-            sugarLevel: number;
+            sugarLevel: string;
             iceLevel: string;
             extraShot: boolean;
-            notes: string;
+            note: string[];
             subtotal: number;
-            toppingIds: number[];
+            toppings: { id: number; name: string; price: number }[];
           }) => ({
-            menuItemId: item.menuItemId,
+            menuItemId: Number(item.menuItemId),
             quantity: item.quantity,
-            size: item.size || 'M',
-            sugarLevel: item.sugarLevel ?? 100,
+            size: item.size || '-',
+            sugarLevel: item.sugarLevel || 'normal',
             iceLevel: item.iceLevel || 'normal',
             extraShot: item.extraShot || false,
-            notes: item.notes || '',
             subtotal: item.subtotal,
-            toppings: item.toppingIds?.length ? {
-              create: item.toppingIds.map((toppingId: number) => ({
-                toppingId,
-              })),
+            notes: item.note ? item.note.join('\n') : '',
+            toppings: item.toppings?.length ? {
+              create: item.toppings.map((t: { id: number; name: string }) => ({
+                toppingId: typeof t.id === 'number' ? t.id : parseInt(String(t.id).split('-')[0]) || 0
+              })).filter((t: { toppingId: number }) => t.toppingId > 0)
             } : undefined,
           })),
         },

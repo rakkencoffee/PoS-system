@@ -94,9 +94,11 @@ export default function CartPage() {
                   <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-white/70">
                     Size {item.size}
                   </span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-white/70">
-                    Sugar {item.sugarLevel}%
-                  </span>
+                  {item.sugarLevel !== 'normal' && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-white/70">
+                      Sugar {item.sugarLevel}
+                    </span>
+                  )}
                   {item.iceLevel !== 'none' && (
                     <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-white/70">
                       Ice: {item.iceLevel}

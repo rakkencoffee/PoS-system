@@ -46,7 +46,7 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
   const { addItem } = useCart();
   const [optionalChoices, setOptionalChoices] = useState<Topping[]>([]);
   const [selectedSize, setSelectedSize] = useState('');
-  const [sugarLevel, setSugarLevel] = useState(100);
+  const [sugarLevel, setSugarLevel] = useState('normal');
   const [iceLevel, setIceLevel] = useState('normal');
   const [selectedChoices, setSelectedChoices] = useState<Topping[]>([]);
   const [quantity, setQuantity] = useState(1);
@@ -60,10 +60,12 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
 
   useEffect(() => {
     if (showOptionalChoice) {
-      fetch('/api/toppings')
-        .then((res) => res.json())
-        .then(setOptionalChoices)
-        .catch(console.error);
+      // Hardcoded addons logic for Coffee Based & Milk Based
+      setOptionalChoices([
+        { id: 9001, name: 'Almond Milk', price: 6000 },
+        { id: 9002, name: 'Espresso Shot', price: 6000 },
+        { id: 9003, name: 'Whip Cream', price: 6000 },
+      ]);
     }
   }, [showOptionalChoice]);
 
@@ -80,12 +82,15 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
   const unitPrice = item.price + sizeAdjustment + choicesTotal;
   const totalPrice = unitPrice * quantity;
 
-  const sugarLevels = [0, 25, 50, 75, 100];
+  const sugarLevels = [
+    { key: 'less', label: 'Less' },
+    { key: 'normal', label: 'Normal' },
+    { key: 'more', label: 'More' }
+  ];
   const iceLevels = [
-    { key: 'none', label: 'No Ice', icon: '🚫' },
     { key: 'less', label: 'Less', icon: '🧊' },
     { key: 'normal', label: 'Normal', icon: '🧊🧊' },
-    { key: 'more', label: 'Extra', icon: '🧊🧊🧊' },
+    { key: 'more', label: 'More', icon: '🧊🧊🧊' },
   ];
 
   const toggleChoice = (choice: Topping) => {
@@ -105,8 +110,8 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
       image: item.image,
       quantity,
       size: selectedSize || '-',
-      sugarLevel: isDrink ? sugarLevel : 100,
-      iceLevel: isDrink ? iceLevel : 'none',
+      sugarLevel: isDrink ? sugarLevel : 'normal',
+      iceLevel: isDrink ? iceLevel : 'normal',
       extraShot: false,
       toppings: selectedChoices.map((t) => ({ id: t.id, name: t.name, price: t.price })),
       subtotal: totalPrice,
@@ -185,20 +190,20 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
           {isDrink && (
             <div>
               <h3 className="text-sm font-semibold text-(--text-secondary) uppercase tracking-wider mb-3">
-                Sugar Level — {sugarLevel}%
+                Sugar Level
               </h3>
               <div className="flex gap-2">
                 {sugarLevels.map((level) => (
                   <button
-                    key={level}
-                    onClick={() => setSugarLevel(level)}
+                    key={level.key}
+                    onClick={() => setSugarLevel(level.key)}
                     className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                      sugarLevel === level
+                      sugarLevel === level.key
                         ? 'bg-linear-to-r from-[#c41525] to-[#A8131E] text-white shadow-lg'
                         : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle)'
                     }`}
                   >
-                    {level}%
+                    {level.label}
                   </button>
                 ))}
               </div>
