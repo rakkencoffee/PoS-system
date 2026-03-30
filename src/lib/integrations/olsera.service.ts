@@ -125,18 +125,41 @@ export interface OlseraProductGroup {
 }
 
 /**
- * Fetch all products from Olsera
+ * Fetch all products from Olsera (with pagination)
  */
 export async function getProducts(): Promise<OlseraProduct[]> {
-  const res = await olseraFetch('/product');
-  if (!res.ok) {
-    const text = await res.text();
-    console.error('Olsera getProducts error:', text);
-    throw new Error(`Failed to fetch products: ${res.status}`);
+  const allProducts: OlseraProduct[] = [];
+  let page = 1;
+  const perPage = 50; // Request more items per page to reduce API calls
+
+  while (true) {
+    const res = await olseraFetch(`/product?page=${page}&per_page=${perPage}`);
+    if (!res.ok) {
+      const text = await res.text();
+      console.error('Olsera getProducts error:', text);
+      throw new Error(`Failed to fetch products: ${res.status}`);
+    }
+
+    const data = await res.json();
+    const products: OlseraProduct[] = data.data || data;
+
+    if (!products || products.length === 0) {
+      break; // No more pages
+    }
+
+    allProducts.push(...products);
+    console.log(`[Olsera API] Fetched page ${page}: ${products.length} products (total: ${allProducts.length})`);
+
+    // If we got fewer items than per_page, we've reached the last page
+    if (products.length < perPage) {
+      break;
+    }
+
+    page++;
   }
 
-  const data = await res.json();
-  return data.data || data;
+  console.log(`[Olsera API] Total products fetched: ${allProducts.length}`);
+  return allProducts;
 }
 
 /**
