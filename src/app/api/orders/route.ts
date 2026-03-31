@@ -1,13 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
 import { getNextQueueNumber } from '@/lib/queue';
 import { orderEvents } from '@/lib/events';
+
+const USE_OLSERA = process.env.USE_OLSERA === 'true';
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
     const today = searchParams.get('today');
+
+    if (USE_OLSERA) {
+      // Fetch open orders from Olsera
+      const olsera = await import('@/lib/integrations/olsera.service');
+      try {
+        const res = await olsera.olseraFetch('/order/openorder?per_page=50');
+        if (!res.ok) {
+          console.error('Olsera orders fetch failed:', res.status);
+          return NextResponse.json([]);
+        }
+        const data = await res.json();
+        const rawOrders = data.data || data || [];
+
+        // Normalize Olsera orders to match frontend format
+        const orders = (Array.isArray(rawOrders) ? rawOrders : []).map((order: any) => ({
+          id: `OLSERA-${order.id || order.order_id}`,
+          queueNumber: (order.id || order.order_id) % 1000,
+          status: order.payment_status === '1' || order.payment_status === 'paid' ? 'PREPARING' : 'PENDING',
+          totalAmount: order.total || order.grand_total || 0,
+          paymentMethod: 'MIDTRANS',
+          createdAt: order.order_date || order.created_at || new Date().toISOString(),
+          items: (order.items || []).map((item: any, idx: number) => ({
+            id: idx,
+            menuItem: { name: item.product_name || item.name || 'Item' },
+            quantity: item.qty || item.quantity || 1,
+            size: item.variant_name || '-',
+            subtotal: item.price || 0,
+          })),
+        }));
+
+        return NextResponse.json(orders);
+      } catch (olseraError) {
+        console.error('Olsera orders error:', olseraError);
+        return NextResponse.json([]);
+      }
+    }
+
+    // Fallback: Prisma
+    const prisma = (await import('@/lib/prisma')).default;
 
     const where: Record<string, unknown> = {};
 
@@ -55,6 +95,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const queueNumber = await getNextQueueNumber();
 
+    const prisma = (await import('@/lib/prisma')).default;
     const order = await prisma.order.create({
       data: {
         queueNumber,

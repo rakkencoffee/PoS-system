@@ -55,7 +55,7 @@ async function getAccessToken(): Promise<string> {
 /**
  * Make authenticated API call to Olsera
  */
-async function olseraFetch(path: string, options: RequestInit = {}, retryCount = 0): Promise<Response> {
+export async function olseraFetch(path: string, options: RequestInit = {}, retryCount = 0): Promise<Response> {
   const token = await getAccessToken();
 
   // Add a timestamp parameter to aggressively bypass any Next.js disk caching
