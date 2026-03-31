@@ -348,15 +348,50 @@ export async function createOrder(
 
 /**
  * Update order status after payment
+ * For Olsera: runs the full auto-settlement flow
  */
 export async function updateOrderPaymentStatus(
   orderId: string,
-  status: 'paid' | 'failed' | 'expired'
+  status: 'paid' | 'failed' | 'expired',
+  paymentAmount?: number
 ): Promise<void> {
   if (USE_OLSERA && orderId.startsWith('OLSERA-')) {
-    // POS Open APIs (like Olsera) typically rely on the Cashier to mark 
-    // Open Orders as "Completed" and input the exact payment amount at the physical store.
-    console.log(`[Olsera POS] Midtrans status for ${orderId} is ${status}. Wait for Cashier to complete.`);
+    const olseraOrderId = parseInt(orderId.replace('OLSERA-', ''));
+
+    if (status === 'paid') {
+      try {
+        // Step 1: Get payment methods to find QRIS/Midtrans mode ID
+        const paymentMethods = await olsera.getPaymentMethods();
+        
+        // Try to find a matching payment mode (QRIS, Midtrans, E-Wallet, or Online)
+        const targetNames = ['qris', 'midtrans', 'e-wallet', 'ewallet', 'online', 'transfer'];
+        let paymentModeId = paymentMethods[0]?.id; // fallback to first available
+        
+        for (const method of paymentMethods) {
+          const name = String(method.name).toLowerCase();
+          if (targetNames.some((t) => name.includes(t))) {
+            paymentModeId = method.id;
+            console.log(`[Auto-Settlement] Using payment mode: ${method.name} (ID: ${method.id})`);
+            break;
+          }
+        }
+
+        // Step 2: Record payment details on the order
+        if (paymentAmount && paymentAmount > 0) {
+          await olsera.updateOrderPayment(olseraOrderId, paymentAmount, paymentModeId);
+        }
+
+        // Step 3: Mark order as PAID
+        await olsera.markOrderAsPaid(olseraOrderId, true);
+
+        console.log(`[Auto-Settlement] ✅ Order ${orderId} fully settled in Olsera POS!`);
+      } catch (error) {
+        // Log but don't throw — webhook must still return 200 to Midtrans
+        console.error(`[Auto-Settlement] ❌ Failed to settle order ${orderId} in Olsera:`, error);
+      }
+    } else {
+      console.log(`[Olsera POS] Order ${orderId} status: ${status}. No Olsera action needed.`);
+    }
     return;
   }
 

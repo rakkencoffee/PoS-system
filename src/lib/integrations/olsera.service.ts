@@ -266,36 +266,85 @@ export async function addItemToOrder(
 }
 
 /**
- * Update order payment status in Olsera
+ * Fetch available payment methods from Olsera
+ * GET /global/list-payment
  */
-export async function updateOrderStatus(
-  orderId: number,
-  status: string = 'paid'
-): Promise<unknown> {
-  const formData = new URLSearchParams();
-  formData.append('order_id', String(orderId));
-  formData.append('status', status);
-
-  const token = await getAccessToken();
-
-  const res = await fetch(
-    `${OLSERA_API_BASE}/api/open-api/v1/en/order/openorder/status`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json',
-      },
-      body: formData,
-    }
-  );
-
+export async function getPaymentMethods(): Promise<{ id: number; name: string; [key: string]: unknown }[]> {
+  const res = await olseraFetch('/global/list-payment?per_page=50');
   if (!res.ok) {
     const text = await res.text();
-    console.error('Olsera updateOrderStatus error:', text);
-    throw new Error(`Failed to update order status: ${res.status}`);
+    console.error('Olsera getPaymentMethods error:', text);
+    throw new Error(`Failed to fetch payment methods: ${res.status}`);
   }
 
   const data = await res.json();
+  const methods = data.data || data;
+  console.log('[Olsera API] Payment methods:', JSON.stringify(methods.map((m: { id: number; name: string }) => ({ id: m.id, name: m.name }))));
+  return methods;
+}
+
+/**
+ * Record payment details on an open order
+ * POST /order/openorder/updatepayment
+ */
+export async function updateOrderPayment(
+  orderId: number,
+  paymentAmount: number,
+  paymentModeId: number,
+  currencyId: string = 'IDR'
+): Promise<unknown> {
+  const today = new Date().toISOString().split('T')[0];
+
+  const formData = new URLSearchParams();
+  formData.append('order_id', String(orderId));
+  formData.append('payment_amount', String(paymentAmount));
+  formData.append('payment_currency_id', currencyId);
+  formData.append('payment_date', today);
+  formData.append('payment_mode_id', String(paymentModeId));
+
+  const res = await olseraFetch('/order/openorder/updatepayment', {
+    method: 'POST',
+    body: formData,
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    console.error('Olsera updateOrderPayment error:', text);
+    throw new Error(`Failed to update order payment: ${res.status}`);
+  }
+
+  const data = await res.json();
+  console.log(`[Olsera API] Payment recorded for order ${orderId}: ${paymentAmount} IDR via mode ${paymentModeId}`);
   return data.data || data;
 }
+
+/**
+ * Mark an open order as Paid (status=1) or Unpaid (status=0)
+ * POST /order/openorder/updatepaymentstatus
+ */
+export async function markOrderAsPaid(
+  orderId: number,
+  paid: boolean = true
+): Promise<unknown> {
+  const formData = new URLSearchParams();
+  formData.append('order_id', String(orderId));
+  formData.append('status', paid ? '1' : '0');
+
+  const res = await olseraFetch('/order/openorder/updatepaymentstatus', {
+    method: 'POST',
+    body: formData,
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    console.error('Olsera markOrderAsPaid error:', text);
+    throw new Error(`Failed to mark order as paid: ${res.status}`);
+  }
+
+  const data = await res.json();
+  console.log(`[Olsera API] Order ${orderId} marked as ${paid ? 'PAID' : 'UNPAID'}`);
+  return data.data || data;
+}
+

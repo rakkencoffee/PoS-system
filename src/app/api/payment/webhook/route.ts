@@ -49,9 +49,11 @@ export async function POST(request: NextRequest) {
     // Parse status
     const status = parseTransactionStatus(transaction_status, fraud_status);
 
-    // Update order in POS
+    // Update order in POS (with auto-settlement for Olsera)
+    const amount = gross_amount ? parseFloat(String(gross_amount)) : undefined;
+
     if (status === 'success') {
-      await updateOrderPaymentStatus(order_id, 'paid');
+      await updateOrderPaymentStatus(order_id, 'paid', amount);
     } else if (status === 'failed') {
       await updateOrderPaymentStatus(order_id, 'failed');
     } else if (status === 'expired') {
