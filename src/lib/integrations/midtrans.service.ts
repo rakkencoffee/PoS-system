@@ -62,19 +62,8 @@ export async function createSnapTransaction(params: CreateTransactionParams): Pr
       first_name: params.customerName || 'Kiosk Customer',
       email: params.customerEmail || 'kiosk@startfriday.co',
     },
-    // Enable all available payment methods for kiosk
-    enabled_payments: [
-      'gopay',
-      'shopeepay',
-      'dana',
-      'ovo',
-      'other_qris',
-      'bca_va',
-      'bni_va',
-      'bri_va',
-      'permata_va',
-      'echannel', // Mandiri Bill
-    ],
+    // Payment methods are controlled from Midtrans Dashboard
+    // (Settings > Snap Preferences > Payment Channels)
     callbacks: {
       finish: '/success',
     },
