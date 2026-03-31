@@ -20,10 +20,19 @@ export async function GET(
         
         // Normalize Olsera response to match our frontend format
         const items = Array.isArray(orderDetail.items) ? orderDetail.items : [];
+        let kdsStatus = 'PENDING';
+        const oStatus = orderDetail.status?.toUpperCase() || '';
+        
+        if (oStatus === 'A') kdsStatus = 'PREPARING';
+        else if (oStatus === 'Z') kdsStatus = 'COMPLETED';
+        else if (orderDetail.payment_status === '1' || orderDetail.payment_status === 'paid') {
+          kdsStatus = 'PENDING'; // Paid but not yet prepared
+        }
+
         return NextResponse.json({
           id: id,
           queueNumber: olseraOrderId % 1000, // Last 3 digits as queue number
-          status: orderDetail.status === '1' || orderDetail.status === 'paid' ? 'PREPARING' : 'PENDING',
+          status: kdsStatus,
           totalAmount: orderDetail.total || 0,
           createdAt: new Date().toISOString(),
           items: items.map((item: any, idx: number) => ({
@@ -84,9 +93,45 @@ export async function PATCH(
     const { id } = await params;
     const body = await request.json();
 
-    // Olsera orders can't be patched via local DB
+    // Olsera orders: update state locally and emit SSE event
     if (id.startsWith('OLSERA-')) {
-      return NextResponse.json({ id, status: body.status });
+      const olseraOrderId = parseInt(id.replace('OLSERA-', ''));
+      
+      // Map KDS status to Olsera status
+      let olseraStatus: 'P' | 'A' | 'S' | 'Z' | 'X' = 'P';
+      if (body.status === 'PREPARING') olseraStatus = 'A'; // Confirmed/Preparing
+      else if (body.status === 'COMPLETED') olseraStatus = 'Z'; // Completed
+      
+      try {
+        const olsera = await import('@/lib/integrations/olsera.service');
+        await olsera.updateOrderStatus(olseraOrderId, olseraStatus);
+        console.log(`Successfully synced Olsera order ${olseraOrderId} to status ${olseraStatus}`);
+      } catch (err: any) {
+        console.error('Failed to sync status to Olsera:', err.message);
+        if (err.message.includes('406') || err.message.includes('payment info')) {
+          return NextResponse.json({ error: 'Order must be fully paid in Olsera before it can be prepared or completed.' }, { status: 400 });
+        }
+        return NextResponse.json({ error: 'Failed to sync status to Olsera' }, { status: 500 });
+      }
+
+      const updatedOrder = {
+        id: id,
+        queueNumber: olseraOrderId % 1000,
+        status: body.status,
+        totalAmount: 0,
+        paymentMethod: 'MIDTRANS',
+        createdAt: new Date().toISOString(),
+        items: [],
+      };
+
+      // Emit SSE so KDS updates in real-time
+      if (body.status === 'COMPLETED') {
+        orderEvents.emit('ORDER_UPDATED', { order: updatedOrder });
+      } else {
+        orderEvents.emit('ORDER_UPDATED', { order: updatedOrder });
+      }
+
+      return NextResponse.json(updatedOrder);
     }
 
     const prisma = (await import('@/lib/prisma')).default;

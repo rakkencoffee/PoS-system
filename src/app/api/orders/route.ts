@@ -19,25 +19,45 @@ export async function GET(request: NextRequest) {
           console.error('Olsera orders fetch failed:', res.status);
           return NextResponse.json([]);
         }
+        
         const data = await res.json();
         const rawOrders = data.data || data || [];
 
+        // Filter out unpaid orders so they don't show up in the KDS
+        const validOrders = (Array.isArray(rawOrders) ? rawOrders : []).filter((order: any) => {
+          const isPaid = order.payment_status === '1' || order.payment_status === 'paid';
+          const oStatus = order.status?.toUpperCase() || '';
+          return isPaid || oStatus === 'A' || oStatus === 'Z' || oStatus === 'S' || oStatus === 'T';
+        });
+
         // Normalize Olsera orders to match frontend format
-        const orders = (Array.isArray(rawOrders) ? rawOrders : []).map((order: any) => ({
-          id: `OLSERA-${order.id || order.order_id}`,
-          queueNumber: (order.id || order.order_id) % 1000,
-          status: order.payment_status === '1' || order.payment_status === 'paid' ? 'PREPARING' : 'PENDING',
-          totalAmount: order.total || order.grand_total || 0,
-          paymentMethod: 'MIDTRANS',
-          createdAt: order.order_date || order.created_at || new Date().toISOString(),
-          items: (order.items || []).map((item: any, idx: number) => ({
-            id: idx,
-            menuItem: { name: item.product_name || item.name || 'Item' },
-            quantity: item.qty || item.quantity || 1,
-            size: item.variant_name || '-',
-            subtotal: item.price || 0,
-          })),
-        }));
+        const orders = validOrders.map((order: any) => {
+          let kdsStatus = 'PENDING';
+          const oStatus = order.status?.toUpperCase() || '';
+          const numericId = order.id || order.order_id;
+          
+          if (oStatus === 'A') kdsStatus = 'PREPARING';
+          else if (oStatus === 'Z') kdsStatus = 'COMPLETED';
+          else if (order.payment_status === '1' || order.payment_status === 'paid') {
+            kdsStatus = 'PENDING'; // Paid but not yet prepared
+          }
+
+          return {
+            id: `OLSERA-${numericId}`,
+            queueNumber: numericId % 1000,
+            status: kdsStatus,
+            totalAmount: order.total || order.grand_total || 0,
+            paymentMethod: 'MIDTRANS',
+            createdAt: order.order_date || order.created_at || new Date().toISOString(),
+            items: (order.items || []).map((item: any, idx: number) => ({
+              id: idx,
+              menuItem: { name: item.product_name || item.name || 'Item' },
+              quantity: item.qty || item.quantity || 1,
+              size: item.variant_name || '-',
+              subtotal: item.price || 0,
+            })),
+          };
+        });
 
         return NextResponse.json(orders);
       } catch (olseraError) {

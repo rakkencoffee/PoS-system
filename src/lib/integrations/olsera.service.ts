@@ -200,6 +200,39 @@ export async function getOrderDetail(orderId: number): Promise<{
 }
 
 /**
+ * Update Olsera order status
+ * Mapping KDS to Olsera: PENDING->P, PREPARING->A, READY->S, COMPLETED->Z
+ */
+export async function updateOrderStatus(orderId: number, status: 'P' | 'A' | 'S' | 'Z' | 'X'): Promise<any> {
+  const formData = new URLSearchParams();
+  formData.append('order_id', String(orderId));
+  formData.append('status', status);
+
+  // Olsera requires shipping_date when marking order as Shipped (S) or Completed (Z/T)
+  if (status === 'S' || status === 'Z') {
+    const now = new Date();
+    const formattedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+    formData.append('shipping_date', formattedDate);
+  }
+
+  const res = await olseraFetch('/order/openorder/updatestatus', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: formData.toString(),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    console.error(`Olsera updateOrderStatus error for ${orderId}:`, text);
+    throw new Error(`Failed to update order status: ${res.status}`);
+  }
+
+  return await res.json();
+}
+
+/**
  * Create an open order in Olsera
  */
 export async function createOrder(

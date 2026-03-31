@@ -63,11 +63,10 @@ function StatusContent() {
   const statusConfig: Record<string, { label: string; color: string; icon: string; desc: string }> = {
     PENDING: { label: 'Pending', color: 'from-yellow-500 to-amber-500', icon: '⏳', desc: 'Your order is in the queue' },
     PREPARING: { label: 'Preparing', color: 'from-blue-500 to-cyan-500', icon: '👨‍🍳', desc: 'The barista is making your drink' },
-    READY: { label: 'Ready!', color: 'from-green-500 to-emerald-500', icon: '✅', desc: 'Come pick up your order!' },
     COMPLETED: { label: 'Completed', color: 'from-gray-500 to-gray-600', icon: '🎉', desc: 'Order completed. Thank you!' },
   };
 
-  const steps = ['PENDING', 'PREPARING', 'READY', 'COMPLETED'];
+  const steps = ['PENDING', 'PREPARING', 'COMPLETED'];
   const currentStep = steps.indexOf(order?.status || 'PENDING');
 
   if (!order) {

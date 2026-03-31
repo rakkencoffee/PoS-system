@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 
 interface OrderData {
-  id: number;
+  id: number | string;
   queueNumber: number;
   status: string;
   totalAmount: number;
@@ -42,7 +42,7 @@ interface NewOrderPayload {
 export default function KitchenPage() {
   const [orders, setOrders] = useState<OrderData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState<number | null>(null);
+  const [updating, setUpdating] = useState<number | string | null>(null);
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -86,16 +86,33 @@ export default function KitchenPage() {
     return () => eventSource.close();
   }, []);
 
-  const updateOrderStatus = async (orderId: number, newStatus: string) => {
+  const updateOrderStatus = async (orderId: number | string, newStatus: string) => {
     setUpdating(orderId);
     try {
-      await fetch(`/api/orders/${orderId}`, {
+      const res = await fetch(`/api/orders/${orderId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
       });
-    } catch (error) {
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to update order');
+      }
+      
+      const updatedOrder = await res.json();
+
+      // Optimistic UI update — move card between columns immediately
+      if (newStatus === 'COMPLETED') {
+        setOrders((prev) => prev.filter((o) => String(o.id) !== String(orderId)));
+      } else {
+        setOrders((prev) =>
+          prev.map((o) => String(o.id) === String(orderId) ? { ...o, ...updatedOrder } : o)
+        );
+      }
+    } catch (error: any) {
       console.error('Error updating order:', error);
+      alert(`Gagal: ${error.message}`);
     } finally {
       setUpdating(null);
     }
@@ -104,18 +121,15 @@ export default function KitchenPage() {
   const statusColors: Record<string, string> = {
     PENDING: 'from-yellow-500 to-amber-500',
     PREPARING: 'from-blue-500 to-cyan-500',
-    READY: 'from-green-500 to-emerald-500',
   };
 
   const statusBg: Record<string, string> = {
     PENDING: 'border-yellow-500/30 bg-yellow-500/5',
     PREPARING: 'border-blue-500/30 bg-blue-500/5',
-    READY: 'border-green-500/30 bg-green-500/5',
   };
 
   const pendingOrders = orders.filter((o) => o.status === 'PENDING');
   const preparingOrders = orders.filter((o) => o.status === 'PREPARING');
-  const readyOrders = orders.filter((o) => o.status === 'READY');
 
   const formatTime = (dateStr: string) => {
     return new Date(dateStr).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
@@ -145,9 +159,7 @@ export default function KitchenPage() {
           </span>
           <div>
             <span className={`badge text-[10px] ${
-              order.status === 'PENDING' ? 'badge-status-pending' :
-              order.status === 'PREPARING' ? 'badge-status-preparing' :
-              'badge-status-ready'
+              order.status === 'PENDING' ? 'badge-status-pending' : 'badge-status-preparing'
             }`}>
               {order.status}
             </span>
@@ -210,20 +222,11 @@ export default function KitchenPage() {
         )}
         {order.status === 'PREPARING' && (
           <button
-            onClick={() => updateOrderStatus(order.id, 'READY')}
+            onClick={() => updateOrderStatus(order.id, 'COMPLETED')}
             disabled={updating === order.id}
             className="flex-1 py-3 rounded-xl bg-linear-to-r from-green-500 to-emerald-500 text-white font-semibold text-sm transition-all hover:shadow-lg hover:shadow-green-500/25 active:scale-95 disabled:opacity-50"
           >
-            {updating === order.id ? '...' : '✅ Mark Ready'}
-          </button>
-        )}
-        {order.status === 'READY' && (
-          <button
-            onClick={() => updateOrderStatus(order.id, 'COMPLETED')}
-            disabled={updating === order.id}
-            className="flex-1 py-3 rounded-xl bg-linear-to-r from-gray-500 to-gray-600 text-white font-semibold text-sm transition-all hover:shadow-lg active:scale-95 disabled:opacity-50"
-          >
-            {updating === order.id ? '...' : '🎉 Complete'}
+            {updating === order.id ? '...' : '🎉 Complete Order'}
           </button>
         )}
       </div>
@@ -260,7 +263,7 @@ export default function KitchenPage() {
         </div>
       </div>
 
-      {/* 3-column layout */}
+      {/* 2-column layout */}
       {orders.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20">
           <span className="text-7xl mb-6">🍵</span>
@@ -268,7 +271,7 @@ export default function KitchenPage() {
           <p className="text-(--text-muted)">Waiting for new orders...</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Pending */}
           <div>
             <div className="flex items-center gap-2 mb-4">
@@ -292,19 +295,6 @@ export default function KitchenPage() {
             </div>
             <div className="space-y-4">
               {preparingOrders.map(renderOrderCard)}
-            </div>
-          </div>
-
-          {/* Ready */}
-          <div>
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
-              <h2 className="text-lg font-semibold text-green-400">
-                Ready ({readyOrders.length})
-              </h2>
-            </div>
-            <div className="space-y-4">
-              {readyOrders.map(renderOrderCard)}
             </div>
           </div>
         </div>
