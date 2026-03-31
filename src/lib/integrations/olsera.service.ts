@@ -178,6 +178,28 @@ export async function getProductGroups(): Promise<OlseraProductGroup[]> {
 }
 
 /**
+ * Fetch open order detail from Olsera
+ * GET /order/openorder/detail?order_id=xxx
+ */
+export async function getOrderDetail(orderId: number): Promise<{
+  id: number;
+  status: string;
+  items: { product_name: string; qty: number; price: number; [key: string]: unknown }[];
+  total: number;
+  [key: string]: unknown;
+}> {
+  const res = await olseraFetch(`/order/openorder/detail?order_id=${orderId}`);
+  if (!res.ok) {
+    const text = await res.text();
+    console.error('Olsera getOrderDetail error:', text);
+    throw new Error(`Failed to fetch order detail: ${res.status}`);
+  }
+
+  const data = await res.json();
+  return data.data || data;
+}
+
+/**
  * Create an open order in Olsera
  */
 export async function createOrder(

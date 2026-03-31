@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 interface OrderData {
-  id: number;
+  id: number | string;
   queueNumber: number;
   status: string;
   totalAmount: number;
@@ -28,6 +28,10 @@ function StatusContent() {
     try {
       const res = await fetch(`/api/orders/${orderId}`);
       const data = await res.json();
+      if (data.error) {
+        console.error('Order fetch error:', data.error);
+        return;
+      }
       setOrder(data);
     } catch (error) {
       console.error('Error fetching order:', error);
@@ -45,7 +49,7 @@ function StatusContent() {
     eventSource.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        if (data.type === 'ORDER_UPDATED' && data.order?.id === parseInt(orderId || '0')) {
+        if (data.type === 'ORDER_UPDATED' && String(data.order?.id) === orderId) {
           setOrder(data.order);
         }
       } catch {
