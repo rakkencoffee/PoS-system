@@ -108,10 +108,20 @@ export default function CheckoutPage() {
       // 2. Open Midtrans Snap popup
       if (window.snap) {
         window.snap.pay(snapToken, {
-          onSuccess: () => {
-            setPaymentStatus('Payment successful!');
+          onSuccess: async () => {
+            setPaymentStatus('Payment successful! Verifying...');
+            // Force verify payment immediately (crucial for local dev since webhooks can't reach localhost)
+            try {
+              await fetch(`/api/payment/verify?orderId=${orderId}`, { method: 'POST' });
+            } catch (e) {
+              console.error('Failed to manually verify payment:', e);
+            }
             clearCart();
-            router.push(`/success?orderId=${orderId}`);
+            
+            // Extract the queue number (last 3 digits of numeric ID)
+            const numericId = orderId.replace('OLSERA-', '');
+            const queueNum = numericId.slice(-3);
+            router.push(`/success?orderId=${orderId}&queue=${queueNum}`);
           },
           onPending: () => {
             setPaymentStatus('Waiting for payment...');

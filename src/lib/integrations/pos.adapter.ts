@@ -285,9 +285,25 @@ export async function createOrder(
   items: { productId: string; variantId?: string; quantity: number; price?: number; note?: string }[]
 ): Promise<{ orderId: string; olseraOrderId?: number }> {
   if (USE_OLSERA) {
-    // 1. Create open order with items
-    const order = await olsera.createOrder(items);
-    const orderId = order.id || order.order_id;
+    // 1. Create open order
+    const order = await olsera.createOrder([]); // create empty order first
+    const orderId = (order.id || order.order_id) as number;
+
+    // 2. Add each item separately as required by Olsera API
+    for (const item of items) {
+      if (!item.productId) continue;
+      try {
+        await olsera.addItemToOrder(
+          orderId,
+          parseInt(item.productId),
+          item.variantId ? parseInt(item.variantId) : null,
+          item.quantity,
+          item.note || ''
+        );
+      } catch (err) {
+        console.error(`Failed to add item ${item.productId} to order ${orderId}:`, err);
+      }
+    }
 
     return {
       orderId: `OLSERA-${orderId}`,
@@ -359,31 +375,40 @@ export async function updateOrderPaymentStatus(
     const olseraOrderId = parseInt(orderId.replace('OLSERA-', ''));
 
     if (status === 'paid') {
+      let paymentModeId: number | undefined = undefined;
+
       try {
         // Step 1: Get payment methods to find QRIS/Midtrans mode ID
+        // (This API randomly returns 500 on Sandbox, so we wrap it)
         const paymentMethods = await olsera.getPaymentMethods();
-        
-        // Try to find a matching payment mode (QRIS, Midtrans, E-Wallet, or Online)
         const targetNames = ['qris', 'midtrans', 'e-wallet', 'ewallet', 'online', 'transfer'];
-        let paymentModeId = paymentMethods[0]?.id; // fallback to first available
+        paymentModeId = paymentMethods[0]?.id;
         
         for (const method of paymentMethods) {
           const name = String(method.name).toLowerCase();
           if (targetNames.some((t) => name.includes(t))) {
             paymentModeId = method.id;
-            console.log(`[Auto-Settlement] Using payment mode: ${method.name} (ID: ${method.id})`);
             break;
           }
         }
+      } catch (paymentDetailsError) {
+        console.warn(`[Auto-Settlement] Non-fatal: Could not fetch payment methods from Olsera. Falling back to default ID 1.`);
+        paymentModeId = 1; // Fallback to 1 (usually Cash/Default)
+      }
 
-        // Step 2: Record payment details on the order
-        if (paymentAmount && paymentAmount > 0) {
-          await olsera.updateOrderPayment(olseraOrderId, paymentAmount, paymentModeId);
+      try {
+        // Step 2: Record payment details on the order (Required before markOrderAsPaid)
+        if (paymentAmount && paymentAmount > 0 && paymentModeId) {
+          try {
+            await olsera.updateOrderPayment(olseraOrderId, paymentAmount, paymentModeId);
+          } catch (paymentAppendError) {
+            console.warn(`[Auto-Settlement] Non-fatal: Could not append updateOrderPayment details to Olsera order ${orderId}:`, paymentAppendError);
+          }
         }
 
-        // Step 3: Mark order as PAID
+        // Step 3: Mark order as PAID (Crucial for KDS visibility)
         await olsera.markOrderAsPaid(olseraOrderId, true);
-
+        
         console.log(`[Auto-Settlement] ✅ Order ${orderId} fully settled in Olsera POS!`);
       } catch (error) {
         // Log but don't throw — webhook must still return 200 to Midtrans

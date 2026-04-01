@@ -181,22 +181,23 @@ export async function getProductGroups(): Promise<OlseraProductGroup[]> {
  * Fetch open order detail from Olsera
  * GET /order/openorder/detail?order_id=xxx
  */
-export async function getOrderDetail(orderId: number): Promise<{
-  id: number;
-  status: string;
-  items: { product_name: string; qty: number; price: number; [key: string]: unknown }[];
-  total: number;
-  [key: string]: unknown;
-}> {
-  const res = await olseraFetch(`/order/openorder/detail?order_id=${orderId}`);
+export async function getOrderDetail(orderId: number): Promise<any> {
+  const res = await olseraFetch(`/order/openorder?per_page=50`);
   if (!res.ok) {
     const text = await res.text();
-    console.error('Olsera getOrderDetail error:', text);
-    throw new Error(`Failed to fetch order detail: ${res.status}`);
+    console.error('Olsera getOrderDetail error (fetch list):', text);
+    throw new Error(`Failed to fetch open orders for detail: ${res.status}`);
   }
 
   const data = await res.json();
-  return data.data || data;
+  const rawOrders = data.data || data || [];
+  const order = rawOrders.find((o: any) => o.id === orderId || o.order_id === orderId);
+  
+  if (!order) {
+    throw new Error(`Order ${orderId} not found in open orders`);
+  }
+
+  return order;
 }
 
 /**
@@ -356,6 +357,7 @@ export async function updateOrderPayment(
   formData.append('payment_currency_id', currencyId);
   formData.append('payment_date', today);
   formData.append('payment_mode_id', String(paymentModeId));
+  formData.append('payment_seq', '1');
 
   const res = await olseraFetch('/order/openorder/updatepayment', {
     method: 'POST',
