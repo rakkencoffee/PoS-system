@@ -36,6 +36,7 @@ interface MenuItem {
   type: string;
   category?: Category;
   sizes: MenuItemSize[];
+  olseraVariants?: { id: number; name: string; price: number }[];
 }
 
 export default function MenuPage() {

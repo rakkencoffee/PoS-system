@@ -23,11 +23,13 @@ export async function GET(request: NextRequest) {
         const data = await res.json();
         const rawOrders = data.data || data || [];
 
-        // Filter out unpaid orders so they don't show up in the KDS
+        // Filter orders for KDS display
+        // Olsera uses `is_paid` (0/1), not `payment_status`
+        // Status: P=Pending, A=Diproses(Preparing), S=Shipped, Z=Selesai(Completed), T=Tunda
         const validOrders = (Array.isArray(rawOrders) ? rawOrders : []).filter((order: any) => {
-          const isPaid = order.payment_status === '1' || order.payment_status === 'paid';
-          const oStatus = order.status?.toUpperCase() || '';
-          return isPaid || oStatus === 'A' || oStatus === 'Z' || oStatus === 'S' || oStatus === 'T';
+          const oStatus = (order.status || '').toUpperCase();
+          // Show orders that are being prepared (A), or completed (Z), or have items (paid via Kiosk)
+          return oStatus === 'A' || oStatus === 'Z' || oStatus === 'S' || oStatus === 'T' || Number(order.is_paid) === 1;
         });
 
         // Normalize Olsera orders to match frontend format
@@ -38,7 +40,7 @@ export async function GET(request: NextRequest) {
           
           if (oStatus === 'A') kdsStatus = 'PREPARING';
           else if (oStatus === 'Z') kdsStatus = 'COMPLETED';
-          else if (order.payment_status === '1' || order.payment_status === 'paid') {
+          else if (Number(order.is_paid) === 1) {
             kdsStatus = 'PENDING'; // Paid but not yet prepared
           }
 

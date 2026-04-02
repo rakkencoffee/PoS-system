@@ -7,11 +7,13 @@ type CartAction =
   | { type: 'ADD_ITEM'; payload: CartItem }
   | { type: 'REMOVE_ITEM'; payload: string }
   | { type: 'UPDATE_QUANTITY'; payload: { id: string; quantity: number } }
+  | { type: 'SET_CUSTOMER_NAME'; payload: string }
   | { type: 'CLEAR_CART' };
 
 const initialState: CartState = {
   items: [],
   totalAmount: 0,
+  customerName: '',
 };
 
 function calculateTotal(items: CartItem[]): number {
@@ -49,16 +51,16 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         newItems = [...state.items, action.payload];
       }
 
-      return { items: newItems, totalAmount: calculateTotal(newItems) };
+      return { ...state, items: newItems, totalAmount: calculateTotal(newItems) };
     }
     case 'REMOVE_ITEM': {
       const newItems = state.items.filter((item) => item.id !== action.payload);
-      return { items: newItems, totalAmount: calculateTotal(newItems) };
+      return { ...state, items: newItems, totalAmount: calculateTotal(newItems) };
     }
     case 'UPDATE_QUANTITY': {
       if (action.payload.quantity <= 0) {
         const newItems = state.items.filter((item) => item.id !== action.payload.id);
-        return { items: newItems, totalAmount: calculateTotal(newItems) };
+        return { ...state, items: newItems, totalAmount: calculateTotal(newItems) };
       }
       const newItems = state.items.map((item) => {
         if (item.id === action.payload.id) {
@@ -71,7 +73,10 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         }
         return item;
       });
-      return { items: newItems, totalAmount: calculateTotal(newItems) };
+      return { ...state, items: newItems, totalAmount: calculateTotal(newItems) };
+    }
+    case 'SET_CUSTOMER_NAME': {
+      return { ...state, customerName: action.payload };
     }
     case 'CLEAR_CART':
       return initialState;
@@ -85,6 +90,7 @@ interface CartContextType {
   addItem: (item: CartItem) => void;
   removeItem: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
+  setCustomerName: (name: string) => void;
   clearCart: () => void;
   itemCount: number;
 }
@@ -105,6 +111,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const updateQuantity = useCallback((id: string, quantity: number) => {
     dispatch({ type: 'UPDATE_QUANTITY', payload: { id, quantity } });
   }, []);
+  
+  const setCustomerName = useCallback((name: string) => {
+    dispatch({ type: 'SET_CUSTOMER_NAME', payload: name });
+  }, []);
 
   const clearCart = useCallback(() => {
     dispatch({ type: 'CLEAR_CART' });
@@ -114,7 +124,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   return (
     <CartContext.Provider
-      value={{ cart, addItem, removeItem, updateQuantity, clearCart, itemCount }}
+      value={{ cart, addItem, removeItem, updateQuantity, setCustomerName, clearCart, itemCount }}
     >
       {children}
     </CartContext.Provider>

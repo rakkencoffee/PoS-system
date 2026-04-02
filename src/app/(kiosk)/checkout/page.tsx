@@ -85,7 +85,7 @@ export default function CheckoutPage() {
             name: item.name,
             price: item.subtotal / item.quantity,
             quantity: item.quantity,
-            variantId: item.size,
+            variantId: item.olseraVariantId ? String(item.olseraVariantId) : undefined,
             note: [
               item.sugarLevel && item.sugarLevel !== 'normal' && `Sugar: ${item.sugarLevel}`,
               item.iceLevel && item.iceLevel !== 'normal' && `Ice: ${item.iceLevel}`,
@@ -96,6 +96,7 @@ export default function CheckoutPage() {
               .join('; '),
           })),
           totalAmount: cart.totalAmount,
+          customerName: cart.customerName,
         }),
       });
 
@@ -236,6 +237,13 @@ export default function CheckoutPage() {
               <>Pay {formatCurrency(cart.totalAmount)}</>
             )}
           </button>
+          
+          {/* Tunnel Fallback Link */}
+          {snapLoaded && !isProcessing && (
+            <p className="text-center text-[10px] text-(--text-muted) mt-3">
+              Payment pop-up not appearing? <button onClick={handleCheckout} className="underline text-blue-400">Click here to retry</button>
+            </p>
+          )}
         </div>
       </div>
     </div>

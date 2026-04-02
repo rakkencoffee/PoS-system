@@ -26,6 +26,7 @@ interface CustomizeModalProps {
     sizes: MenuItemSize[];
     category?: { name: string; slug: string };
     categorySlug?: string;
+    olseraVariants?: { id: number; name: string; price: number }[];
   };
   onClose: () => void;
 }
@@ -102,6 +103,9 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
   };
 
   const handleAddToCart = () => {
+    // Look up the Olsera variant ID that matches the selected size name
+    const matchedVariant = item.olseraVariants?.find((v) => v.name === selectedSize);
+    
     addItem({
       id: `${item.id}-${Date.now()}`,
       menuItemId: item.id as number | string,
@@ -110,6 +114,7 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
       image: item.image,
       quantity,
       size: selectedSize || '-',
+      olseraVariantId: matchedVariant?.id,
       sugarLevel: isDrink ? sugarLevel : 'normal',
       iceLevel: isDrink ? iceLevel : 'normal',
       extraShot: false,

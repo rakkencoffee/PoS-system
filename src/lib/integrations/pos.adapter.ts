@@ -15,6 +15,16 @@ import type { OlseraProduct, OlseraProductGroup } from './olsera.service';
 const USE_OLSERA = process.env.USE_OLSERA === 'true';
 
 // ──────────────────────────────
+// In-Memory Cache for Test Resiliency
+// ──────────────────────────────
+let olseraCache = {
+  products: null as NormalizedMenuItem[] | null,
+  categories: null as NormalizedCategory[] | null,
+  timestamp: 0,
+};
+const CACHE_TTL_MS = 60000; // 1 minute cache
+
+// ──────────────────────────────
 // Normalized data types used by the UI
 // ──────────────────────────────
 
@@ -85,7 +95,7 @@ function mapOlseraProduct(product: OlseraProduct, groups: OlseraProductGroup[]):
   const variants = product.variants || [];
 
   // Map variants to sizes if they look like size variants
-  const sizes = variants.length > 0
+  let sizes = variants.length > 0
     ? variants.map((v) => {
         const vPrice = v.sell_price_pos != null ? v.sell_price_pos : (v.sell_price || 0);
         const parsedVPrice = typeof vPrice === 'string' ? parseFloat(vPrice) : Number(vPrice);
@@ -95,6 +105,11 @@ function mapOlseraProduct(product: OlseraProduct, groups: OlseraProductGroup[]):
         };
       })
     : [];
+
+  // Fallback for drinks (Coffee/Milk based) that might not have variants in Olsera but need size selection in Kiosk
+  if (sizes.length === 0 && (groupSlug === 'coffee-based' || groupSlug === 'milk-based' || groupSlug === 'coffee')) {
+    sizes = [{ size: 'Regular', priceAdjustment: 0 }];
+  }
 
   return {
     id: String(product.id || product.product_id),
@@ -201,12 +216,18 @@ export async function getMenuItems(filters?: {
   includeUnavailable?: boolean;
 }): Promise<NormalizedMenuItem[]> {
   if (USE_OLSERA) {
-    const [products, groups] = await Promise.all([
-      olsera.getProducts(),
-      olsera.getProductGroups(),
-    ]);
+    const isCacheExpired = Date.now() - olseraCache.timestamp > CACHE_TTL_MS;
+    
+    if (isCacheExpired || !olseraCache.products) {
+      const [products, groups] = await Promise.all([
+        olsera.getProducts(),
+        olsera.getProductGroups(),
+      ]);
+      olseraCache.products = products.map((p) => mapOlseraProduct(p, groups));
+      olseraCache.timestamp = Date.now();
+    }
 
-    let items = products.map((p) => mapOlseraProduct(p, groups));
+    let items = olseraCache.products || [];
 
     // Apply filters
     if (!filters?.includeUnavailable) {
@@ -267,9 +288,14 @@ export async function getCategories(): Promise<NormalizedCategory[]> {
   };
 
   if (USE_OLSERA) {
-    const groups = await olsera.getProductGroups();
-    const mapped = groups.map(mapOlseraGroup);
-    return mapped.sort((a, b) => (CATEGORY_ORDER[a.slug] ?? 99) - (CATEGORY_ORDER[b.slug] ?? 99));
+    const isCacheExpired = Date.now() - olseraCache.timestamp > CACHE_TTL_MS;
+    
+    if (isCacheExpired || !olseraCache.categories) {
+      const groups = await olsera.getProductGroups();
+      olseraCache.categories = groups.map(mapOlseraGroup).sort((a, b) => (CATEGORY_ORDER[a.slug] ?? 99) - (CATEGORY_ORDER[b.slug] ?? 99));
+    }
+    
+    return olseraCache.categories || [];
   }
 
   // Fallback: use Prisma
@@ -282,11 +308,12 @@ export async function getCategories(): Promise<NormalizedCategory[]> {
  * Create order in POS system
  */
 export async function createOrder(
-  items: { productId: string; variantId?: string; quantity: number; price?: number; note?: string }[]
+  items: { productId: string; variantId?: string; quantity: number; price?: number; note?: string }[],
+  customerName?: string
 ): Promise<{ orderId: string; olseraOrderId?: number }> {
   if (USE_OLSERA) {
     // 1. Create open order
-    const order = await olsera.createOrder([]); // create empty order first
+    const order = await olsera.createOrder([], { customer_name: customerName }); // create empty order first with customer name if possible
     const orderId = (order.id || order.order_id) as number;
 
     // 2. Add each item separately as required by Olsera API
@@ -354,6 +381,7 @@ export async function createOrder(
     data: {
       queueNumber,
       totalAmount,
+      customerName: customerName || '',
       paymentMethod: 'MIDTRANS',
       items: { create: orderItems },
     },
@@ -397,7 +425,7 @@ export async function updateOrderPaymentStatus(
       }
 
       try {
-        // Step 2: Record payment details on the order (Required before markOrderAsPaid)
+        // Step 2: Record payment details on the order
         if (paymentAmount && paymentAmount > 0 && paymentModeId) {
           try {
             await olsera.updateOrderPayment(olseraOrderId, paymentAmount, paymentModeId);
@@ -406,10 +434,18 @@ export async function updateOrderPaymentStatus(
           }
         }
 
-        // Step 3: Mark order as PAID (Crucial for KDS visibility)
-        await olsera.markOrderAsPaid(olseraOrderId, true);
+        // Step 3: Move order to "Diproses" (A = Preparing) status
+        // NOTE: Do NOT call markOrderAsPaid — that removes the order from
+        // the open orders list, making it invisible to KDS!
+        // Instead, set status to 'A' which keeps it in open orders and
+        // signals to KDS that the order is being prepared.
+        try {
+          await olsera.updateOrderStatus(olseraOrderId, 'A');
+          console.log(`[Auto-Settlement] ✅ Order ${orderId} moved to PREPARING in Olsera POS!`);
+        } catch (statusError) {
+          console.warn(`[Auto-Settlement] Non-fatal: Could not update status to A:`, statusError);
+        }
         
-        console.log(`[Auto-Settlement] ✅ Order ${orderId} fully settled in Olsera POS!`);
       } catch (error) {
         // Log but don't throw — webhook must still return 200 to Midtrans
         console.error(`[Auto-Settlement] ❌ Failed to settle order ${orderId} in Olsera:`, error);

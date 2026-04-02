@@ -1,0 +1,559 @@
+[
+  {
+    "id": "TC001",
+    "title": "Start a new kiosk ordering session from the welcome screen",
+    "description": "Verifies a walk-up customer can start an ordering session from the welcome screen and reach the menu catalog.",
+    "category": "Welcome / Start Session",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Start an order from the welcome screen"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the user lands on the menu catalog page"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC002",
+    "title": "Browse menu and add a customized drink to the cart",
+    "description": "Verifies a customer can browse the menu, customize a drink (size/sugar/ice/toppings), add it to the cart, and see the item with the selected customizations in the cart.",
+    "category": "Browse Menu & Product Customization",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /menu"
+      },
+      {
+        "type": "action",
+        "description": "Open a product details or customization view from the product list"
+      },
+      {
+        "type": "action",
+        "description": "Select a size option"
+      },
+      {
+        "type": "action",
+        "description": "Select a sugar level option"
+      },
+      {
+        "type": "action",
+        "description": "Select an ice level option"
+      },
+      {
+        "type": "action",
+        "description": "Select at least one topping option"
+      },
+      {
+        "type": "action",
+        "description": "Add the customized item to the cart"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to the cart page from the menu"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the cart displays the added item with the selected customization options"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC003",
+    "title": "Queue status reflects kitchen updates to Ready",
+    "description": "Verifies that when a barista marks an order as ready in the kitchen view, the same order appears as ready on the customer status board.",
+    "category": "Queue Status (Customer-Facing)",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /kitchen"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the orders list to finish loading"
+      },
+      {
+        "type": "action",
+        "description": "If no pending order exists, wait until at least one paid/pending order is visible"
+      },
+      {
+        "type": "action",
+        "description": "Mark a pending order as preparing"
+      },
+      {
+        "type": "action",
+        "description": "Mark the same order as ready"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to /status"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the queue list to finish loading"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the order that was marked ready is shown with ready status"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC004",
+    "title": "Move an order from preparing to ready",
+    "description": "Verifies that a barista can change an order’s state from preparing to ready and the UI reflects the new status grouping.",
+    "category": "Kitchen Display System (Barista)",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /kitchen"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the orders list to finish loading"
+      },
+      {
+        "type": "action",
+        "description": "If no preparing order exists, mark a pending order as preparing"
+      },
+      {
+        "type": "action",
+        "description": "Mark a preparing order as ready"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the order is now shown in the ready section/grouping or no longer shown as preparing"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC005",
+    "title": "Move an order from pending to preparing",
+    "description": "Verifies that a barista can change an order’s state from pending to preparing and the UI reflects the new status grouping.",
+    "category": "Kitchen Display System (Barista)",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /kitchen"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the orders list to finish loading"
+      },
+      {
+        "type": "action",
+        "description": "If no pending order exists, wait until at least one paid/pending order is visible"
+      },
+      {
+        "type": "action",
+        "description": "Mark a pending order as preparing"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the order is now shown in the preparing section/grouping"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC006",
+    "title": "Initiate payment from checkout and reach a payment-in-progress state",
+    "description": "Verifies a customer can initiate payment from checkout and the UI displays a payment state (such as QR code/instructions) without duplicating the initiation on rapid repeat clicks.",
+    "category": "Cart Management and Checkout",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /menu"
+      },
+      {
+        "type": "action",
+        "description": "Add any product to the cart"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to the cart page from the menu"
+      },
+      {
+        "type": "action",
+        "description": "Fill a valid customer name into the customer name field"
+      },
+      {
+        "type": "action",
+        "description": "Proceed to checkout"
+      },
+      {
+        "type": "action",
+        "description": "Initiate payment"
+      },
+      {
+        "type": "action",
+        "description": "Initiate payment again immediately"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the checkout shows a single payment-in-progress UI state (for example a single QR code/instruction area)"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC007",
+    "title": "View pending and preparing orders in kitchen dashboard",
+    "description": "Verifies that a barista can open the kitchen dashboard and see orders grouped by lifecycle status.",
+    "category": "Kitchen Display System (Barista)",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /kitchen"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the orders list to finish loading"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify orders are displayed in sections or groupings by status (such as pending and preparing)"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify each displayed order shows identifying details needed to fulfill it (such as queue number and items)"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC008",
+    "title": "Add two differently customized items and verify cart line items preserve options",
+    "description": "Verifies a customer can add the same product twice with different customization selections and the cart preserves each line item’s selected options separately.",
+    "category": "Browse Menu & Product Customization",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /menu"
+      },
+      {
+        "type": "action",
+        "description": "Open a product details or customization view from the product list"
+      },
+      {
+        "type": "action",
+        "description": "Select a first set of customization options (size, sugar, ice, and a topping)"
+      },
+      {
+        "type": "action",
+        "description": "Add the customized item to the cart"
+      },
+      {
+        "type": "action",
+        "description": "Return to the menu product list"
+      },
+      {
+        "type": "action",
+        "description": "Open the same product customization view again"
+      },
+      {
+        "type": "action",
+        "description": "Select a different set of customization options than the first item"
+      },
+      {
+        "type": "action",
+        "description": "Add the second customized item to the cart"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to the cart page from the menu"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the cart shows two line items whose customization options differ and are preserved per item"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC009",
+    "title": "See queue list and statuses update on the status board",
+    "description": "Verifies that a customer can view the queue list on the status board and see at least one order change status after waiting/refreshing behavior.",
+    "category": "Queue Status (Customer-Facing)",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /status"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the queue list to finish loading"
+      },
+      {
+        "type": "action",
+        "description": "Wait for a polling interval long enough for the list to refresh"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the queue list with order numbers and statuses is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify at least one order’s status changes between refreshes"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC010",
+    "title": "Update cart quantities and verify totals recalculate",
+    "description": "Verifies a customer can increase and decrease item quantity in the cart and the displayed totals update accordingly.",
+    "category": "Cart Management and Checkout",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /menu"
+      },
+      {
+        "type": "action",
+        "description": "Add any product to the cart"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to the cart page from the menu"
+      },
+      {
+        "type": "action",
+        "description": "Increase the quantity of the cart item by 1"
+      },
+      {
+        "type": "action",
+        "description": "Decrease the quantity of the cart item by 1"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the cart totals are updated to match the current quantity"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC011",
+    "title": "Checkout is blocked until customer name is provided",
+    "description": "Verifies a customer cannot proceed to checkout from the cart without entering a customer name, then can proceed after entering a valid name.",
+    "category": "Cart Management and Checkout",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /menu"
+      },
+      {
+        "type": "action",
+        "description": "Add any product to the cart"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to the cart page from the menu"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to proceed to checkout without entering a customer name"
+      },
+      {
+        "type": "action",
+        "description": "Fill a valid customer name into the customer name field"
+      },
+      {
+        "type": "action",
+        "description": "Proceed to checkout"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the user lands on the checkout page"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC012",
+    "title": "Remove an item from the cart and see the updated cart state",
+    "description": "Verifies a customer can remove an item from the cart and the cart updates to reflect the removal.",
+    "category": "Cart Management and Checkout",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /menu"
+      },
+      {
+        "type": "action",
+        "description": "Add any product to the cart"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to the cart page from the menu"
+      },
+      {
+        "type": "action",
+        "description": "Remove the cart item"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the cart no longer lists the removed item"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC013",
+    "title": "Admin can log in and view dashboard sales and sync controls",
+    "description": "Verifies that an operations user can log in to the admin area and reach the dashboard where daily sales data and sync controls are visible.",
+    "category": "Admin Login & Dashboard",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the admin username field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the admin password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit credentials"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the dashboard to finish loading"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify daily sales data is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify sync controls are visible and enabled for interaction"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC014",
+    "title": "Admin login shows error for incorrect credentials",
+    "description": "Verifies that entering incorrect admin credentials shows an authentication error and does not navigate to the dashboard.",
+    "category": "Admin Login & Dashboard",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the admin username field with invalid-user@example.com"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the admin password field with wrong-password"
+      },
+      {
+        "type": "action",
+        "description": "Submit credentials"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify an authentication error is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the user remains on the admin login page"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC015",
+    "title": "Status board handles empty state when no orders are present",
+    "description": "Verifies that the status board shows a clear empty state when there are no orders to display.",
+    "category": "Queue Status (Customer-Facing)",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /status"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the queue list area to finish loading"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify either a queue list is displayed or an empty state message is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the page remains usable without broken layout or stuck loading state"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC016",
+    "title": "Prevent rapid duplicate status updates on a single order",
+    "description": "Verifies that rapidly attempting to change the same order’s status multiple times does not result in duplicated or inconsistent UI state for that order.",
+    "category": "Kitchen Display System (Barista)",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /kitchen"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the orders list to finish loading"
+      },
+      {
+        "type": "action",
+        "description": "If no pending order exists, wait until at least one paid/pending order is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click the control to mark the same pending order as preparing twice in quick succession"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the order appears only once in the preparing section and not duplicated across sections"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC017",
+    "title": "Admin dashboard is accessible directly without login (no-auth configuration)",
+    "description": "Verifies that when authentication is not required, navigating directly to the admin dashboard loads the dashboard content without forcing a login.",
+    "category": "Admin Login & Dashboard",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /admin/dashboard"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the dashboard to finish loading"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify daily sales data is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify sync controls are visible and enabled for interaction"
+      }
+    ],
+    "priority": "Low"
+  }
+]

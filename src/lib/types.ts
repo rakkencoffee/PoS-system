@@ -8,6 +8,7 @@ export interface CartItem {
   image: string;
   quantity: number;
   size: string;
+  olseraVariantId?: number; // Olsera variant ID for the selected size
   sugarLevel: string;
   iceLevel: string;
   extraShot: boolean;
@@ -18,6 +19,7 @@ export interface CartItem {
 export interface CartState {
   items: CartItem[];
   totalAmount: number;
+  customerName: string;
 }
 
 export type OrderStatus = 'PENDING' | 'PREPARING' | 'READY' | 'COMPLETED';

@@ -42,9 +42,11 @@ interface NewOrderPayload {
 export default function KitchenPage() {
   const [orders, setOrders] = useState<OrderData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [updating, setUpdating] = useState<number | string | null>(null);
 
   const fetchOrders = useCallback(async () => {
+    setRefreshing(true);
     try {
       const res = await fetch('/api/orders?today=true');
       const data = await res.json();
@@ -53,6 +55,7 @@ export default function KitchenPage() {
       console.error('Error fetching orders:', error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
@@ -247,12 +250,13 @@ export default function KitchenPage() {
           <div className="flex items-center gap-3">
             <button
               onClick={fetchOrders}
+              disabled={refreshing}
               className="btn-secondary flex items-center gap-2"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
-              Refresh
+              {refreshing ? 'Syncing...' : 'Sync Data'}
             </button>
             <div className="text-right">
               <p className="text-xl font-semibold text-(--text-primary)">

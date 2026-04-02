@@ -22,19 +22,31 @@ function StatusContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get('orderId');
   const [order, setOrder] = useState<OrderData | null>(null);
+  const [usePolling, setUsePolling] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const fetchOrder = useCallback(async () => {
-    if (!orderId) return;
+    if (!orderId) {
+      setLoading(false);
+      setError('Order ID missing');
+      return;
+    }
     try {
       const res = await fetch(`/api/orders/${orderId}`);
+      if (!res.ok) throw new Error('Order not found');
       const data = await res.json();
       if (data.error) {
-        console.error('Order fetch error:', data.error);
+        setError(data.error);
         return;
       }
       setOrder(data);
-    } catch (error) {
-      console.error('Error fetching order:', error);
+      setError(null);
+    } catch (err: any) {
+      console.error('Error fetching order:', err);
+      setError(err.message || 'Failed to fetch order');
+    } finally {
+      setLoading(false);
     }
   }, [orderId]);
 
@@ -44,6 +56,8 @@ function StatusContent() {
 
   // Listen for SSE updates
   useEffect(() => {
+    if (usePolling) return; // If SSE failed, skip
+    
     const eventSource = new EventSource('/api/orders/stream');
 
     eventSource.onmessage = (event) => {
@@ -57,8 +71,25 @@ function StatusContent() {
       }
     };
 
+    eventSource.onerror = () => {
+      console.warn('SSE Connection failed. Falling back to polling mode for TestSprite tunnel resilience.');
+      eventSource.close();
+      setUsePolling(true);
+    };
+
     return () => eventSource.close();
-  }, [orderId]);
+  }, [orderId, usePolling]);
+  
+  // Polling fallback mechanism
+  useEffect(() => {
+    if (!usePolling) return;
+    
+    const interval = setInterval(() => {
+      fetchOrder();
+    }, 5000);
+    
+    return () => clearInterval(interval);
+  }, [usePolling, fetchOrder]);
 
   const statusConfig: Record<string, { label: string; color: string; icon: string; desc: string }> = {
     PENDING: { label: 'Pending', color: 'from-yellow-500 to-amber-500', icon: '⏳', desc: 'Your order is in the queue' },
@@ -69,10 +100,27 @@ function StatusContent() {
   const steps = ['PENDING', 'PREPARING', 'COMPLETED'];
   const currentStep = steps.indexOf(order?.status || 'PENDING');
 
-  if (!order) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="w-12 h-12 border-4 border-[#A8131E] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error || !order) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center">
+        <span className="text-6xl mb-6">🔍</span>
+        <h2 className="text-2xl font-bold text-(--text-primary) mb-2">Order Not Found</h2>
+        <p className="text-(--text-muted) mb-8 max-w-xs">
+          {error === 'Order ID missing' 
+            ? 'Please place an order first to see your status.' 
+            : 'We couldn\'t find your order details. Please check your order ID or try again.'}
+        </p>
+        <button onClick={() => router.push('/menu')} className="btn-primary px-8">
+          Go to Menu
+        </button>
       </div>
     );
   }

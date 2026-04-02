@@ -16,7 +16,7 @@ import { createSnapTransaction } from '@/lib/integrations/midtrans.service';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { items, totalAmount } = body;
+    const { items, totalAmount, customerName } = body;
 
     if (!items || !items.length || !totalAmount) {
       return NextResponse.json(
@@ -39,7 +39,8 @@ export async function POST(request: NextRequest) {
           quantity: item.quantity,
           price: item.price,
           note: item.note,
-        }))
+        })),
+        customerName
       );
       dbOrderId = adapterOrder.orderId;
       console.log('Successfully created POS order:', dbOrderId);

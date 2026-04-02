@@ -14,7 +14,9 @@ function formatCurrency(amount: number): string {
 
 export default function CartPage() {
   const router = useRouter();
-  const { cart, removeItem, updateQuantity, itemCount } = useCart();
+  const { cart, removeItem, updateQuantity, itemCount, setCustomerName } = useCart();
+
+  const isNameValid = cart.customerName.trim().length >= 2;
 
   if (itemCount === 0) {
     return (
@@ -139,6 +141,26 @@ export default function CartPage() {
             </div>
           </div>
         ))}
+
+        {/* Customer Name Input */}
+        <div className="glass-card p-4 mt-8">
+          <label htmlFor="customerName" className="block text-sm font-medium text-(--text-secondary) mb-2">
+            Customer Name <span className="text-red-500">*</span>
+          </label>
+          <input
+            id="customerName"
+            type="text"
+            placeholder="Enter your name to proceed..."
+            value={cart.customerName}
+            onChange={(e) => setCustomerName(e.target.value)}
+            className="w-full bg-(--bg-card) border border-(--border-subtle) rounded-xl px-4 py-3 text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:border-[#A8131E] transition-colors"
+            required
+            minLength={2}
+          />
+          <p className="text-[10px] text-(--text-muted) mt-2">
+            * Required for calling your order when it's ready.
+          </p>
+        </div>
       </div>
 
       {/* Bottom bar */}
@@ -157,9 +179,10 @@ export default function CartPage() {
             </button>
             <button
               onClick={() => router.push('/checkout')}
-              className="btn-primary flex-2"
+              disabled={!isNameValid}
+              className={`btn-primary flex-2 ${!isNameValid ? 'opacity-50 cursor-not-allowed grayscale' : ''}`}
             >
-              Checkout
+              {isNameValid ? 'Checkout' : 'Enter Name to Checkout'}
             </button>
           </div>
         </div>

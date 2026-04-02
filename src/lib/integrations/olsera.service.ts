@@ -238,11 +238,13 @@ export async function updateOrderStatus(orderId: number, status: 'P' | 'A' | 'S'
  */
 export async function createOrder(
   items: { productId: string; variantId?: string; quantity: number; price?: number; note?: string }[] = [],
-  currencyId: string | number = 'IDR'
+  options: { currencyId?: string | number; customer_name?: string } = {}
 ): Promise<{ id: number; order_id?: number; [key: string]: unknown }> {
+  const { currencyId = 'IDR', customer_name } = options;
   const formData = new URLSearchParams();
   formData.append('order_date', new Date().toISOString().split('T')[0]);
   formData.append('currency_id', String(currencyId));
+  if (customer_name) formData.append('customer_name', customer_name);
 
   items.forEach((item, index) => {
     formData.append(`items[${index}][product_id]`, item.productId);
@@ -256,19 +258,11 @@ export async function createOrder(
     }
   });
 
-  const token = await getAccessToken();
-
-  const res = await fetch(
-    `${OLSERA_API_BASE}/api/open-api/v1/en/order/openorder`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json',
-      },
-      body: formData,
-    }
-  );
+  const res = await olseraFetch('/order/openorder', {
+    method: 'POST',
+    body: formData,
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  });
 
   if (!res.ok) {
     const text = await res.text();
@@ -292,24 +286,21 @@ export async function addItemToOrder(
 ): Promise<unknown> {
   const formData = new URLSearchParams();
   formData.append('order_id', String(orderId));
-  // Olsera uses "product_id|variant_id" format
-  formData.append('product_id', variantId ? `${productId}|${variantId}` : String(productId));
-  formData.append('qty', String(quantity));
+  // For products WITH variants: use "variant_id|product_id" pipe format
+  // For products WITHOUT variants: use just the numeric product ID
+  const itemValue = variantId ? `${variantId}|${productId}` : String(productId);
+  formData.append('item_product_id', itemValue);
+  formData.append('item_products', itemValue);
+  formData.append('item_qty', String(quantity));
   if (note) formData.append('note', note);
 
-  const token = await getAccessToken();
+  console.log(`[Olsera API] addItemToOrder payload:`, Object.fromEntries(formData));
 
-  const res = await fetch(
-    `${OLSERA_API_BASE}/api/open-api/v1/en/order/openorder/additem`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json',
-      },
-      body: formData,
-    }
-  );
+  const res = await olseraFetch('/order/openorder/additem', {
+    method: 'POST',
+    body: formData,
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  });
 
   if (!res.ok) {
     const text = await res.text();
@@ -357,7 +348,7 @@ export async function updateOrderPayment(
   formData.append('payment_currency_id', currencyId);
   formData.append('payment_date', today);
   formData.append('payment_mode_id', String(paymentModeId));
-  formData.append('payment_seq', '1');
+  formData.append('payment_seq', '0');
 
   const res = await olseraFetch('/order/openorder/updatepayment', {
     method: 'POST',

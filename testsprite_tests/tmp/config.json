@@ -1,0 +1,14 @@
+{
+  "prdPath": "testsprite_tests/standard_prd.json",
+  "serverUrl": "http://localhost:3000",
+  "projectType": "frontend",
+  "executionArgs": {
+    "prd": "testsprite_tests/standard_prd.json",
+    "url": "http://localhost:3000",
+    "envs": {
+      "NEXT_PUBLIC_TEST_MODE": "true",
+      "USE_OLSERA": "true"
+    },
+    "serverMode": "production"
+  }
+}

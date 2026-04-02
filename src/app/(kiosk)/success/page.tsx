@@ -6,9 +6,29 @@ import { useRouter, useSearchParams } from 'next/navigation';
 function SuccessContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const orderId = searchParams.get('orderId');
-  const queue = searchParams.get('queue');
+  
+  // Handle both our router.push format AND Midtrans redirect format
+  const orderId = searchParams.get('orderId') || searchParams.get('order_id');
+  const transactionStatus = searchParams.get('transaction_status');
+  
+  // Extract queue: either from explicit param or from order ID (last 3 digits)
+  const rawQueue = searchParams.get('queue');
+  const queue = rawQueue || (() => {
+    if (!orderId) return null;
+    const numericId = orderId.replace('OLSERA-', '');
+    return numericId.slice(-3);
+  })();
+  
   const [countdown, setCountdown] = useState(15);
+
+  // If coming from Midtrans redirect (CC payment), verify payment
+  useEffect(() => {
+    if (orderId && transactionStatus && (transactionStatus === 'capture' || transactionStatus === 'settlement')) {
+      fetch(`/api/payment/verify?orderId=${orderId}`, { method: 'POST' })
+        .then(() => console.log('Payment verified after Midtrans redirect'))
+        .catch((e) => console.error('Failed to verify payment after redirect:', e));
+    }
+  }, [orderId, transactionStatus]);
 
   useEffect(() => {
     const timer = setInterval(() => {
