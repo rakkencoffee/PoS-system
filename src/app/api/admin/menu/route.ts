@@ -11,18 +11,7 @@ export async function GET() {
       const items = await posAdapter.getMenuItems();
       return NextResponse.json(items);
     }
-
-    // Fallback: Prisma
-    const prisma = (await import('@/lib/prisma')).default;
-    const items = await prisma.menuItem.findMany({
-      include: {
-        category: true,
-        sizes: { orderBy: { size: 'asc' } },
-      },
-      orderBy: { name: 'asc' },
-    });
-
-    return NextResponse.json(items);
+    throw new Error('Local database (Prisma) is no longer supported.');
   } catch (error) {
     console.error('Error fetching all menu items:', error);
     return NextResponse.json({ error: 'Failed to fetch menu items' }, { status: 500 });

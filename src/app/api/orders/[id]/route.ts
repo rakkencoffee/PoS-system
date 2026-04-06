@@ -54,31 +54,9 @@ export async function GET(
           items: [],
         });
       }
+    } else {
+      throw new Error("Local database (Prisma) is no longer supported. Invalid Order ID format.");
     }
-
-    // Fallback: local Prisma DB
-    const prisma = (await import('@/lib/prisma')).default;
-    const order = await prisma.order.findUnique({
-      where: { id: parseInt(id) },
-      include: {
-        items: {
-          include: {
-            menuItem: true,
-            toppings: {
-              include: {
-                topping: true,
-              },
-            },
-          },
-        },
-      },
-    });
-
-    if (!order) {
-      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
-    }
-
-    return NextResponse.json(order);
   } catch (error) {
     console.error('Error fetching order:', error);
     return NextResponse.json({ error: 'Failed to fetch order' }, { status: 500 });
@@ -132,32 +110,9 @@ export async function PATCH(
       }
 
       return NextResponse.json(updatedOrder);
+    } else {
+      throw new Error("Local database (Prisma) is no longer supported for updating orders.");
     }
-
-    const prisma = (await import('@/lib/prisma')).default;
-    const order = await prisma.order.update({
-      where: { id: parseInt(id) },
-      data: {
-        status: body.status,
-      },
-      include: {
-        items: {
-          include: {
-            menuItem: true,
-            toppings: {
-              include: {
-                topping: true,
-              },
-            },
-          },
-        },
-      },
-    });
-
-    // Emit SSE event
-    orderEvents.emit('ORDER_UPDATED', { order });
-
-    return NextResponse.json(order);
   } catch (error) {
     console.error('Error updating order:', error);
     return NextResponse.json({ error: 'Failed to update order' }, { status: 500 });

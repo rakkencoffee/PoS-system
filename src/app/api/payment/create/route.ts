@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     // Generate unique order ID
     const orderId = `SF-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
 
-    // 1. Try to create order in POS (Olsera or local DB depending on USE_OLSERA)
+    // 1. Create order in POS (Olsera)
     let dbOrderId: string | null = null;
     try {
       const posAdapter = await import('@/lib/integrations/pos.adapter');
@@ -45,8 +45,8 @@ export async function POST(request: NextRequest) {
       dbOrderId = adapterOrder.orderId;
       console.log('Successfully created POS order:', dbOrderId);
     } catch (posError) {
-      console.warn('Could not create POS order (non-fatal):', posError);
-      // Continue — Midtrans payment can proceed without POS order
+      console.error('CRITICAL: Could not create POS order in Olsera:', posError);
+      throw new Error('Gagal menyinkronkan pesanan dengan sistem POS. Harap coba lagi atau hubungi kasir.');
     }
 
     // 2. Create Midtrans Snap token

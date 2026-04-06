@@ -149,59 +149,6 @@ function mapOlseraGroup(group: OlseraProductGroup): NormalizedCategory {
 }
 
 // ──────────────────────────────
-// Mappers: Prisma → Normalized
-// ──────────────────────────────
-
-interface PrismaMenuItem {
-  id: number;
-  name: string;
-  description: string;
-  price: number;
-  image: string;
-  isAvailable: boolean;
-  isBestSeller: boolean;
-  isRecommended: boolean;
-  type: string;
-  categoryId: number;
-  category: { id: number; name: string; slug: string };
-  sizes: { size: string; priceAdjustment: number }[];
-}
-
-interface PrismaCategory {
-  id: number;
-  name: string;
-  slug: string;
-  icon: string;
-}
-
-function mapPrismaItem(item: PrismaMenuItem): NormalizedMenuItem {
-  return {
-    id: String(item.id),
-    name: item.name,
-    description: item.description,
-    price: item.price,
-    image: item.image,
-    isAvailable: item.isAvailable,
-    isBestSeller: item.isBestSeller,
-    isRecommended: item.isRecommended,
-    type: item.type,
-    categoryId: String(item.categoryId),
-    categoryName: item.category.name,
-    categorySlug: item.category.slug,
-    sizes: item.sizes,
-  };
-}
-
-function mapPrismaCategory(cat: PrismaCategory): NormalizedCategory {
-  return {
-    id: String(cat.id),
-    name: cat.name,
-    slug: cat.slug,
-    icon: cat.icon,
-  };
-}
-
-// ──────────────────────────────
 // Public API
 // ──────────────────────────────
 
@@ -245,32 +192,8 @@ export async function getMenuItems(filters?: {
 
     return items;
   }
-
-  // Fallback: use Prisma
-  const prisma = (await import('@/lib/prisma')).default;
-
-  const where: Record<string, unknown> = {};
-  if (!filters?.includeUnavailable) where.isAvailable = true;
-  if (filters?.category) where.category = { slug: filters.category };
-  if (filters?.search) {
-    where.OR = [
-      { name: { contains: filters.search } },
-      { description: { contains: filters.search } },
-    ];
-  }
-  if (filters?.type && filters.type !== 'all') {
-    where.OR = [{ type: filters.type }, { type: 'both' }];
-  }
-  if (filters?.filter === 'best-seller') where.isBestSeller = true;
-  if (filters?.filter === 'recommended') where.isRecommended = true;
-
-  const items = await prisma.menuItem.findMany({
-    where,
-    include: { category: true, sizes: { orderBy: { size: 'asc' } } },
-    orderBy: { name: 'asc' },
-  });
-
-  return (items as unknown as PrismaMenuItem[]).map(mapPrismaItem);
+  // Fallback removed
+  throw new Error('Local database (Prisma) is no longer supported. Please ensure Olsera configuration is active in Vercel.');
 }
 
 /**
@@ -297,11 +220,8 @@ export async function getCategories(): Promise<NormalizedCategory[]> {
     
     return olseraCache.categories || [];
   }
-
-  // Fallback: use Prisma
-  const prisma = (await import('@/lib/prisma')).default;
-  const categories = await prisma.category.findMany({ orderBy: { name: 'asc' } });
-  return (categories as unknown as PrismaCategory[]).map(mapPrismaCategory);
+  // Fallback removed
+  throw new Error('Local database (Prisma) is no longer supported.');
 }
 
 /**
@@ -337,57 +257,8 @@ export async function createOrder(
       olseraOrderId: orderId,
     };
   }
-
-  // Fallback: use Prisma
-  const prisma = (await import('@/lib/prisma')).default;
-
-  // Get queue number
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const lastOrder = await prisma.order.findFirst({
-    where: { createdAt: { gte: todayStart } },
-    orderBy: { queueNumber: 'desc' },
-  });
-  const queueNumber = (lastOrder?.queueNumber || 0) + 1;
-
-  // Calculate total
-  let totalAmount = 0;
-  const orderItems: { menuItemId: number; quantity: number; size: string; subtotal: number; notes: string }[] = [];
-  for (const item of items) {
-    const menuItem = await prisma.menuItem.findUnique({
-      where: { id: parseInt(item.productId) },
-      include: { sizes: true },
-    });
-    if (!menuItem) continue;
-
-    let price = menuItem.price;
-    if (item.variantId) {
-      const size = menuItem.sizes.find((s: { size: string; priceAdjustment: number }) => s.size === item.variantId);
-      if (size) price += size.priceAdjustment;
-    }
-
-    const subtotal = price * item.quantity;
-    totalAmount += subtotal;
-    orderItems.push({
-      menuItemId: menuItem.id,
-      quantity: item.quantity,
-      size: item.variantId || 'M',
-      subtotal,
-      notes: item.note || '',
-    });
-  }
-
-  const order = await prisma.order.create({
-    data: {
-      queueNumber,
-      totalAmount,
-      customerName: customerName || '',
-      paymentMethod: 'MIDTRANS',
-      items: { create: orderItems },
-    },
-  });
-
-  return { orderId: String(order.id) };
+  // Fallback removed
+  throw new Error('Local database (Prisma) is no longer supported for creating orders.');
 }
 
 /**
@@ -455,14 +326,9 @@ export async function updateOrderPaymentStatus(
     }
     return;
   }
-
-  // Fallback: update local DB
-  const prisma = (await import('@/lib/prisma')).default;
-  const dbStatus = status === 'paid' ? 'PREPARING' : 'CANCELLED';
-  await prisma.order.update({
-    where: { id: parseInt(orderId) },
-    data: { status: dbStatus },
-  });
+  // Fallback removed
+  console.warn(`[Auto-Settlement] Order ${orderId} does not exist in Olsera POS or is unsupported. Escaping Prisma update.`);
+  return;
 }
 
 /**

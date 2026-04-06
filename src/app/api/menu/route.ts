@@ -25,31 +25,9 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/**
- * POST /api/menu — Create menu item (admin, local DB only)
- */
 export async function POST(request: NextRequest) {
-  try {
-    const prisma = (await import('@/lib/prisma')).default;
-    const body = await request.json();
-    const item = await prisma.menuItem.create({
-      data: {
-        name: body.name,
-        description: body.description || '',
-        price: body.price,
-        image: body.image || '',
-        categoryId: body.categoryId,
-        isAvailable: body.isAvailable ?? true,
-        isBestSeller: body.isBestSeller ?? false,
-        isRecommended: body.isRecommended ?? false,
-        type: body.type || 'both',
-        sizes: body.sizes ? { create: body.sizes } : undefined,
-      },
-      include: { category: true, sizes: true },
-    });
-    return NextResponse.json(item, { status: 201 });
-  } catch (error) {
-    console.error('Error creating menu item:', error);
-    return NextResponse.json({ error: 'Failed to create menu item' }, { status: 500 });
-  }
+  return NextResponse.json(
+    { error: 'POST to /api/menu is deprecated. Menu management is handled via Olsera Dashboard.' },
+    { status: 501 }
+  );
 }
