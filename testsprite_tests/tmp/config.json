@@ -12,8 +12,16 @@
     "additionalInstruction": "",
     "serverMode": "production",
     "projectPath": "c:\\Users\\Dzaky Ahnaf\\kerja\\startfriday\\pos-system",
-    "testIds": []
+    "testIds": [
+      "TC008",
+      "TC010",
+      "TC011",
+      "TC012",
+      "TC013",
+      "TC015",
+      "TC017"
+    ]
   },
-  "serverPort": 54729,
-  "proxy": "http://7f0087ac-c639-4366-9c01-0952eb013da5:WY4ex3I0tKysAoHv4PwDkXOmPeWPdvNB@tun.testsprite.com:8080"
+  "serverPort": 49884,
+  "proxy": "http://dccfa2e6-85a9-47ce-bb18-c3abe153115f:zNVONTaahIil7uxtsneUTMyOJqItl2AC@tun.testsprite.com:8080"
 }

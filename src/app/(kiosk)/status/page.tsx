@@ -17,6 +17,44 @@ interface OrderData {
   }[];
 }
 
+function PublicBoard() {
+  const [orders, setOrders] = useState<OrderData[]>([]);
+  
+  useEffect(() => {
+    fetch('/api/orders?today=true')
+      .then(res => res.json())
+      .then(data => setOrders(Array.isArray(data) ? data : []))
+      .catch(console.error);
+  }, []);
+
+  const pending = orders.filter(o => o.status === 'PENDING');
+  const preparing = orders.filter(o => o.status === 'PREPARING');
+  const ready = orders.filter(o => o.status === 'COMPLETED');
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="glass-card p-6">
+        <h2 className="text-xl font-bold text-yellow-400 mb-4">Pending ({pending.length})</h2>
+        <div className="space-y-2">
+          {pending.map(o => <div key={o.id} className="text-2xl font-mono">#{o.queueNumber}</div>)}
+        </div>
+      </div>
+      <div className="glass-card p-6 border-blue-500/30">
+        <h2 className="text-xl font-bold text-blue-400 mb-4">Preparing ({preparing.length})</h2>
+        <div className="space-y-2">
+          {preparing.map(o => <div key={o.id} className="text-2xl font-mono">#{o.queueNumber}</div>)}
+        </div>
+      </div>
+      <div className="glass-card p-6 border-green-500/30">
+        <h2 className="text-xl font-bold text-green-400 mb-4">Ready ({ready.length})</h2>
+        <div className="space-y-2">
+          {ready.map(o => <div key={o.id} className="text-2xl font-mono text-green-400">#{o.queueNumber}</div>)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function StatusContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -109,14 +147,24 @@ function StatusContent() {
   }
 
   if (error || !order) {
+    if (!orderId) {
+      // Public Board Mode
+      return (
+        <div className="min-h-screen p-8">
+          <div className="max-w-4xl mx-auto">
+            <h1 className="text-3xl font-bold text-gradient mb-8 text-center">Public Status Board</h1>
+            <PublicBoard />
+          </div>
+        </div>
+      );
+    }
+    
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center">
         <span className="text-6xl mb-6">🔍</span>
         <h2 className="text-2xl font-bold text-(--text-primary) mb-2">Order Not Found</h2>
         <p className="text-(--text-muted) mb-8 max-w-xs">
-          {error === 'Order ID missing' 
-            ? 'Please place an order first to see your status.' 
-            : 'We couldn\'t find your order details. Please check your order ID or try again.'}
+          We couldn't find your order details. Please check your order ID or try again.
         </p>
         <button onClick={() => router.push('/menu')} className="btn-primary px-8">
           Go to Menu

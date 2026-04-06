@@ -33,13 +33,13 @@ async def run_test():
         # -> Navigate to http://localhost:3000
         await page.goto("http://localhost:3000")
         
-        # -> Navigate to /success and load the success page
+        # -> Navigate to /success (http://localhost:3000/success) and then check the page for an order confirmation view and a queue number.
         await page.goto("http://localhost:3000/success")
         
         # --> Assertions to verify final state
         frame = context.pages[-1]
-        assert await frame.locator("xpath=//*[contains(., 'Order confirmation')]").nth(0).is_visible(), "The success page should show an order confirmation after completing the process.",
-        assert await frame.locator("xpath=//*[contains(., 'Queue number')]").nth(0).is_visible(), "The success page should show a queue number to inform the user of their position in line."]}
+        assert await frame.locator("xpath=//*[contains(., 'Order confirmation')]").nth(0).is_visible(), "The order confirmation should be visible when the user reaches the success page.",
+        assert await frame.locator("xpath=//*[contains(., 'Queue number')]").nth(0).is_visible(), "A queue number should be visible on the confirmation page to show the user's place in line.",
         await asyncio.sleep(5)
 
     finally:

@@ -33,12 +33,15 @@ async def run_test():
         # -> Navigate to http://localhost:3000
         await page.goto("http://localhost:3000")
         
-        # -> Navigate to /kitchen, wait for the kitchen dashboard to finish loading, then verify the dashboard displays order queues/sections for 'pending' and 'preparing'.
+        # -> Navigate to /kitchen and wait for the kitchen dashboard to finish loading, then verify the dashboard shows queues/sections for 'pending' and 'preparing' orders for the barista.
+        await page.goto("http://localhost:3000/kitchen")
+        
+        # -> Force a reload of the /kitchen page (navigate to http://localhost:3000/kitchen) to attempt to load the SPA, then wait for the kitchen dashboard to render.
         await page.goto("http://localhost:3000/kitchen")
         
         # --> Assertions to verify final state
         frame = context.pages[-1]
-        assert await frame.locator("xpath=//*[contains(., 'pending') and contains(., 'preparing')]").nth(0).is_visible(), "The kitchen dashboard should display queues for pending and preparing orders."]}
+        assert await frame.locator("xpath=//*[contains(., 'pending') and contains(., 'preparing')]").nth(0).is_visible(), "The kitchen dashboard should display queues for pending and preparing orders for barista operation."
         await asyncio.sleep(5)
 
     finally:

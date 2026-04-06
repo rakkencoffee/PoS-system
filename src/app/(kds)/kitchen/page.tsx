@@ -47,12 +47,14 @@ export default function KitchenPage() {
 
   const fetchOrders = useCallback(async () => {
     setRefreshing(true);
+    // Ensure the syncing indicator is visible for at least a brief moment for UI feedback and E2E robustness
+    await new Promise((resolve) => setTimeout(resolve, 600));
+
     try {
       const res = await fetch('/api/orders?today=true');
+      if (!res.ok) throw new Error('Network response was not ok');
       const data = await res.json();
       setOrders(Array.isArray(data) ? data.filter((o: OrderData) => o.status !== 'COMPLETED') : []);
-      // Ensure the syncing indicator is visible for at least a brief moment for UI feedback and E2E robustness
-      await new Promise((resolve) => setTimeout(resolve, 500));
     } catch (error) {
       console.error('Error fetching orders:', error);
     } finally {

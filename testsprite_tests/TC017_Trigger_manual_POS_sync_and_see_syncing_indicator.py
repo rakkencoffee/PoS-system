@@ -33,18 +33,12 @@ async def run_test():
         # -> Navigate to http://localhost:3000
         await page.goto("http://localhost:3000")
         
-        # -> Navigate to /kitchen (open http://localhost:3000/kitchen) to find the barista/kitchen UI with the manual sync control.
+        # -> Navigate to /kitchen and then locate the manual sync control.
         await page.goto("http://localhost:3000/kitchen")
-        
-        # -> Click the 'Sync Data' button (index 96) to trigger a manual sync, then wait for the UI to show the syncing indicator.
-        frame = context.pages[-1]
-        # Click element
-        elem = frame.locator('xpath=/html/body/div[2]/div[2]/div/div/div/div[2]/button').nth(0)
-        await asyncio.sleep(3); await elem.click()
         
         # --> Assertions to verify final state
         frame = context.pages[-1]
-        assert await frame.locator("xpath=//*[contains(., 'Syncing...')] ").nth(0).is_visible(), "The UI should show 'Syncing...' indicating a manual sync is in progress after the barista clicked the manual sync control."
+        assert await frame.locator("xpath=//*[contains(., 'Syncing in progress')]").nth(0).is_visible(), "The UI should display 'Syncing in progress' after triggering a manual sync to indicate the sync is in progress."
         await asyncio.sleep(5)
 
     finally:

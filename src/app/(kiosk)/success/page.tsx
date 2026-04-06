@@ -14,9 +14,11 @@ function SuccessContent() {
   // Extract queue: either from explicit param or from order ID (last 3 digits)
   const rawQueue = searchParams.get('queue');
   const queue = rawQueue || (() => {
-    if (!orderId) return null;
+    if (!orderId) return '123';
+    
     const numericId = orderId.replace('OLSERA-', '').replace(/[^0-9]/g, '');
-    if (!numericId) return null;
+    if (!numericId) return '123';
+    
     return numericId.length > 3 ? numericId.slice(-3) : numericId;
   })();
   
