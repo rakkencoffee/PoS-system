@@ -15,18 +15,31 @@ function SuccessContent() {
   const rawQueue = searchParams.get('queue');
   const queue = rawQueue || (() => {
     if (!orderId) return null;
-    const numericId = orderId.replace('OLSERA-', '');
-    return numericId.slice(-3);
+    const numericId = orderId.replace('OLSERA-', '').replace(/[^0-9]/g, '');
+    if (!numericId) return null;
+    return numericId.length > 3 ? numericId.slice(-3) : numericId;
   })();
   
   const [countdown, setCountdown] = useState(15);
 
-  // If coming from Midtrans redirect (CC payment), verify payment
+  // Auto-verify payment & Test-Mode bypass
   useEffect(() => {
-    if (orderId && transactionStatus && (transactionStatus === 'capture' || transactionStatus === 'settlement')) {
-      fetch(`/api/payment/verify?orderId=${orderId}`, { method: 'POST' })
-        .then(() => console.log('Payment verified after Midtrans redirect'))
-        .catch((e) => console.error('Failed to verify payment after redirect:', e));
+    if (orderId) {
+      if (process.env.NEXT_PUBLIC_TEST_MODE === 'true') {
+        // [TEST MODE EXCLUSIVE] Auto settle the Olsera order since Webhooks can't reach us locally
+        fetch('/api/test-settle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId }),
+        })
+          .then(() => console.log('Test-Mode Auto Settlement triggered!'))
+          .catch((e) => console.error('Failed to auto-settle test order:', e));
+      } else if (transactionStatus && (transactionStatus === 'capture' || transactionStatus === 'settlement')) {
+        // Standard Midtrans redirect verify
+        fetch(`/api/payment/verify?orderId=${orderId}`, { method: 'POST' })
+          .then(() => console.log('Payment verified after Midtrans redirect'))
+          .catch((e) => console.error('Failed to verify payment after redirect:', e));
+      }
     }
   }, [orderId, transactionStatus]);
 

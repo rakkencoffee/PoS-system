@@ -1,14 +1,19 @@
 {
-  "prdPath": "testsprite_tests/standard_prd.json",
-  "serverUrl": "http://localhost:3000",
-  "projectType": "frontend",
+  "status": "commited",
+  "type": "frontend",
+  "scope": "codebase",
+  "localEndpoint": "http://localhost:3000",
   "executionArgs": {
-    "prd": "testsprite_tests/standard_prd.json",
-    "url": "http://localhost:3000",
+    "projectName": "pos-system",
     "envs": {
       "NEXT_PUBLIC_TEST_MODE": "true",
       "USE_OLSERA": "true"
     },
-    "serverMode": "production"
-  }
+    "additionalInstruction": "",
+    "serverMode": "production",
+    "projectPath": "c:\\Users\\Dzaky Ahnaf\\kerja\\startfriday\\pos-system",
+    "testIds": []
+  },
+  "serverPort": 54729,
+  "proxy": "http://7f0087ac-c639-4366-9c01-0952eb013da5:WY4ex3I0tKysAoHv4PwDkXOmPeWPdvNB@tun.testsprite.com:8080"
 }

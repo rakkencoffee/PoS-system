@@ -69,13 +69,61 @@ export default function CheckoutPage() {
     loadSnapScript();
   }, [loadSnapScript]);
 
+  const [snapTokenCache, setSnapTokenCache] = useState<string | null>(null);
+  const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
+
+  const triggerSnapPopup = (token: string, id: string) => {
+    setPaymentStatus('Opening payment...');
+    if (window.snap) {
+      window.snap.pay(token, {
+        onSuccess: async () => {
+          setPaymentStatus('Payment successful! Verifying...');
+          try {
+            await fetch(`/api/payment/verify?orderId=${id}`, { method: 'POST' });
+          } catch (e) {
+            console.error('Failed to manually verify payment:', e);
+          }
+          clearCart();
+          
+          const numericId = id.replace('OLSERA-', '');
+          const queueNum = numericId.slice(-3);
+          router.push(`/success?orderId=${id}&queue=${queueNum}`);
+        },
+        onPending: () => {
+          setPaymentStatus('Waiting for payment...');
+          clearCart();
+          router.push(`/status?orderId=${id}&status=pending`);
+        },
+        onError: () => {
+          setPaymentStatus('');
+          setIsProcessing(false);
+          checkoutInProgress.current = false;
+          alert('Payment failed. Please try again.');
+        },
+        onClose: () => {
+          setPaymentStatus('');
+          setIsProcessing(false);
+          checkoutInProgress.current = false;
+        },
+      });
+    } else {
+      alert('Payment system failed to load. Please try again later.');
+      setIsProcessing(false);
+    }
+  };
+
   const handleCheckout = async () => {
+    if (snapTokenCache && createdOrderId) {
+      setIsProcessing(true);
+      triggerSnapPopup(snapTokenCache, createdOrderId);
+      return;
+    }
+
     checkoutInProgress.current = true;
     setIsProcessing(true);
     setPaymentStatus('Creating payment...');
 
     try {
-      // 1. Create payment (order in POS + Midtrans Snap token)
       const res = await fetch('/api/payment/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -91,9 +139,7 @@ export default function CheckoutPage() {
               item.iceLevel && item.iceLevel !== 'normal' && `Ice: ${item.iceLevel}`,
               item.extraShot && 'Extra Shot',
               item.toppings.length && `Toppings: ${item.toppings.map((t) => t.name).join(', ')}`,
-            ]
-              .filter(Boolean)
-              .join('; '),
+            ].filter(Boolean).join('; '),
           })),
           totalAmount: cart.totalAmount,
           customerName: cart.customerName,
@@ -102,48 +148,13 @@ export default function CheckoutPage() {
 
       if (!res.ok) throw new Error('Failed to create payment');
 
-      const { snapToken, orderId } = await res.json();
+      const { snapToken, orderId, redirectUrl } = await res.json();
+      setSnapTokenCache(snapToken);
+      setCreatedOrderId(orderId);
 
-      setPaymentStatus('Opening payment...');
-
-      // 2. Open Midtrans Snap popup
       if (window.snap) {
-        window.snap.pay(snapToken, {
-          onSuccess: async () => {
-            setPaymentStatus('Payment successful! Verifying...');
-            // Force verify payment immediately (crucial for local dev since webhooks can't reach localhost)
-            try {
-              await fetch(`/api/payment/verify?orderId=${orderId}`, { method: 'POST' });
-            } catch (e) {
-              console.error('Failed to manually verify payment:', e);
-            }
-            clearCart();
-            
-            // Extract the queue number (last 3 digits of numeric ID)
-            const numericId = orderId.replace('OLSERA-', '');
-            const queueNum = numericId.slice(-3);
-            router.push(`/success?orderId=${orderId}&queue=${queueNum}`);
-          },
-          onPending: () => {
-            setPaymentStatus('Waiting for payment...');
-            clearCart();
-            router.push(`/status?orderId=${orderId}&status=pending`);
-          },
-          onError: () => {
-            setPaymentStatus('');
-            setIsProcessing(false);
-            checkoutInProgress.current = false;
-            alert('Payment failed. Please try again.');
-          },
-          onClose: () => {
-            setPaymentStatus('');
-            setIsProcessing(false);
-            checkoutInProgress.current = false;
-          },
-        });
-      } else {
-        // Fallback: redirect to Midtrans payment page
-        const { redirectUrl } = await res.json();
+        triggerSnapPopup(snapToken, orderId);
+      } else if (redirectUrl) {
         window.location.href = redirectUrl;
       }
     } catch (error) {

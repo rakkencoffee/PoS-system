@@ -1,0 +1,60 @@
+[2026-04-06T04:37:10.676Z] [ERROR] checkPortListening tcp error: 3000 localhost
+AggregateError
+[2026-04-06T04:37:11.189Z] [ERROR] checkPortListening tcp error: 3000 localhost
+AggregateError
+[2026-04-06T04:37:11.704Z] [ERROR] checkPortListening tcp error: 3000 localhost
+AggregateError
+[2026-04-06T04:37:12.217Z] [ERROR] checkPortListening tcp error: 3000 localhost
+AggregateError
+[2026-04-06T04:37:12.734Z] [ERROR] checkPortListening http check failed: http://localhost:3000/ TypeError: fetch failed
+[2026-04-06T04:37:12.734Z] [ERROR] checkPortListening failed (tcp + http): 3000 localhost
+[2026-04-06T04:37:15.165Z] [ERROR] checkPortListening tcp error: 3000 localhost
+AggregateError
+[2026-04-06T04:37:15.670Z] [ERROR] checkPortListening tcp error: 3000 localhost
+AggregateError
+[2026-04-06T04:37:16.179Z] [ERROR] checkPortListening tcp error: 3000 localhost
+AggregateError
+[2026-04-06T04:37:16.691Z] [ERROR] checkPortListening tcp error: 3000 localhost
+AggregateError
+[2026-04-06T04:37:17.199Z] [ERROR] checkPortListening tcp error: 3000 localhost
+AggregateError
+[2026-04-06T04:37:17.713Z] [ERROR] checkPortListening tcp error: 3000 localhost
+AggregateError
+[2026-04-06T04:37:18.223Z] [ERROR] checkPortListening tcp error: 3000 localhost
+AggregateError
+[2026-04-06T04:37:18.736Z] [ERROR] checkPortListening tcp error: 3000 localhost
+AggregateError
+[2026-04-06T04:37:19.250Z] [ERROR] checkPortListening tcp error: 3000 localhost
+AggregateError
+[2026-04-06T04:37:19.762Z] [ERROR] checkPortListening tcp error: 3000 localhost
+AggregateError
+[2026-04-06T04:37:20.273Z] [ERROR] checkPortListening tcp error: 3000 localhost
+AggregateError
+[2026-04-06T04:37:20.786Z] [ERROR] checkPortListening tcp error: 3000 localhost
+AggregateError
+[2026-04-06T04:37:21.301Z] [ERROR] checkPortListening tcp error: 3000 localhost
+AggregateError
+[2026-04-06T04:37:21.813Z] [ERROR] checkPortListening tcp error: 3000 localhost
+AggregateError
+[2026-04-06T04:37:22.324Z] [ERROR] checkPortListening tcp error: 3000 localhost
+AggregateError
+[2026-04-06T04:37:22.837Z] [ERROR] checkPortListening tcp error: 3000 localhost
+AggregateError
+[31mTest execution failed:[0m Error: Failed to generate and execute tests: McpTunnelError: Failed to set up testing tunnel: Because the local project is not running on port 3000.
+Step 1: Install all necessary dependencies for the local project.
+Step 2: Restart the local project.
+Step 3: Review and update the local port configuration if needed to ensure the project functions correctly.
+    at TunnelClientWrapper.startV1 (file:///C:/Users/Dzaky%20Ahnaf/AppData/Local/npm-cache/_npx/8ddf6bea01b2519d/node_modules/@testsprite/testsprite-mcp/dist/index.js:142065:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async _generateCodeAndExecute (file:///C:/Users/Dzaky%20Ahnaf/AppData/Local/npm-cache/_npx/8ddf6bea01b2519d/node_modules/@testsprite/testsprite-mcp/dist/index.js:144596:23)
+    at async file:///C:/Users/Dzaky%20Ahnaf/AppData/Local/npm-cache/_npx/8ddf6bea01b2519d/node_modules/@testsprite/testsprite-mcp/dist/index.js:144085:24
+    at async Command.<anonymous> (file:///C:/Users/Dzaky%20Ahnaf/AppData/Local/npm-cache/_npx/8ddf6bea01b2519d/node_modules/@testsprite/testsprite-mcp/dist/index.js:149395:9)
+    at async Command.parseAsync (file:///C:/Users/Dzaky%20Ahnaf/AppData/Local/npm-cache/_npx/8ddf6bea01b2519d/node_modules/@testsprite/testsprite-mcp/dist/index.js:147655:6)
+    at async main (file:///C:/Users/Dzaky%20Ahnaf/AppData/Local/npm-cache/_npx/8ddf6bea01b2519d/node_modules/@testsprite/testsprite-mcp/dist/index.js:149615:9)
+    at _generateCodeAndExecute (file:///C:/Users/Dzaky%20Ahnaf/AppData/Local/npm-cache/_npx/8ddf6bea01b2519d/node_modules/@testsprite/testsprite-mcp/dist/index.js:144842:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Dzaky%20Ahnaf/AppData/Local/npm-cache/_npx/8ddf6bea01b2519d/node_modules/@testsprite/testsprite-mcp/dist/index.js:144085:24
+    at async Command.<anonymous> (file:///C:/Users/Dzaky%20Ahnaf/AppData/Local/npm-cache/_npx/8ddf6bea01b2519d/node_modules/@testsprite/testsprite-mcp/dist/index.js:149395:9)
+    at async Command.parseAsync (file:///C:/Users/Dzaky%20Ahnaf/AppData/Local/npm-cache/_npx/8ddf6bea01b2519d/node_modules/@testsprite/testsprite-mcp/dist/index.js:147655:6)
+    at async main (file:///C:/Users/Dzaky%20Ahnaf/AppData/Local/npm-cache/_npx/8ddf6bea01b2519d/node_modules/@testsprite/testsprite-mcp/dist/index.js:149615:9)
+
