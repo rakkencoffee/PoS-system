@@ -82,6 +82,13 @@ export async function olseraFetch(path: string, options: RequestInit = {}, retry
     return olseraFetch(path, options, 1);
   }
 
+  // If not successful, log the body for debugging (clone first so downstream can still read it)
+  if (!res.ok) {
+    const cloned = res.clone();
+    const errorBody = await cloned.text();
+    console.error(`[Olsera API] Request failed: ${res.status} - ${path}`, errorBody);
+  }
+
   return res;
 }
 
@@ -244,19 +251,35 @@ export async function createOrder(
   const formData = new URLSearchParams();
   formData.append('order_date', new Date().toISOString().split('T')[0]);
   formData.append('currency_id', String(currencyId));
-  if (customer_name) formData.append('customer_name', customer_name);
+  formData.append('is_funding', '0'); // Required by Olsera Open API (boolean: 1/0)
+  
+  if (customer_name) {
+    formData.append('customer_name', customer_name);
+    // Guest profile requires email, phone, and customer_type_id to avoid 406 errors
+    const uniqueId = Date.now().toString().slice(-6);
+    formData.append('customer_email', `${customer_name.replace(/\s+/g, '').toLowerCase()}${uniqueId}@rakkencoffee.com`);
+    formData.append('customer_phone', `08123${uniqueId}`);
+    formData.append('customer_type_id', '0'); // Guest type ID found from API
+  } else {
+    formData.append('customer_name', 'Guest');
+    formData.append('customer_type_id', '0');
+  }
 
-  items.forEach((item, index) => {
-    formData.append(`items[${index}][product_id]`, item.productId);
-    formData.append(`items[${index}][qty]`, String(item.quantity));
-    if (item.price) formData.append(`items[${index}][price]`, String(item.price));
-    if (item.variantId) {
-      formData.append(`items[${index}][variant_id]`, item.variantId);
-    }
-    if (item.note) {
-      formData.append(`items[${index}][notes]`, item.note);
-    }
-  });
+  // Items are better added via addItemToOrder after getting order_id
+  // but we keep the logic here if items were passed
+  if (items && items.length > 0) {
+    items.forEach((item, index) => {
+      formData.append(`items[${index}][product_id]`, item.productId);
+      formData.append(`items[${index}][qty]`, String(item.quantity));
+      if (item.price) formData.append(`items[${index}][price]`, String(item.price));
+      if (item.variantId) {
+        formData.append(`items[${index}][variant_id]`, item.variantId);
+      }
+      if (item.note) {
+        formData.append(`items[${index}][notes]`, item.note);
+      }
+    });
+  }
 
   const res = await olseraFetch('/order/openorder', {
     method: 'POST',
@@ -266,12 +289,18 @@ export async function createOrder(
 
   if (!res.ok) {
     const text = await res.text();
-    console.error('Olsera createOrder error:', text);
-    throw new Error(`Failed to create order: ${res.status}`);
+    console.error('Olsera createOrder error details:', text);
+    throw new Error(`Failed to create order header: ${res.status} - ${text}`);
   }
 
-  const data = await res.json();
-  return data.data || data;
+  const result = await res.json();
+  const data = result.data || result;
+  
+  if (!data || !(data.id || data.order_id)) {
+    throw new Error(`Olsera createOrder response missing ID: ${JSON.stringify(result)}`);
+  }
+
+  return data;
 }
 
 /**
