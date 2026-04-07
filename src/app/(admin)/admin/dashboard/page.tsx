@@ -113,7 +113,8 @@ export default function AdminDashboard() {
   const itemCounts: Record<string, number> = {};
   orders.forEach((o) => {
     o.items.forEach((item) => {
-      itemCounts[item.menuItem.name] = (itemCounts[item.menuItem.name] || 0) + item.quantity;
+      const itemName = item.menuItem?.name || 'Unknown Item';
+      itemCounts[itemName] = (itemCounts[itemName] || 0) + item.quantity;
     });
   });
   const bestSellers = Object.entries(itemCounts)
@@ -379,7 +380,7 @@ export default function AdminDashboard() {
                               item.name.toLowerCase().includes(menuSearch.toLowerCase()) ||
                               item.description.toLowerCase().includes(menuSearch.toLowerCase());
                             const matchCategory = menuCategoryFilter === 'all' ||
-                              item.category.name === menuCategoryFilter;
+                              item.category?.name === menuCategoryFilter;
                             return matchSearch && matchCategory;
                           })
                           .map((item) => (
@@ -390,7 +391,7 @@ export default function AdminDashboard() {
                                 <p className="text-xs text-(--text-muted) mt-0.5 max-w-[200px] truncate">{item.description}</p>
                               )}
                             </td>
-                            <td className="p-4 text-sm text-(--text-secondary)">{item.category.name}</td>
+                            <td className="p-4 text-sm text-(--text-secondary)">{item.category?.name || 'Uncategorized'}</td>
                             <td className="p-4 text-sm text-(--text-primary) font-medium">{formatCurrency(item.price)}</td>
                             <td className="p-4">
                               <div className="flex gap-1 flex-wrap">
@@ -519,7 +520,7 @@ export default function AdminDashboard() {
                           <div className="flex flex-wrap gap-1">
                             {order.items.map((item) => (
                               <span key={item.id} className="text-xs px-2 py-1 rounded-full bg-white/10 text-white/70">
-                                {item.quantity}x {item.menuItem.name}
+                                {item.quantity}x {item.menuItem?.name || 'Item'}
                               </span>
                             ))}
                           </div>

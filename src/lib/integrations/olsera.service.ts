@@ -58,38 +58,64 @@ async function getAccessToken(): Promise<string> {
 export async function olseraFetch(path: string, options: RequestInit = {}, retryCount = 0): Promise<Response> {
   const token = await getAccessToken();
 
+  // Add timeout using AbortController
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
   // Add a timestamp parameter to aggressively bypass any Next.js disk caching
   const separator = path.includes('?') ? '&' : '?';
   const url = `${OLSERA_API_BASE}/api/open-api/v1/en${path}${separator}_t=${Date.now()}`;
 
-  console.log(`[Olsera API] Fetching: ${url}`);
+  console.log(`[Olsera API] Fetching (${retryCount > 0 ? "RETRY " + retryCount : "FIRST"}): ${url}`);
 
-  const res = await fetch(url, {
-    cache: 'no-store', // Prevent Next.js from caching
-    ...options,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  });
+  try {
+    const res = await fetch(url, {
+      cache: 'no-store', // Prevent Next.js from caching
+      ...options,
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    });
 
-  // If unauthorized, clear cached token and retry exactly once
-  if (res.status === 401 && retryCount === 0) {
-    console.warn('[Olsera API] Token expired or invalid. Refreshing token and retrying...');
-    cachedToken = null; 
-    return olseraFetch(path, options, 1);
+    clearTimeout(timeoutId);
+
+    // If unauthorized, clear cached token and retry exactly once
+    if (res.status === 401 && retryCount === 0) {
+      console.warn('[Olsera API] Token expired or invalid. Refreshing token and retrying...');
+      cachedToken = null; 
+      return olseraFetch(path, options, 1);
+    }
+
+    // If not successful, log the body for debugging (clone first so downstream can still read it)
+    if (!res.ok) {
+      const cloned = res.clone();
+      try {
+        const errorBody = await cloned.text();
+        console.error(`[Olsera API] Request failed: ${res.status} - ${path}`, errorBody);
+      } catch (e) {
+        console.error(`[Olsera API] Request failed (${res.status}) but body unreadable:`, e);
+      }
+    }
+
+    return res;
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    
+    // If it's a network error or timeout and we haven't retried yet, retry once
+    const isNetworkError = err.name === 'AbortError' || err.code === 'UND_ERR_CONNECT_TIMEOUT' || err.message?.includes('fetch failed');
+    if (isNetworkError && retryCount < 1) {
+      console.warn(`[Olsera API] Network/Timeout error (${err.name}). Retrying once...`);
+      // Wait 1s before retry
+      await new Promise(r => setTimeout(r, 1000));
+      return olseraFetch(path, options, retryCount + 1);
+    }
+    
+    throw err;
   }
-
-  // If not successful, log the body for debugging (clone first so downstream can still read it)
-  if (!res.ok) {
-    const cloned = res.clone();
-    const errorBody = await cloned.text();
-    console.error(`[Olsera API] Request failed: ${res.status} - ${path}`, errorBody);
-  }
-
-  return res;
 }
 
 // ──────────────────────────────

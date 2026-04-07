@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
             totalAmount: 15000,
             paymentMethod: 'MIDTRANS',
             createdAt: new Date().toISOString(),
-            items: [{ id: 1, menuItem: { name: 'Kopi Bot' }, quantity: 1, size: 'Regular', subtotal: 15000 }],
+            items: [{ id: 1, menuItem: { id: 'MOCK-01', name: 'Kopi Bot' }, quantity: 1, size: 'Regular', subtotal: 15000 }],
           });
         }
         
@@ -85,12 +85,11 @@ export async function GET(request: NextRequest) {
             totalAmount: 20000,
             paymentMethod: 'MIDTRANS',
             createdAt: new Date().toISOString(),
-            items: [{ id: 2, menuItem: { name: 'Teh Bot' }, quantity: 2, size: 'Large', subtotal: 20000 }],
+            items: [{ id: 2, menuItem: { id: 'MOCK-02', name: 'Teh Bot' }, quantity: 2, size: 'Large', subtotal: 20000 }],
           });
         }
       }
 
-      return NextResponse.json(orders);
       return NextResponse.json(orders);
     } else {
       throw new Error("Local database (Prisma) is no longer supported for fetching orders.");

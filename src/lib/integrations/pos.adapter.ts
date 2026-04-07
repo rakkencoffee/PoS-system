@@ -41,6 +41,7 @@ export interface NormalizedMenuItem {
   categoryId: string;
   categoryName: string;
   categorySlug: string;
+  category: { name: string };
   sizes: { size: string; priceAdjustment: number }[];
   olseraProductId?: number;
   olseraVariants?: { id: number; name: string; price: number }[];
@@ -125,6 +126,7 @@ function mapOlseraProduct(product: OlseraProduct, groups: OlseraProductGroup[]):
     categoryId: String(groupId || 0),
     categoryName: groupName,
     categorySlug: groupSlug,
+    category: { name: groupName },
     sizes,
     olseraProductId: product.id || product.product_id,
     olseraVariants: variants.map((v) => {

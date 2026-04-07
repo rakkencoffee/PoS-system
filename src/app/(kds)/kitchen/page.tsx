@@ -181,7 +181,7 @@ export default function KitchenPage() {
           <div key={item.id} className="bg-black/20 rounded-xl p-3">
             <div className="flex items-center justify-between">
               <span className="font-medium text-(--text-primary) text-sm">
-                {item.quantity}x {item.menuItem.name}
+                {item.quantity}x {item.menuItem?.name || 'Unknown Item'}
               </span>
               <span className="text-xs text-(--text-muted) bg-white/10 px-2 py-0.5 rounded-full">
                 {item.size}
@@ -203,9 +203,9 @@ export default function KitchenPage() {
                   +Shot
                 </span>
               )}
-              {item.toppings.map((t, i) => (
+              {item.toppings?.map((t, i) => (
                 <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/70">
-                  {t.topping.name}
+                  {t.topping?.name || 'Extra'}
                 </span>
               ))}
             </div>
