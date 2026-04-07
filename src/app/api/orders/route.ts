@@ -60,36 +60,7 @@ export async function GET(request: NextRequest) {
         console.error('Olsera orders error:', olseraError);
       }
 
-      // Mock API fallback for TestSprite UI validations
-      if (process.env.NEXT_PUBLIC_TEST_MODE === 'true') {
-        const hasPending = orders.some(o => o.status === 'PENDING');
-        const hasPreparing = orders.some(o => o.status === 'PREPARING');
-
-        if (!hasPending) {
-          orders.push({
-            id: 'OLSERA-TEST01',
-            queueNumber: 101,
-            status: 'PENDING',
-            totalAmount: 15000,
-            paymentMethod: 'MIDTRANS',
-            createdAt: new Date().toISOString(),
-            items: [{ id: 1, menuItem: { id: 'MOCK-01', name: 'Kopi Bot' }, quantity: 1, size: 'Regular', subtotal: 15000 }],
-          });
-        }
-        
-        if (!hasPreparing) {
-          orders.push({
-            id: 'OLSERA-TEST02',
-            queueNumber: 102,
-            status: 'PREPARING',
-            totalAmount: 20000,
-            paymentMethod: 'MIDTRANS',
-            createdAt: new Date().toISOString(),
-            items: [{ id: 2, menuItem: { id: 'MOCK-02', name: 'Teh Bot' }, quantity: 2, size: 'Large', subtotal: 20000 }],
-          });
-        }
-      }
-
+      // Mock API removed as requested by user. Proceeding with real data only.
       return NextResponse.json(orders);
     } else {
       throw new Error("Local database (Prisma) is no longer supported for fetching orders.");

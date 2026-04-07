@@ -172,7 +172,7 @@ export async function getMenuItems(filters?: {
         olsera.getProducts(),
         olsera.getProductGroups(),
       ]);
-      olseraCache.products = products.map((p) => mapOlseraProduct(p, groups));
+      olseraCache.products = products.map((p) => mapOlseraProduct(p, groups)).reverse();
       olseraCache.timestamp = Date.now();
     }
 
@@ -302,8 +302,10 @@ export async function updateOrderPaymentStatus(
         if (paymentAmount && paymentAmount > 0 && paymentModeId) {
           try {
             await olsera.updateOrderPayment(olseraOrderId, paymentAmount, paymentModeId);
+            // CRITICAL: Also mark as Paid (status=1) so Olsera allows status updates to A/Z later
+            await olsera.markOrderAsPaid(olseraOrderId, true);
           } catch (paymentAppendError) {
-            console.warn(`[Auto-Settlement] Non-fatal: Could not append updateOrderPayment details to Olsera order ${orderId}:`, paymentAppendError);
+            console.warn(`[Auto-Settlement] Non-fatal: Could not append payment details to Olsera order ${orderId}:`, paymentAppendError);
           }
         }
 
