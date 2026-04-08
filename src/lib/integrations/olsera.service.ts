@@ -19,6 +19,12 @@ const OLSERA_STORE_ID = process.env.OLSERA_STORE_ID || '';
 let cachedToken: { token: string; expiresAt: number } | null = null;
 let cachedStoreAlias: string | null = null;
 
+// Payment methods cache - Initialize with a robust fallback
+let cachedPaymentMethods: any[] | null = [{ id: 1, name: 'Cash/General' }];
+let paymentMethodsExpiry: number = 0;
+const CACHE_TTL_PAYMENT = 3600_000; // 1 hour for success
+const CACHE_TTL_FAILURE = 300_000;  // 5 minutes for failure (negative cache)
+
 /**
  * Get access token from Olsera API
  */
@@ -55,7 +61,12 @@ async function getAccessToken(): Promise<string> {
 /**
  * Make authenticated API call to Olsera
  */
-export async function olseraFetch(path: string, options: RequestInit = {}, retryCount = 0): Promise<Response> {
+export async function olseraFetch(
+  path: string, 
+  options: RequestInit & { silent?: boolean } = {}, 
+  retryCount = 0
+): Promise<Response> {
+  const { silent, ...fetchOptions } = options;
   const token = await getAccessToken();
 
   // Add timeout using AbortController
@@ -71,13 +82,13 @@ export async function olseraFetch(path: string, options: RequestInit = {}, retry
   try {
     const res = await fetch(url, {
       cache: 'no-store', // Prevent Next.js from caching
-      ...options,
+      ...fetchOptions,
       signal: controller.signal,
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'application/json',
         'Content-Type': 'application/json',
-        ...options.headers,
+        ...fetchOptions.headers,
       },
     });
 
@@ -90,8 +101,8 @@ export async function olseraFetch(path: string, options: RequestInit = {}, retry
       return olseraFetch(path, options, 1);
     }
 
-    // If not successful, log the body for debugging (clone first so downstream can still read it)
-    if (!res.ok) {
+    // If not successful, log the body for debugging
+    if (!res.ok && !silent) {
       const cloned = res.clone();
       try {
         const errorBody = await cloned.text();
@@ -212,25 +223,59 @@ export async function getProductGroups(): Promise<OlseraProductGroup[]> {
 
 /**
  * Fetch open order detail from Olsera
- * GET /order/openorder/detail?order_id=xxx
+ * GET /order/openorder/detail?id=xxx
+ * Note: Use the numeric internal ID.
  */
-export async function getOrderDetail(orderId: number): Promise<any> {
-  const res = await olseraFetch(`/order/openorder?per_page=50`);
+export async function getOrderDetail(orderId: number | string): Promise<any> {
+  // Extract numeric ID if string (e.g. OLSERA-12345 -> 12345)
+  const numericId = typeof orderId === 'string' 
+    ? orderId.replace('OLSERA-', '') 
+    : orderId;
+
+  console.log(`[Olsera API] Fetching detail for order: ${numericId}`);
+
+  const res = await olseraFetch(`/order/openorder/detail?id=${numericId}`);
   if (!res.ok) {
     const text = await res.text();
-    console.error('Olsera getOrderDetail error (fetch list):', text);
-    throw new Error(`Failed to fetch open orders for detail: ${res.status}`);
+    console.error(`Olsera getOrderDetail error for ${numericId}:`, text);
+    throw new Error(`Failed to fetch open order detail: ${res.status}`);
   }
 
   const data = await res.json();
-  const rawOrders = data.data || data || [];
-  const order = rawOrders.find((o: any) => o.id === orderId || o.order_id === orderId);
+  // Detail API returns order inside .data
+  const order = data.data || data;
   
-  if (!order) {
-    throw new Error(`Order ${orderId} not found in open orders`);
+  if (!order || (!order.id && !order.order_id)) {
+    throw new Error(`Order ${orderId} detail empty or malformed`);
+  }
+
+  // Ensure 'total' is available (alias for total_amount in Open Order)
+  if (order.total_amount && !order.total) {
+    order.total = order.total_amount;
+  }
+  
+  // Ensure 'items' is available (alias for orderitems in Open Order)
+  if (Array.isArray(order.orderitems) && !order.items) {
+    order.items = order.orderitems;
   }
 
   return order;
+}
+
+/**
+ * Fetch closed order detail from Olsera
+ * GET /order/closeorder/detail?id=xxx
+ */
+export async function getClosedOrderDetail(orderId: number): Promise<any> {
+  const res = await olseraFetch(`/order/closeorder/detail?id=${orderId}`);
+  if (!res.ok) {
+    const text = await res.text();
+    console.error('Olsera getClosedOrderDetail error:', text);
+    throw new Error(`Failed to fetch closed order detail: ${res.status}`);
+  }
+
+  const data = await res.json();
+  return data.data || data;
 }
 
 /**
@@ -259,11 +304,21 @@ export async function updateOrderStatus(orderId: number, status: 'P' | 'A' | 'S'
 
   if (!res.ok) {
     const text = await res.text();
+    
+    // IDEMPOTENCY CHECK: If status is already what we want, Olsera returns 406.
+    // We catch this and treat it as a success to avoid terminal clutter.
+    if (res.status === 406 && (text.includes('sebelumnya sudah') || text.includes('already'))) {
+      console.log(`[Olsera API] Order ${orderId} is already in status ${status}. Skipping update.`);
+      return { success: true, message: 'Already in target status' };
+    }
+
     console.error(`Olsera updateOrderStatus error for ${orderId}:`, text);
     throw new Error(`Failed to update order status: ${res.status}`);
   }
 
-  return await res.json();
+  const result = await res.json();
+  console.log(`[Olsera API] Successfully updated order ${orderId} to status ${status}`);
+  return result;
 }
 
 /**
@@ -341,10 +396,9 @@ export async function addItemToOrder(
 ): Promise<unknown> {
   const formData = new URLSearchParams();
   formData.append('order_id', String(orderId));
-  // For products WITH variants: use "variant_id|product_id" pipe format
+  // For products WITH variants: use "product_id|variant_id" pipe format (Standard Olsera Open API)
   // For products WITHOUT variants: use just the numeric product ID
-  const itemValue = variantId ? `${variantId}|${productId}` : String(productId);
-  formData.append('item_product_id', itemValue);
+  const itemValue = variantId ? `${productId}|${variantId}` : String(productId);
   formData.append('item_products', itemValue);
   formData.append('item_qty', String(quantity));
   if (note) formData.append('note', note);
@@ -372,17 +426,38 @@ export async function addItemToOrder(
  * GET /global/list-payment
  */
 export async function getPaymentMethods(): Promise<{ id: number; name: string; [key: string]: unknown }[]> {
-  const res = await olseraFetch('/global/list-payment?per_page=50');
-  if (!res.ok) {
-    const text = await res.text();
-    console.error('Olsera getPaymentMethods error:', text);
-    throw new Error(`Failed to fetch payment methods: ${res.status}`);
+  // Return cached methods if available and not expired
+  if (cachedPaymentMethods && paymentMethodsExpiry > Date.now()) {
+    console.log('[Olsera API] Using cached payment methods');
+    return cachedPaymentMethods;
   }
 
-  const data = await res.json();
-  const methods = data.data || data;
-  console.log('[Olsera API] Payment methods:', JSON.stringify(methods.map((m: { id: number; name: string }) => ({ id: m.id, name: m.name }))));
-  return methods;
+  try {
+    const res = await olseraFetch('/global/list-payment?per_page=50', { silent: true });
+    if (!res.ok) {
+      throw new Error(`Status ${res.status}`);
+    }
+
+    const data = await res.json();
+    const methods = data.data || data;
+    
+    if (Array.isArray(methods)) {
+      cachedPaymentMethods = methods;
+      paymentMethodsExpiry = Date.now() + CACHE_TTL_PAYMENT;
+      console.log('[Olsera API] Fetched and cached payment methods');
+      return methods;
+    }
+    
+    return methods || [];
+  } catch (error: any) {
+    // NEGATIVE CACHING: Update expiry even on failure so we don't retry immediately
+    paymentMethodsExpiry = Date.now() + CACHE_TTL_FAILURE;
+    
+    console.warn('[Olsera API] Payment API unavailable (500), using fallback for 5 mins.');
+    
+    // We already have a default in cachedPaymentMethods from initialization
+    return cachedPaymentMethods || [{ id: 1, name: 'Cash/General' }];
+  }
 }
 
 /**
@@ -403,7 +478,7 @@ export async function updateOrderPayment(
   formData.append('payment_currency_id', currencyId);
   formData.append('payment_date', today);
   formData.append('payment_mode_id', String(paymentModeId));
-  formData.append('payment_seq', '0');
+  formData.append('payment_seq', '1');
 
   const res = await olseraFetch('/order/openorder/updatepayment', {
     method: 'POST',

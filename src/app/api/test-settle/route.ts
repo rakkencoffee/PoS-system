@@ -24,11 +24,23 @@ export async function POST(request: NextRequest) {
     }
 
     const posAdapter = await import('@/lib/integrations/pos.adapter');
-    
-    // Simulate payment settlement and force order to 'Preparing' status in Olsera
-    await posAdapter.updateOrderPaymentStatus(orderId, 'paid', 1000); // 1000 is a dummy amount
+    const olsera = await import('@/lib/integrations/olsera.service');
+    const olseraOrderId = parseInt(orderId.replace('OLSERA-', ''));
 
-    console.log(`[Test Mode] Automatically settled Olsera order: ${orderId}`);
+    // Step 1: Fetch actual order detail to get the correct total
+    const orderDetail = await olsera.getOrderDetail(orderId);
+    // Use 'total' field from Olsera detail response
+    const actualTotal = orderDetail.total ? parseFloat(String(orderDetail.total)) : 0;
+
+    if (actualTotal <= 0) {
+      throw new Error(`Order ${orderId} has no items or zero total. Cannot settle.`);
+    }
+    
+    // Step 2: Simulate payment settlement with the CORRECT amount
+    console.log(`[Test Mode] Settling order ${orderId} with actual amount: ${actualTotal}`);
+    await posAdapter.updateOrderPaymentStatus(orderId, 'paid', actualTotal);
+
+    console.log(`[Test Mode] Successfully settled Olsera order: ${orderId}`);
 
     return NextResponse.json({
       success: true,

@@ -31,28 +31,48 @@ export async function GET(
 
         return NextResponse.json({
           id: id,
-          queueNumber: olseraOrderId % 1000, // Last 3 digits as queue number
+          queueNumber: olseraOrderId % 1000,
           status: kdsStatus,
           totalAmount: orderDetail.total || 0,
-          createdAt: new Date().toISOString(),
+          createdAt: orderDetail.order_date || new Date().toISOString(),
           items: items.map((item: any, idx: number) => ({
             id: idx,
-            menuItem: { name: item.product_name || item.name || 'Item' },
+            menuItem: { name: item.product_name || item.name || item.item_name || 'Item' },
             quantity: item.qty || item.quantity || 1,
-            size: item.variant_name || '-',
+            size: item.variant_name || item.item_variant_name || '-',
           })),
         });
       } catch (olseraError) {
-        console.error('Olsera getOrderDetail failed:', olseraError);
-        // Return a minimal order object so the page doesn't crash
-        return NextResponse.json({
-          id: id,
-          queueNumber: olseraOrderId % 1000,
-          status: 'PENDING',
-          totalAmount: 0,
-          createdAt: new Date().toISOString(),
-          items: [],
-        });
+        console.warn(`Order ${olseraOrderId} not in open orders, checking closed orders...`);
+        try {
+          const closedOrder = await olsera.getClosedOrderDetail(olseraOrderId);
+          const items = Array.isArray(closedOrder.items) ? closedOrder.items : [];
+          
+          return NextResponse.json({
+            id: id,
+            queueNumber: olseraOrderId % 1000,
+            status: 'COMPLETED', // Found in closed orders, must be completed
+            totalAmount: closedOrder.total || 0,
+            createdAt: closedOrder.order_date || new Date().toISOString(),
+            items: items.map((item: any, idx: number) => ({
+              id: idx,
+              menuItem: { name: item.product_name || item.name || item.item_name || 'Item' },
+              quantity: item.qty || item.quantity || 1,
+              size: item.variant_name || item.item_variant_name || '-',
+            })),
+          });
+        } catch (closedError) {
+          console.error('Order not found even in closed orders:', closedError);
+          // Return a minimal order object as last resort
+          return NextResponse.json({
+            id: id,
+            queueNumber: olseraOrderId % 1000,
+            status: 'PENDING',
+            totalAmount: 0,
+            createdAt: new Date().toISOString(),
+            items: [],
+          });
+        }
       }
     } else {
       throw new Error("Local database (Prisma) is no longer supported. Invalid Order ID format.");
@@ -131,7 +151,17 @@ export async function PATCH(
 
       // Fetch detail if not already fetched during self-healing
       if (!detail && !id.includes('TEST')) {
-        detail = await olsera.getOrderDetail(olseraOrderId);
+        try {
+          detail = await olsera.getOrderDetail(olseraOrderId);
+        } catch (detailError) {
+          console.warn(`Could not find order ${olseraOrderId} in open orders after status update, checking closed orders...`);
+          try {
+            detail = await olsera.getClosedOrderDetail(olseraOrderId);
+          } catch (closedError: any) {
+            console.error(`Status update likely succeeded but could not fetch final detail:`, closedError.message);
+            // Don't throw here, we'll format a minimal response based on body status
+          }
+        }
       }
 
       const updatedOrder = {

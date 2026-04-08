@@ -172,6 +172,7 @@ export async function getMenuItems(filters?: {
         olsera.getProducts(),
         olsera.getProductGroups(),
       ]);
+      // Reverse the order so newest/added-later items appear first as per user request
       olseraCache.products = products.map((p) => mapOlseraProduct(p, groups)).reverse();
       olseraCache.timestamp = Date.now();
     }
@@ -299,31 +300,41 @@ export async function updateOrderPaymentStatus(
 
       try {
         // Step 2: Record payment details on the order
-        if (paymentAmount && paymentAmount > 0 && paymentModeId) {
+        // Fetch the absolute source of truth for the total from Olsera to avoid 406 "Incorrect payment amount"
+        const orderDetail = await olsera.getOrderDetail(orderId);
+        const actualOlseraTotal = orderDetail.total ? parseFloat(String(orderDetail.total)) : (paymentAmount || 0);
+        
+        // Skip if already paid in Olsera to avoid duplicate settlement errors
+        if (orderDetail.is_paid === true || orderDetail.is_paid === 1 || orderDetail.is_paid === '1') {
+          console.log(`[Auto-Settlement] Order ${orderId} already marked as PAID in Olsera. Skipping settlement.`);
+          return;
+        }
+
+        if (actualOlseraTotal > 0 && paymentModeId) {
           try {
-            await olsera.updateOrderPayment(olseraOrderId, paymentAmount, paymentModeId);
+            console.log(`[Auto-Settlement] Initializing settlement for Olsera order ${orderId} with amount: ${actualOlseraTotal}`);
+            await olsera.updateOrderPayment(olseraOrderId, actualOlseraTotal, paymentModeId);
+            
             // CRITICAL: Also mark as Paid (status=1) so Olsera allows status updates to A/Z later
             await olsera.markOrderAsPaid(olseraOrderId, true);
-          } catch (paymentAppendError) {
-            console.warn(`[Auto-Settlement] Non-fatal: Could not append payment details to Olsera order ${orderId}:`, paymentAppendError);
+            console.log(`[Auto-Settlement] Successfully recorded payment info for order ${orderId}`);
+            
+            // FORCE status back to PENDING (P)
+            // Olsera sometimes auto-accepts orders and moves them to 'A' (Preparing).
+            // We force it back to 'P' so it appears in the first column of the KDS.
+            await olsera.updateOrderStatus(olseraOrderId, 'P');
+            console.log(`[Auto-Settlement] Forced status to PENDING for order ${orderId}`);
+          } catch (paymentAppendError: any) {
+            console.warn(`[Auto-Settlement] Non-fatal: Could not append payment details to Olsera order ${orderId}:`, paymentAppendError.message);
           }
         }
 
-        // Step 3: Move order to "Diproses" (A = Preparing) status
-        // NOTE: Do NOT call markOrderAsPaid — that removes the order from
-        // the open orders list, making it invisible to KDS!
-        // Instead, set status to 'A' which keeps it in open orders and
-        // signals to KDS that the order is being prepared.
-        try {
-          await olsera.updateOrderStatus(olseraOrderId, 'A');
-          console.log(`[Auto-Settlement] ✅ Order ${orderId} moved to PREPARING in Olsera POS!`);
-        } catch (statusError) {
-          console.warn(`[Auto-Settlement] Non-fatal: Could not update status to A:`, statusError);
-        }
-        
-      } catch (error) {
+        // Step 3: Keep order in Pending (P) so it stays in Column 1 of KDS
+        // The Barista will manually move it to PREPARING (A) by clicking "Start Making"
+        console.log(`[Auto-Settlement] ✅ Order ${orderId} marked as PAID. Staying in PENDING for KDS check.`);
+      } catch (error: any) {
         // Log but don't throw — webhook must still return 200 to Midtrans
-        console.error(`[Auto-Settlement] ❌ Failed to settle order ${orderId} in Olsera:`, error);
+        console.error(`[Auto-Settlement] ❌ Failed to settle order ${orderId} in Olsera:`, error.message);
       }
     } else {
       console.log(`[Olsera POS] Order ${orderId} status: ${status}. No Olsera action needed.`);

@@ -19,10 +19,12 @@ export async function GET(request: NextRequest) {
           const data = await res.json();
           const rawOrders = data.data || data || [];
 
-          // Filter orders for KDS display
+          // Filter orders for KDS display - ONLY show PAID orders
           const validOrders = (Array.isArray(rawOrders) ? rawOrders : []).filter((order: any) => {
             const oStatus = (order.status || '').toUpperCase();
-            return oStatus === 'A' || oStatus === 'Z' || oStatus === 'S' || oStatus === 'T' || Number(order.is_paid) === 1;
+            // Critical Security: Only show if paid (1) or completed (Z)
+            // This prevents unpaid orders from appearing in KDS
+            return Number(order.is_paid) === 1 || oStatus === 'Z';
           });
 
           // Normalize Olsera orders to match frontend format
@@ -34,7 +36,7 @@ export async function GET(request: NextRequest) {
             if (oStatus === 'A') kdsStatus = 'PREPARING';
             else if (oStatus === 'Z') kdsStatus = 'COMPLETED';
             else if (Number(order.is_paid) === 1) {
-              kdsStatus = 'PENDING'; // Paid but not yet prepared
+              kdsStatus = 'PENDING'; // Paid but not yet started (Status P)
             }
 
             return {

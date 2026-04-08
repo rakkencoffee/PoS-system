@@ -61,14 +61,8 @@ export async function POST(request: NextRequest) {
       })),
     });
 
-    // 3. [TEST MODE] Immediately bypass settlement webhook since Midtrans can't hit offline local test server
-    if (process.env.NEXT_PUBLIC_TEST_MODE === 'true' && dbOrderId) {
-      console.log('[Test Mode Bypassed] Auto-settling newly created order:', dbOrderId);
-      import('@/lib/integrations/pos.adapter').then(adapter => {
-        adapter.updateOrderPaymentStatus(String(dbOrderId), 'paid', totalAmount)
-          .catch((e: any) => console.warn('Test mode auto-settle failed:', e));
-      });
-    }
+    // 3. Auto-settlement logic removed to prevent premature KDS appearance.
+    // Orders will now only be marked as paid via the Midtrans webhook or manual verification.
 
     return NextResponse.json({
       snapToken: snapResult.token,
