@@ -16,9 +16,9 @@ import { createSnapTransaction } from '@/lib/integrations/midtrans.service';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { items, totalAmount, customerName } = body;
+    const { items, totalAmount, customerName, discountAmount, voucherCode } = body;
 
-    if (!items || !items.length || !totalAmount) {
+    if (!items || !items.length || typeof totalAmount !== 'number') {
       return NextResponse.json(
         { error: 'Items and totalAmount are required' },
         { status: 400 }
@@ -44,21 +44,42 @@ export async function POST(request: NextRequest) {
       );
       dbOrderId = adapterOrder.orderId;
       console.log('Successfully created POS order:', dbOrderId);
+
+      // Inject discount natively to Olsera if a voucher was applied
+      if (discountAmount && discountAmount > 0) {
+        await posAdapter.applyOrderDiscount(dbOrderId, discountAmount);
+      }
+
     } catch (posError) {
       console.error('CRITICAL: Could not create POS order in Olsera:', posError);
       throw new Error('Gagal menyinkronkan pesanan dengan sistem POS. Harap coba lagi atau hubungi kasir.');
     }
 
-    // 2. Create Midtrans Snap token
+    // 2. Format Midtrans Items
+    const midtransItems = items.map((item: { productId: string; name: string; price: number; quantity: number }) => ({
+      id: item.productId,
+      name: item.name,
+      price: item.price,
+      quantity: item.quantity,
+    }));
+
+    // If discount exists, subtract it using Midtrans dummy item
+    let finalGrossAmount = totalAmount;
+    if (discountAmount && discountAmount > 0) {
+      finalGrossAmount -= discountAmount;
+      midtransItems.push({
+        id: 'VOUCHER',
+        name: voucherCode ? `Voucher: ${voucherCode}` : 'Discount Voucher',
+        price: -Math.abs(discountAmount),
+        quantity: 1,
+      });
+    }
+
+    // 3. Create Midtrans Snap token
     const snapResult = await createSnapTransaction({
       orderId: dbOrderId ? String(dbOrderId) : orderId,
-      grossAmount: totalAmount,
-      items: items.map((item: { productId: string; name: string; price: number; quantity: number }) => ({
-        id: item.productId,
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity,
-      })),
+      grossAmount: finalGrossAmount,
+      items: midtransItems,
     });
 
     // 3. Auto-settlement logic removed to prevent premature KDS appearance.

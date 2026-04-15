@@ -1,0 +1,14 @@
+﻿
+--- Testing Apply Discount on Dummy Order ---
+Using product: RAKKEN Coffee Sampler (ID: 112701863, Price: undefined)
+Created Order ID: 1278290619
+Added Item. Total: N/A
+Found Order Item ID: 3242626849. Attempting to apply 5000 discount.
+Update Detail Status: 200
+
+--- FINAL ORDER SUMMARY ---
+Original Price: undefined
+Item Discount Saved in API: 5000.00
+Final Grand Total of Order: 61000.00
+
+Order 1278290619 cancelled for cleanup.

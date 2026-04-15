@@ -1,0 +1,23 @@
+Token acquired.
+FAIL /global/list-payment => Status: 500
+  Error: {"message":"server error","error":"server error","statusCode":500}
+FAIL /global/list-paymentmode => Status: 404
+  Error: {"error":{"path":"api/open-api/v1/en/global/list-paymentmode","message":"Error Found","status_code":404,"error":"Not Found Resource"}}
+FAIL /global/list-paymenttype => Status: 404
+  Error: {"error":{"path":"api/open-api/v1/en/global/list-paymenttype","message":"Error Found","status_code":404,"error":"Not Found Resource"}}
+FAIL /global/list-payment-mode => Status: 404
+  Error: {"error":{"path":"api/open-api/v1/en/global/list-payment-mode","message":"Error Found","status_code":404,"error":"Not Found Resource"}}
+FAIL /global/list-payment-type => Status: 404
+  Error: {"error":{"path":"api/open-api/v1/en/global/list-payment-type","message":"Error Found","status_code":404,"error":"Not Found Resource"}}
+FAIL /global/paymentmode => Status: 404
+  Error: {"error":{"path":"api/open-api/v1/en/global/paymentmode","message":"Error Found","status_code":404,"error":"Not Found Resource"}}
+FAIL /global/paymenttype => Status: 404
+  Error: {"error":{"path":"api/open-api/v1/en/global/paymenttype","message":"Error Found","status_code":404,"error":"Not Found Resource"}}
+FAIL /global/payment-mode => Status: 404
+  Error: {"error":{"path":"api/open-api/v1/en/global/payment-mode","message":"Error Found","status_code":404,"error":"Not Found Resource"}}
+FAIL /global/payment-type => Status: 404
+  Error: {"error":{"path":"api/open-api/v1/en/global/payment-type","message":"Error Found","status_code":404,"error":"Not Found Resource"}}
+FAIL /global/list-transactionmode => Status: 404
+  Error: {"error":{"path":"api/open-api/v1/en/global/list-transactionmode","message":"Error Found","status_code":404,"error":"Not Found Resource"}}
+FAIL /global/transaction-mode => Status: 404
+  Error: {"error":{"path":"api/open-api/v1/en/global/transaction-mode","message":"Error Found","status_code":404,"error":"Not Found Resource"}}

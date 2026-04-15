@@ -265,6 +265,67 @@ export async function createOrder(
 }
 
 /**
+ * Apply native discount directly to Olsera POS
+ * By executing an updatedetail bypass on the first item in the receipt.
+ */
+export async function applyOrderDiscount(
+  orderId: string,
+  discountAmount: number
+): Promise<void> {
+  if (USE_OLSERA && orderId.startsWith('OLSERA-')) {
+    const olseraOrderId = parseInt(orderId.replace('OLSERA-', ''));
+    
+    if (discountAmount <= 0) return;
+
+    try {
+      // 1. Get order detail to extract the first order item ID
+      console.log(`[Voucher System] Fetching order detail for ${orderId} to apply discount...`);
+      const orderDetail = await olsera.getOrderDetail(olseraOrderId);
+      const items = orderDetail?.items || orderDetail?.orderitems || [];
+      
+      if (!items || items.length === 0) {
+        console.warn(`[Voucher System] Cannot apply discount on order ${orderId}: no items found.`);
+        return;
+      }
+
+      // We apply the total discount to the first item.
+      const targetItem = items[0];
+      const targetItemId = targetItem.id;
+
+      // 2. Prepare payload for updatedetail
+      const formData = new URLSearchParams();
+      formData.append('order_id', String(olseraOrderId));
+      formData.append('id', String(targetItemId));
+      
+      // Olsera updatedetail requires us to resend price and qty!
+      const currentPrice = targetItem.price || targetItem.subtotal_per_item || 0;
+      const currentQty = targetItem.qty || targetItem.quantity || 1;
+      
+      formData.append('price', String(currentPrice));
+      formData.append('qty', String(currentQty));
+      formData.append('discount', String(discountAmount));
+
+      // 3. Inject discount to Olsera natively
+      const res = await olsera.olseraFetch('/order/openorder/updatedetail', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formData.toString()
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        console.error(`[Voucher System] Failed to apply discount via API:`, text);
+      } else {
+        console.log(`[Voucher System] Successfully injected discount (Rp ${discountAmount}) to order ${orderId}`);
+      }
+    } catch (e: any) {
+      console.error(`[Voucher System] Error applying discount to order ${orderId}:`, e.message);
+    }
+  }
+}
+
+
+/**
  * Update order status after payment
  * For Olsera: runs the full auto-settlement flow
  */

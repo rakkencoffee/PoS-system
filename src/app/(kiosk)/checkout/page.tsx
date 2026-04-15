@@ -37,6 +37,13 @@ export default function CheckoutPage() {
   const [snapLoaded, setSnapLoaded] = useState(false);
   const checkoutInProgress = useRef(false);
 
+  // Voucher states
+  const [voucherCode, setVoucherCode] = useState('');
+  const [appliedDiscount, setAppliedDiscount] = useState<number>(0);
+  const [voucherMessage, setVoucherMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
+  const [isValidatingVoucher, setIsValidatingVoucher] = useState(false);
+
+
   useEffect(() => {
     if (itemCount === 0 && !checkoutInProgress.current) {
       router.push('/menu');
@@ -150,6 +157,8 @@ export default function CheckoutPage() {
           })),
           totalAmount: cart.totalAmount,
           customerName: cart.customerName,
+          discountAmount: appliedDiscount > 0 ? appliedDiscount : undefined,
+          voucherCode: appliedDiscount > 0 ? voucherCode.toUpperCase().trim() : undefined,
         }),
       });
 
@@ -173,6 +182,33 @@ export default function CheckoutPage() {
       alert('Failed to create payment. Please try again.');
     }
   };
+
+  const handleApplyVoucher = async () => {
+    if (!voucherCode.trim()) return;
+    setIsValidatingVoucher(true);
+    setVoucherMessage(null);
+    try {
+      const res = await fetch('/api/payment/validate-voucher', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: voucherCode, totalAmount: cart.totalAmount })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setVoucherMessage({ type: 'error', text: data.error || 'Voucher invalid' });
+        setAppliedDiscount(0);
+      } else {
+        setVoucherMessage({ type: 'success', text: data.message });
+        setAppliedDiscount(data.discountAmount);
+      }
+    } catch(e) {
+      setVoucherMessage({ type: 'error', text: 'Error contacting server' });
+    } finally {
+      setIsValidatingVoucher(false);
+    }
+  };
+
+  const finalTotalToPay = Math.max(0, cart.totalAmount - appliedDiscount);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -206,9 +242,66 @@ export default function CheckoutPage() {
               </div>
             ))}
           </div>
-          <div className="border-t border-(--border-subtle) mt-4 pt-4 flex items-center justify-between">
-            <span className="font-semibold text-(--text-primary)">Total</span>
-            <span className="text-xl font-bold text-gradient">{formatCurrency(cart.totalAmount)}</span>
+          <div className="border-t border-(--border-subtle) mt-4 pt-4 space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-(--text-muted)">Subtotal</span>
+              <span className="text-(--text-primary)">{formatCurrency(cart.totalAmount)}</span>
+            </div>
+            {appliedDiscount > 0 && (
+              <div className="flex items-center justify-between text-sm text-green-500 font-medium">
+                <span>Discount Promo</span>
+                <span>- {formatCurrency(appliedDiscount)}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between pt-2">
+              <span className="font-semibold text-(--text-primary)">Total</span>
+              <span className="text-xl font-bold text-gradient">{formatCurrency(finalTotalToPay)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Voucher Section */}
+        <div className="glass-card p-5 animate-fade-in">
+          <div className="flex items-center gap-3 mb-3">
+            <span className="text-2xl">🎟️</span>
+            <div>
+              <h2 className="text-lg font-semibold text-(--text-primary)">Promo & Voucher</h2>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2">
+            <div className="flex gap-2">
+              <input 
+                type="text" 
+                placeholder="Enter promo code (e.g. STARTFRIDAY10)" 
+                value={voucherCode}
+                onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
+                className="flex-1 px-4 py-3 rounded-xl bg-(--bg-card) border border-(--border-subtle) text-(--text-primary) placeholder:text-(--text-muted) focus:outline-none focus:ring-2 focus:ring-(--brand-primary)"
+              />
+              <button 
+                onClick={handleApplyVoucher}
+                disabled={isValidatingVoucher || !voucherCode.trim()}
+                className="px-6 py-3 bg-(--brand-primary) text-white font-medium rounded-xl disabled:opacity-50"
+              >
+                {isValidatingVoucher ? '...' : 'Apply'}
+              </button>
+            </div>
+            {voucherMessage && (
+              <p className={`text-sm mt-1 px-1 ${voucherMessage.type === 'success' ? 'text-green-500' : 'text-red-500'}`}>
+                {voucherMessage.text}
+              </p>
+            )}
+            {appliedDiscount > 0 && (
+              <button 
+                onClick={() => {
+                  setAppliedDiscount(0);
+                  setVoucherCode('');
+                  setVoucherMessage(null);
+                }}
+                className="text-xs text-red-400 mt-2 text-left px-1 hover:underline w-fit"
+              >
+                Remove Voucher
+              </button>
+            )}
           </div>
         </div>
 
@@ -253,7 +346,7 @@ export default function CheckoutPage() {
                 Loading payment...
               </>
             ) : (
-              <>Pay {formatCurrency(cart.totalAmount)}</>
+              <>Pay {formatCurrency(finalTotalToPay)}</>
             )}
           </button>
           

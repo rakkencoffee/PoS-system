@@ -8,55 +8,164 @@
  * 1. Get access_token via POST /api/open-api/v1/id/token
  * 2. Use token in Authorization header for all subsequent calls
  * 3. Endpoints use store alias in URL path: /{storeAlias}/api/open-api/v1/en/...
+ *
+ * DEV MODE FIX: Token is persisted to a temp file to survive Next.js HMR resets.
+ * A mutex prevents concurrent token requests that cause Olsera rate-limiting/401s.
  */
+
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
 const OLSERA_API_BASE = process.env.OLSERA_API_BASE || 'https://api-open.olsera.co.id';
 const OLSERA_APP_ID = process.env.OLSERA_APP_ID || '';
 const OLSERA_SECRET_KEY = process.env.OLSERA_SECRET_KEY || '';
 const OLSERA_STORE_ID = process.env.OLSERA_STORE_ID || '';
+const IS_DEV = process.env.NODE_ENV !== 'production';
 
-// Token cache
-let cachedToken: { token: string; expiresAt: number } | null = null;
+// ──────────────────────────────
+// File-Based Token Cache (survives HMR in dev mode)
+// ──────────────────────────────
+const TOKEN_CACHE_FILE = path.join(os.tmpdir(), '.olsera_token_cache.json');
+
+interface TokenCache {
+  token: string;
+  expiresAt: number;
+}
+
+// In-memory fast cache (primary)
+let cachedToken: TokenCache | null = null;
 let cachedStoreAlias: string | null = null;
+
+// Mutex: only one token request at a time (prevents race conditions)
+let tokenRefreshPromise: Promise<string> | null = null;
+
+/**
+ * Read token from temp file (fallback when in-memory cache is wiped by HMR)
+ */
+function readTokenFromDisk(): TokenCache | null {
+  try {
+    if (!fs.existsSync(TOKEN_CACHE_FILE)) return null;
+    const raw = fs.readFileSync(TOKEN_CACHE_FILE, 'utf-8');
+    const data = JSON.parse(raw) as TokenCache;
+    // Validate: token must exist and not be expired (with 5 min buffer)
+    if (data.token && data.expiresAt > Date.now() + 300_000) {
+      return data;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Write token to temp file for persistence across HMR
+ */
+function writeTokenToDisk(cache: TokenCache): void {
+  try {
+    fs.writeFileSync(TOKEN_CACHE_FILE, JSON.stringify(cache), 'utf-8');
+  } catch (err) {
+    // Non-fatal: if we can't write, we just won't have disk persistence
+    console.warn('[Olsera Auth] Could not persist token to disk:', err);
+  }
+}
+
+/**
+ * Actually fetch a new token from Olsera API (internal, called by getAccessToken)
+ */
+async function fetchNewToken(): Promise<string> {
+  const formData = new URLSearchParams();
+  formData.append('app_id', OLSERA_APP_ID);
+  formData.append('secret_key', OLSERA_SECRET_KEY);
+  formData.append('grant_type', 'secret_key');
+
+  // Retry up to 3 times with exponential backoff
+  const MAX_AUTH_RETRIES = 3;
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < MAX_AUTH_RETRIES; attempt++) {
+    if (attempt > 0) {
+      const delay = Math.min(1000 * Math.pow(2, attempt), 8000); // 2s, 4s, 8s
+      console.warn(`[Olsera Auth] Retry ${attempt}/${MAX_AUTH_RETRIES} in ${delay}ms...`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+
+    try {
+      const res = await fetch(`${OLSERA_API_BASE}/api/open-api/v1/id/token`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const token = data.access_token || data.data?.access_token;
+        if (token) {
+          const newCache: TokenCache = {
+            token,
+            expiresAt: Date.now() + 3600_000, // 1 hour validity
+          };
+          cachedToken = newCache;
+          writeTokenToDisk(newCache);
+          console.log(`[Olsera Auth] ✅ Token acquired successfully (attempt ${attempt + 1})`);
+          return token;
+        }
+      }
+
+      const text = await res.text();
+      lastError = new Error(`Olsera auth failed (${res.status}): ${text}`);
+      
+      // If it's a 401, it might be a transient issue — retry
+      if (res.status === 401) {
+        console.warn(`[Olsera Auth] Got 401 on attempt ${attempt + 1}. Will retry...`);
+        continue;
+      }
+      
+      // For other errors (500, etc.), also retry
+      console.warn(`[Olsera Auth] Got ${res.status} on attempt ${attempt + 1}. Will retry...`);
+    } catch (fetchErr: any) {
+      lastError = fetchErr;
+      console.warn(`[Olsera Auth] Network error on attempt ${attempt + 1}:`, fetchErr.message);
+    }
+  }
+
+  throw lastError || new Error('Olsera auth failed after all retries');
+}
+
+/**
+ * Get access token from Olsera API (with file cache, mutex, and retry)
+ */
+async function getAccessToken(): Promise<string> {
+  // 1. Check in-memory cache first (fastest)
+  if (cachedToken && cachedToken.expiresAt > Date.now() + 300_000) {
+    return cachedToken.token;
+  }
+
+  // 2. Check disk cache (survives HMR in dev mode)
+  const diskCache = readTokenFromDisk();
+  if (diskCache) {
+    cachedToken = diskCache; // warm the in-memory cache
+    console.log('[Olsera Auth] 🔄 Recovered token from disk cache (survived HMR)');
+    return diskCache.token;
+  }
+
+  // 3. Need to fetch a new token — use mutex to prevent concurrent requests
+  if (tokenRefreshPromise) {
+    console.log('[Olsera Auth] ⏳ Waiting for existing token request...');
+    return tokenRefreshPromise;
+  }
+
+  tokenRefreshPromise = fetchNewToken().finally(() => {
+    tokenRefreshPromise = null; // release the mutex
+  });
+
+  return tokenRefreshPromise;
+}
 
 // Payment methods cache - Initialize with a robust fallback
 let cachedPaymentMethods: any[] | null = [{ id: 1, name: 'Cash/General' }];
 let paymentMethodsExpiry: number = 0;
 const CACHE_TTL_PAYMENT = 3600_000; // 1 hour for success
 const CACHE_TTL_FAILURE = 300_000;  // 5 minutes for failure (negative cache)
-
-/**
- * Get access token from Olsera API
- */
-async function getAccessToken(): Promise<string> {
-  // Return cached token if not expired (with 5 min buffer)
-  if (cachedToken && cachedToken.expiresAt > Date.now() + 300_000) {
-    return cachedToken.token;
-  }
-
-  const formData = new URLSearchParams();
-  formData.append('app_id', OLSERA_APP_ID);
-  formData.append('secret_key', OLSERA_SECRET_KEY);
-  formData.append('grant_type', 'secret_key');
-
-  const res = await fetch(`${OLSERA_API_BASE}/api/open-api/v1/id/token`, {
-    method: 'POST',
-    body: formData,
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Olsera auth failed (${res.status}): ${text}`);
-  }
-
-  const data = await res.json();
-  cachedToken = {
-    token: data.access_token || data.data?.access_token,
-    expiresAt: Date.now() + 3600_000, // assume 1 hour validity
-  };
-
-  return cachedToken.token;
-}
 
 /**
  * Make authenticated API call to Olsera
@@ -77,7 +186,9 @@ export async function olseraFetch(
   const separator = path.includes('?') ? '&' : '?';
   const url = `${OLSERA_API_BASE}/api/open-api/v1/en${path}${separator}_t=${Date.now()}`;
 
-  console.log(`[Olsera API] Fetching (${retryCount > 0 ? "RETRY " + retryCount : "FIRST"}): ${url}`);
+  if (!silent) {
+    console.log(`[Olsera API] ${retryCount > 0 ? `RETRY ${retryCount}` : "→"} ${path}`);
+  }
 
   try {
     const res = await fetch(url, {
@@ -94,11 +205,15 @@ export async function olseraFetch(
 
     clearTimeout(timeoutId);
 
-    // If unauthorized, clear cached token and retry exactly once
-    if (res.status === 401 && retryCount === 0) {
-      console.warn('[Olsera API] Token expired or invalid. Refreshing token and retrying...');
-      cachedToken = null; 
-      return olseraFetch(path, options, 1);
+    // If unauthorized, invalidate ALL caches and retry with fresh token
+    if (res.status === 401 && retryCount < 2) {
+      console.warn(`[Olsera API] 401 on ${path}. Invalidating token & retrying (attempt ${retryCount + 1}/2)...`);
+      cachedToken = null;
+      // Also delete disk cache to force a truly fresh token
+      try { fs.unlinkSync(TOKEN_CACHE_FILE); } catch { /* ignore */ }
+      // Backoff before retry
+      await new Promise(r => setTimeout(r, 1000 * (retryCount + 1)));
+      return olseraFetch(path, options, retryCount + 1);
     }
 
     // If not successful, log the body for debugging
@@ -116,12 +231,11 @@ export async function olseraFetch(
   } catch (err: any) {
     clearTimeout(timeoutId);
     
-    // If it's a network error or timeout and we haven't retried yet, retry once
+    // If it's a network error or timeout and we haven't retried enough, retry
     const isNetworkError = err.name === 'AbortError' || err.code === 'UND_ERR_CONNECT_TIMEOUT' || err.message?.includes('fetch failed');
-    if (isNetworkError && retryCount < 1) {
-      console.warn(`[Olsera API] Network/Timeout error (${err.name}). Retrying once...`);
-      // Wait 1s before retry
-      await new Promise(r => setTimeout(r, 1000));
+    if (isNetworkError && retryCount < 2) {
+      console.warn(`[Olsera API] Network error (${err.name}). Retrying in ${(retryCount + 1)}s...`);
+      await new Promise(r => setTimeout(r, 1000 * (retryCount + 1)));
       return olseraFetch(path, options, retryCount + 1);
     }
     
@@ -526,3 +640,57 @@ export async function markOrderAsPaid(
   return data.data || data;
 }
 
+
+/**
+ * Fetch both open and closed orders from Olsera
+ */
+export async function getAllOrders(options: { today?: boolean } = {}): Promise<any[]> {
+  const { today } = options;
+  const allOrders: any[] = [];
+  
+  // Date filter for today (WIB / GMT+7)
+  let dateFilter = '';
+  if (today) {
+    const now = new Date();
+    // Adjust to WIB (GMT+7)
+    const wibOffset = 7 * 60 * 60 * 1000;
+    const wibDate = new Date(now.getTime() + wibOffset);
+    dateFilter = wibDate.toISOString().split('T')[0];
+    console.log(`[Olsera API] Filtering orders for today: ${dateFilter}`);
+  }
+
+  try {
+    // 1. Fetch Open Orders
+    const openRes = await olseraFetch(`/order/openorder?per_page=50${today ? `&date_from=${dateFilter}` : ''}`);
+    if (openRes.ok) {
+      const data = await openRes.json();
+      const orders = data.data || data || [];
+      if (Array.isArray(orders)) {
+        allOrders.push(...orders);
+      }
+    }
+
+    // 2. Fetch Closed Orders
+    const closedRes = await olseraFetch(`/order/closeorder?per_page=50${today ? `&date_from=${dateFilter}` : ''}`);
+    if (closedRes.ok) {
+      const data = await closedRes.json();
+      const orders = data.data || data || [];
+      if (Array.isArray(orders)) {
+        allOrders.push(...orders);
+      }
+    }
+
+    // Sort by date descending
+    allOrders.sort((a, b) => {
+      const dateA = new Date(a.order_date || a.created_at || 0).getTime();
+      const dateB = new Date(b.order_date || b.created_at || 0).getTime();
+      return dateB - dateA;
+    });
+
+    console.log(`[Olsera API] Total orders fetched (Open+Closed): ${allOrders.length}`);
+    return allOrders;
+  } catch (err) {
+    console.error('[Olsera API] Error fetching combined orders:', err);
+    throw err;
+  }
+}

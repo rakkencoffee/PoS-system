@@ -1,0 +1,15 @@
+﻿Using Token: eyJ0eXAiOi...
+[FAILED] global/list-payment: Status 500
+[FAILED] global/list-payment-mode: Status 404
+[FAILED] global/list-payment-type: Status 404
+[FAILED] global/payment-mode: Status 404
+[FAILED] global/payment-type: Status 404
+[FAILED] pos/list-payment: Status 404
+[FAILED] bank/list: Status 404
+[FAILED] global/paymenttype: Status 404
+[FAILED] global/list-transcation-type: Status 404
+[FAILED] global/transcation-type: Status 404
+[FAILED] global/list-transaction-type: Status 404
+[FAILED] global/transaction-type: Status 404
+[FAILED] global/list-transcation: Status 404
+[FAILED] global/list-transaction: Status 404

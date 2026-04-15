@@ -1,0 +1,31 @@
+﻿[Token] Acquired successfully: eyJ0eXAiOiJKV1Q...
+
+--- GET /promotion ---
+Error: 404 - {"error":{"path":"api/open-api/v1/en/promotion","message":"Error Found","status_code":404,"error":"Not Found Resource"}}
+
+--- GET /promotion/list ---
+Error: 404 - {"error":{"path":"api/open-api/v1/en/promotion/list","message":"Error Found","status_code":404,"error":"Not Found Resource"}}
+
+--- GET /voucher ---
+Error: 404 - {"error":{"path":"api/open-api/v1/en/voucher","message":"Error Found","status_code":404,"error":"Not Found Resource"}}
+
+--- GET /voucher/list ---
+Error: 404 - {"error":{"path":"api/open-api/v1/en/voucher/list","message":"Error Found","status_code":404,"error":"Not Found Resource"}}
+
+--- GET /discount ---
+Error: 404 - {"error":{"path":"api/open-api/v1/en/discount","message":"Error Found","status_code":404,"error":"Not Found Resource"}}
+
+--- GET /discount/list ---
+Error: 404 - {"error":{"path":"api/open-api/v1/en/discount/list","message":"Error Found","status_code":404,"error":"Not Found Resource"}}
+
+--- GET /coupon ---
+Error: 404 - {"error":{"path":"api/open-api/v1/en/coupon","message":"Error Found","status_code":404,"error":"Not Found Resource"}}
+
+--- GET /member/promo ---
+Error: 404 - {"error":{"path":"api/open-api/v1/en/member/promo","message":"Error Found","status_code":404,"error":"Not Found Resource"}}
+
+--- GET /global/promo ---
+Error: 404 - {"error":{"path":"api/open-api/v1/en/global/promo","message":"Error Found","status_code":404,"error":"Not Found Resource"}}
+
+--- GET /global/voucher ---
+Error: 404 - {"error":{"path":"api/open-api/v1/en/global/voucher","message":"Error Found","status_code":404,"error":"Not Found Resource"}}
