@@ -17,11 +17,19 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
-const OLSERA_API_BASE = process.env.OLSERA_API_BASE || 'https://api-open.olsera.co.id';
-const OLSERA_APP_ID = process.env.OLSERA_APP_ID || '';
-const OLSERA_SECRET_KEY = process.env.OLSERA_SECRET_KEY || '';
-const OLSERA_STORE_ID = process.env.OLSERA_STORE_ID || '';
-const IS_DEV = process.env.NODE_ENV !== 'production';
+// ──────────────────────────────
+// LAZY ENV GETTERS: Read from process.env on every call.
+// This prevents empty strings being cached when Next.js HMR
+// re-evaluates the module before .env is fully loaded.
+// ──────────────────────────────
+function getEnv() {
+  return {
+    API_BASE: (process.env.OLSERA_API_BASE || 'https://api-open.olsera.co.id').replace(/\/+$/, ''),
+    APP_ID: (process.env.OLSERA_APP_ID || '').trim(),
+    SECRET_KEY: (process.env.OLSERA_SECRET_KEY || '').trim(),
+    STORE_ID: (process.env.OLSERA_STORE_ID || '').trim(),
+  };
+}
 
 // ──────────────────────────────
 // File-Based Token Cache (survives HMR in dev mode)
@@ -74,9 +82,17 @@ function writeTokenToDisk(cache: TokenCache): void {
  * Actually fetch a new token from Olsera API (internal, called by getAccessToken)
  */
 async function fetchNewToken(): Promise<string> {
+  const env = getEnv();
+
+  // Safety check: if credentials are missing, fail fast with a helpful message
+  if (!env.APP_ID || !env.SECRET_KEY) {
+    console.error('[Olsera Auth] ❌ OLSERA_APP_ID or OLSERA_SECRET_KEY is empty! Check your .env file.');
+    throw new Error('Olsera credentials not configured. Set OLSERA_APP_ID and OLSERA_SECRET_KEY in .env');
+  }
+
   const formData = new URLSearchParams();
-  formData.append('app_id', OLSERA_APP_ID);
-  formData.append('secret_key', OLSERA_SECRET_KEY);
+  formData.append('app_id', env.APP_ID);
+  formData.append('secret_key', env.SECRET_KEY);
   formData.append('grant_type', 'secret_key');
 
   // Retry up to 3 times with exponential backoff
@@ -91,7 +107,7 @@ async function fetchNewToken(): Promise<string> {
     }
 
     try {
-      const res = await fetch(`${OLSERA_API_BASE}/api/open-api/v1/id/token`, {
+      const res = await fetch(`${env.API_BASE}/api/open-api/v1/id/token`, {
         method: 'POST',
         body: formData,
       });
@@ -184,7 +200,7 @@ export async function olseraFetch(
 
   // Add a timestamp parameter to aggressively bypass any Next.js disk caching
   const separator = path.includes('?') ? '&' : '?';
-  const url = `${OLSERA_API_BASE}/api/open-api/v1/en${path}${separator}_t=${Date.now()}`;
+  const url = `${getEnv().API_BASE}/api/open-api/v1/en${path}${separator}_t=${Date.now()}`;
 
   if (!silent) {
     console.log(`[Olsera API] ${retryCount > 0 ? `RETRY ${retryCount}` : "→"} ${path}`);
@@ -414,7 +430,8 @@ export async function updateOrderStatus(orderId: number, status: 'P' | 'A' | 'S'
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     body: formData.toString(),
-  });
+    silent: true, // Suppress 406 "already in status" log noise
+  } as any);
 
   if (!res.ok) {
     const text = await res.text();
