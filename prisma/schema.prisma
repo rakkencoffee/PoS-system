@@ -1,0 +1,133 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+// ─── TABEL MILIK SISTEM KITA (Source of Truth) ──────────────────────────────
+
+model User {
+  id                String     @id @default(cuid())
+  username          String     @unique
+  name              String
+  passwordHash      String
+  role              Role       @default(CASHIER)
+  defaultStationId  String?
+  createdAt         DateTime   @default(now())
+  orders            Order[]
+  shiftLogs         ShiftLog[]
+}
+
+enum Role {
+  CASHIER
+  MANAGER
+  KITCHEN
+  ADMIN
+}
+
+model Order {
+  id                  String      @id // Format: #A001
+  stationId           String      // "A", "B", atau "C"
+  cashier             User        @relation(fields: [cashierId], references: [id])
+  cashierId           String
+  tableNumber         String?
+  status              OrderStatus @default(PENDING)
+  total               Int         // Rupiah integer
+  paymentMethod       String?     // CASH, CARD, QRIS, TRANSFER
+  cashReceived        Int?        
+  changeAmount        Int?        
+  edcTransactionId    String?     
+
+  // Tracking sinkronisasi ke Olsera
+  olseraSynced        Boolean     @default(false)
+  olseraSyncedAt      DateTime?
+  olseraTransactionId String?     
+
+  items               OrderItem[]
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  @@index([stationId, createdAt])
+  @@index([status])
+  @@index([createdAt])
+  @@index([olseraSynced])
+}
+
+enum OrderStatus {
+  PENDING       
+  PROCESSING    
+  PAID          
+  PREPARING     
+  READY         
+  COMPLETED     
+  CANCELLED     
+}
+
+model OrderItem {
+  id        String @id @default(cuid())
+  order     Order  @relation(fields: [orderId], references: [id])
+  orderId   String
+  olseraId  String 
+  name      String 
+  price     Int    
+  quantity  Int
+  subtotal  Int    
+  notes     String?
+
+  @@index([orderId])
+}
+
+model ShiftLog {
+  id          String    @id @default(cuid())
+  stationId   String
+  cashier     User      @relation(fields: [cashierId], references: [id])
+  cashierId   String
+  startTime   DateTime  @default(now())
+  endTime     DateTime?
+  openingCash Int       @default(0)
+  closingCash Int?
+  totalSales  Int?      
+
+  @@index([stationId, startTime])
+}
+
+// ─── TABEL CACHE DARI OLSERA (Read-Only Mirror) ──────────────────────────────
+
+model ProductCache {
+  olseraId    String   @id        
+  name        String
+  description String?
+  price       Int                 
+  stock       Int                 
+  category    String
+  imageUrl    String?
+  isActive    Boolean  @default(true)
+  cachedAt    DateTime @default(now())  
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
+  @@index([isActive])
+  @@index([cachedAt])             
+}
+
+// ─── AUDIT LOG SINKRONISASI OLSERA ───────────────────────────────────────────
+
+model OlseraSyncLog {
+  id          String   @id @default(cuid())
+  type        String   // "product_sync" | "stock_update" | "push_transaction"
+  status      String   // "success" | "failed"
+  orderId     String?  // Untuk type push_transaction
+  productId   String?  // Untuk type stock_update
+  itemsSynced Int?     // Untuk type product_sync
+  errorMsg    String?
+  createdAt   DateTime @default(now())
+
+  @@index([type, createdAt])
+  @@index([status])
+}

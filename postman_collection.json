@@ -1,0 +1,197 @@
+{
+  "info": {
+    "name": "StartFriday POS System API",
+    "description": "API documentation for the Next.js local backend and the Olsera POS Open API integration.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Frontend APIs (Next.js Application)",
+      "item": [
+        {
+          "name": "1. Get All Menu Items",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/menu",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "menu"]
+            },
+            "description": "Fetching available menu items from Olsera products."
+          }
+        },
+        {
+          "name": "2. Get Single Menu Item by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/menu/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "menu", ":id"],
+              "variable": [
+                { "key": "id", "value": "12345" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "3. Get Categories",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "categories"]
+            },
+            "description": "Fetches product groups / categories."
+          }
+        },
+        {
+          "name": "4. Get Orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders?today=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders"],
+              "query": [
+                { "key": "today", "value": "true", "description": "Fetch only today's orders." },
+                { "key": "status", "value": "PENDING", "description": "Filter by kds status" }
+              ]
+            },
+            "description": "Fetches open and closed orders. Combines KDS status mapping."
+          }
+        },
+        {
+          "name": "5. Validate Voucher",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"STARTFRIDAY10\",\n  \"totalAmount\": 60000\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/payment/validate-voucher",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payment", "validate-voucher"]
+            }
+          }
+        },
+        {
+          "name": "6. Create Payment & Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{\n    \"productId\": \"123\",\n    \"quantity\": 1,\n    \"price\": 50000,\n    \"note\": \"sugar: less; ice: normal\"\n  }],\n  \"totalAmount\": 50000,\n  \"customerName\": \"John Doe\",\n  \"discountAmount\": 0,\n  \"voucherCode\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/payment/create",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payment", "create"]
+            },
+            "description": "Creates an order in Olsera via addItemToOrder and generates Midtrans Snap token."
+          }
+        },
+        {
+          "name": "7. Verify Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/payment/verify?orderId=OLSERA-12345",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payment", "verify"],
+              "query": [
+                { "key": "orderId", "value": "OLSERA-12345" }
+              ]
+            },
+            "description": "Verifies Midtrans payment status and applies settlement to Olsera."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Olsera Open API References",
+      "item": [
+        {
+          "name": "1. Auth Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "app_id", "value": "{{olseraAppId}}" },
+                { "key": "secret_key", "value": "{{olseraSecretKey}}" },
+                { "key": "grant_type", "value": "secret_key" }
+              ]
+            },
+            "url": {
+              "raw": "https://api-open.olsera.co.id/api/open-api/v1/id/token",
+              "host": ["https://api-open.olsera.co.id"],
+              "path": ["api", "open-api", "v1", "id", "token"]
+            }
+          }
+        },
+        {
+          "name": "2. Create Order Header",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "url": {
+              "raw": "https://api-open.olsera.co.id/api/open-api/v1/en/order/openorder",
+              "host": ["https://api-open.olsera.co.id"],
+              "path": ["api", "open-api", "v1", "en", "order", "openorder"]
+            }
+          }
+        },
+        {
+          "name": "3. Add Item to Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "order_id", "value": "123456" },
+                { "key": "item_products", "value": "789|456" },
+                { "key": "item_qty", "value": "1" },
+                { "key": "notes", "value": "Sugar: Less; Ice: Normal", "description": "MUST use 'notes', not 'note'" }
+              ]
+            },
+            "url": {
+              "raw": "https://api-open.olsera.co.id/api/open-api/v1/en/order/openorder/additem",
+              "host": ["https://api-open.olsera.co.id"],
+              "path": ["api", "open-api", "v1", "en", "order", "openorder", "additem"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    }
+  ]
+}
