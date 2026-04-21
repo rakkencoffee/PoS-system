@@ -40,6 +40,8 @@ export const authConfig = {
           pathname === '/' || 
           pathname.startsWith('/_next') || 
           pathname.startsWith('/api/auth') || 
+          pathname.startsWith('/api/webhooks') || 
+          pathname.startsWith('/api/jobs') || 
           pathname.startsWith('/favicon.ico');
 
         if (isPublic) return true;
