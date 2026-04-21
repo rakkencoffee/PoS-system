@@ -3,6 +3,7 @@ import Credentials from 'next-auth/providers/credentials';
 import { prisma } from './db';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
+import { authConfig } from './auth.config';
 
 const LoginSchema = z.object({
   username: z.string().min(3),
@@ -10,6 +11,7 @@ const LoginSchema = z.object({
 });
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  ...authConfig,
   providers: [
     Credentials({
       async authorize(credentials) {
@@ -34,28 +36,4 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       }
     })
   ],
-  callbacks: {
-    jwt({ token, user }) {
-      if (user) {
-        token.role = (user as any).role;
-        token.stationId = (user as any).stationId;
-      }
-      return token;
-    },
-    session({ session, token }) {
-      if (session.user) {
-        (session.user as any).role = token.role;
-        (session.user as any).stationId = token.stationId;
-      }
-      return session;
-    },
-  },
-  pages: {
-    signIn: '/login',
-    error:  '/login',
-  },
-  session: {
-    strategy: 'jwt',
-    maxAge: 8 * 60 * 60, // 8 jam = 1 shift kasir
-  },
 });

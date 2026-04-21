@@ -1,39 +1,14 @@
-import { auth } from '@/lib/auth';
-import { NextResponse } from 'next/server';
+import NextAuth from 'next-auth';
+import { authConfig } from '@/lib/auth.config';
 
-export default auth((req) => {
-  const { pathname } = req.nextUrl;
-  const session = req.auth;
+/**
+ * Middleware using NextAuth v5 Edge Configuration.
+ * 
+ * To keep the bundle size under 1MB, we only import from auth.config.ts,
+ * avoiding heavy libraries like Prisma and bcrypt.
+ */
 
-  // Login page access
-  if (pathname === '/login') {
-    if (session) {
-      return NextResponse.redirect(new URL('/pos', req.url));
-    }
-    return NextResponse.next();
-  }
-
-  // Auth guard: protect everything except public assets, login, and auth APIs
-  if (!session) {
-    // Check if the path is not public/auth related
-    const isPublic = 
-      pathname === '/' || 
-      pathname.startsWith('/_next') || 
-      pathname.startsWith('/api/auth') || 
-      pathname.startsWith('/favicon.ico');
-
-    if (!isPublic) {
-      return NextResponse.redirect(new URL('/login', req.url));
-    }
-  }
-
-  // Role guard: dashboard logic from PLAN.md
-  if (pathname.startsWith('/dashboard') && (session?.user as any)?.role === 'cashier') {
-    return NextResponse.redirect(new URL('/pos', req.url));
-  }
-
-  return NextResponse.next();
-});
+export default NextAuth(authConfig).auth;
 
 export const config = {
   matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
