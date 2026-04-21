@@ -1,5 +1,5 @@
 import { prisma } from '../db';
-import { olseraApi } from './olsera';
+import { olseraApi } from './olsera.service';
 import { redis } from '../redis';
 
 /**

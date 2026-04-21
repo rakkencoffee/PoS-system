@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { olseraApi } from '@/lib/integrations/olsera';
+import { olseraApi } from '@/lib/integrations/olsera.service';
 
 /**
  * POST /api/payment/validate-voucher
