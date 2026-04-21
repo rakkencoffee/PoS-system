@@ -104,7 +104,7 @@ async function fetchNewToken(): Promise<string> {
     throw new Error('Olsera credentials not configured.');
   }
 
-  const formData = new URLSearchParams();
+  const formData = new FormData();
   formData.append('app_id', env.APP_ID);
   formData.append('secret_key', env.SECRET_KEY);
   formData.append('grant_type', 'secret_key');
@@ -123,6 +123,10 @@ async function fetchNewToken(): Promise<string> {
     try {
       const res = await fetch(`${env.API_BASE}/api/open-api/v1/id/token`, {
         method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          // Note: FormData automatically sets the correct Content-Type with boundary
+        },
         body: formData,
       });
 
