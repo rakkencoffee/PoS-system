@@ -84,10 +84,24 @@ function writeTokenToDisk(cache: TokenCache): void {
 async function fetchNewToken(): Promise<string> {
   const env = getEnv();
 
+  // Safe logging for debugging .env propagation in Vercel
+  const safeLog = (name: string, val: string) => {
+    const v = val || '';
+    const masked = v.length > 6 
+      ? `${v.substring(0, 3)}...${v.substring(v.length - 3)}` 
+      : '***';
+    return `${name}: [${masked}] (len: ${v.length})`;
+  };
+
+  console.log(`[Olsera Auth] Attempting token fetch (DEBUG enabled)...`);
+  console.log(`[Olsera Auth] ${safeLog('APP_ID', env.APP_ID)}`);
+  console.log(`[Olsera Auth] ${safeLog('SECRET_KEY', env.SECRET_KEY)}`);
+  console.log(`[Olsera Auth] URL: ${env.API_BASE}/api/open-api/v1/id/token`);
+
   // Safety check: if credentials are missing, fail fast with a helpful message
   if (!env.APP_ID || !env.SECRET_KEY) {
-    console.error('[Olsera Auth] ❌ OLSERA_APP_ID or OLSERA_SECRET_KEY is empty! Check your .env file.');
-    throw new Error('Olsera credentials not configured. Set OLSERA_APP_ID and OLSERA_SECRET_KEY in .env');
+    console.error('[Olsera Auth] ❌ OLSERA_APP_ID or OLSERA_SECRET_KEY is empty!');
+    throw new Error('Olsera credentials not configured.');
   }
 
   const formData = new URLSearchParams();
