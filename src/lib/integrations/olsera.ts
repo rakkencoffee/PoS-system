@@ -31,11 +31,19 @@ function getEnv() {
 
 async function fetchNewToken(): Promise<string> {
   const env = getEnv();
+  
+  if (!env.APP_ID || !env.SECRET_KEY || env.APP_ID.includes('YOUR_SECRET_VALUE')) {
+    console.error('[Olsera Auth] INVALID CREDENTIALS DETECTED. Please check Vercel Env Variables.');
+    throw new Error('Olsera credentials are not configured or still using placeholders.');
+  }
+
   const formData = new URLSearchParams();
   formData.append('app_id', env.APP_ID);
   formData.append('secret_key', env.SECRET_KEY);
   formData.append('grant_type', 'secret_key');
 
+  console.log(`[Olsera Auth] Attempting to fetch new token for APP_ID: ${env.APP_ID.substring(0, 5)}...`);
+  
   const res = await fetch(`${env.API_BASE}/api/open-api/v1/id/token`, {
     method: 'POST',
     body: formData,
@@ -43,16 +51,27 @@ async function fetchNewToken(): Promise<string> {
 
   if (!res.ok) {
     const text = await res.text();
+    console.error(`[Olsera Auth] FAILED (${res.status}): ${text}`);
     throw new Error(`Olsera auth failed: ${text}`);
   }
 
   const data = await res.json();
-  const token = data.access_token || data.data?.access_token;
+  const token = data.access_token || data.data?.access_token || data.token;
 
-  if (!token) throw new Error('Olsera token missing in response');
+  if (!token) {
+    console.error('[Olsera Auth] Token missing in successful response:', JSON.stringify(data));
+    throw new Error('Olsera token missing in response');
+  }
 
+  console.log('[Olsera Auth] Successfully retrieved new token.');
+  
   const newCache = { token, expiresAt: Date.now() + 3600_000 };
-  try { fs.writeFileSync(TOKEN_CACHE_FILE, JSON.stringify(newCache)); } catch {}
+  try { 
+    // In Vercel, tmpdir is writable
+    fs.writeFileSync(TOKEN_CACHE_FILE, JSON.stringify(newCache)); 
+  } catch (err) {
+    console.warn('[Olsera Auth] Failed to write token cache file:', err);
+  }
   cachedToken = newCache;
   return token;
 }
@@ -80,10 +99,14 @@ async function getAccessToken(): Promise<string> {
  */
 async function olseraFetch(path: string, options: RequestInit = {}) {
   // Rate limit check
-  const { success, reset } = await olseraRatelimit.limit('global');
-  if (!success) {
-    const retryAfter = Math.ceil((reset - Date.now()) / 1000);
-    throw new Error(`Olsera rate limit reached. Retry in ${retryAfter}s`);
+  try {
+    const { success, reset } = await olseraRatelimit.limit('global');
+    if (!success) {
+      const retryAfter = Math.ceil((reset - Date.now()) / 1000);
+      throw new Error(`Olsera rate limit reached. Retry in ${retryAfter}s`);
+    }
+  } catch (limitErr) {
+    console.warn('[Olsera API] Rate limiter error (Redis probably down), skipping limit...', limitErr);
   }
 
   const token = await getAccessToken();
@@ -92,6 +115,8 @@ async function olseraFetch(path: string, options: RequestInit = {}) {
   // Always bypass cache
   const separator = path.includes('?') ? '&' : '?';
   const url = `${env.API_BASE}/api/open-api/v1/en${path}${separator}_t=${Date.now()}`;
+
+  console.log(`[Olsera API] FETCH: ${url}`);
 
   const res = await fetch(url, {
     ...options,
@@ -104,11 +129,12 @@ async function olseraFetch(path: string, options: RequestInit = {}) {
 
   if (!res.ok) {
     const text = await res.text();
-    console.error(`[Olsera API] Error ${res.status}: ${text}`);
-    throw new Error(`Olsera error ${res.status}`);
+    console.error(`[Olsera API] ERROR ${res.status} on ${path}: ${text}`);
+    throw new Error(`Olsera error ${res.status}: ${text}`);
   }
 
-  return res.json();
+  const data = await res.json();
+  return data;
 }
 
 /**
@@ -198,27 +224,41 @@ export const olseraApi = {
     message: string;
   }> {
     const uppercaseCode = code.toUpperCase().trim();
+    console.log(`[Voucher] Validating code: ${uppercaseCode} for amount: ${totalAmount}`);
     
     // 1. Fetch available vouchers
-    const vouchers = await this.getVouchers();
+    let vouchers: any[] = [];
+    try {
+      vouchers = await this.getVouchers();
+      console.log(`[Voucher] Retrieved ${vouchers.length} vouchers from Olsera`);
+    } catch (err: any) {
+      console.error('[Voucher] Failed to fetch vouchers:', err.message);
+      return { valid: false, discountAmount: 0, message: 'Gagal menghubungi server Olsera.' };
+    }
     
-    // 2. Find matching voucher by code
+    // 2. Find matching voucher by code - Flexible matching for various schemas
     const voucher = vouchers.find((v: any) => 
       (v.code?.toUpperCase() === uppercaseCode) || 
-      (v.voucher_code?.toUpperCase() === uppercaseCode)
+      (v.voucher_code?.toUpperCase() === uppercaseCode) ||
+      (v.promo_code?.toUpperCase() === uppercaseCode)
     );
 
     if (!voucher) {
+      console.warn(`[Voucher] Code ${uppercaseCode} not found in Olsera list`);
       return { valid: false, discountAmount: 0, message: 'Kode voucher tidak valid.' };
     }
 
+    console.log('[Voucher] Matching voucher found:', JSON.stringify(voucher));
+
     // 3. Check status
-    if (voucher.status !== '1' && voucher.status !== 1 && voucher.status !== 'active') {
+    const status = String(voucher.status).toLowerCase();
+    const isInactive = status === '0' || status === 'inactive' || status === 'disabled';
+    if (isInactive) {
       return { valid: false, discountAmount: 0, message: 'Voucher sudah tidak aktif.' };
     }
 
     // 4. Check min purchase
-    const minPurchase = Number(voucher.min_purchase || 0);
+    const minPurchase = Number(voucher.min_purchase || voucher.min_order || 0);
     if (totalAmount < minPurchase) {
       return { 
         valid: false, 
@@ -229,10 +269,13 @@ export const olseraApi = {
 
     // 5. Calculate discount
     let discountAmount = 0;
-    const type = voucher.discount_type || (voucher.type === '1' ? 'nominal' : 'percentage');
-    const value = Number(voucher.discount_value || voucher.value || 0);
+    // Handle diff field names: discount_type (string), type (1=nominal, 2=percentage)
+    const rawType = String(voucher.discount_type || voucher.type || '1');
+    const type = (rawType === '1' || rawType === 'nominal') ? 'nominal' : 'percentage';
+    
+    const value = Number(voucher.discount_value || voucher.value || voucher.amount || 0);
 
-    if (type === 'nominal' || type === '1') {
+    if (type === 'nominal') {
       discountAmount = value;
     } else {
       discountAmount = Math.floor(totalAmount * (value / 100));
@@ -240,6 +283,8 @@ export const olseraApi = {
 
     // Cap discount at total amount
     discountAmount = Math.min(discountAmount, totalAmount);
+    
+    console.log(`[Voucher] Validation Success! Discount: ${discountAmount}`);
 
     return {
       valid: true,
