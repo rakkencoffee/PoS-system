@@ -42,6 +42,10 @@ export const authConfig = {
           pathname.startsWith('/api/auth') || 
           pathname.startsWith('/api/webhooks') || 
           pathname.startsWith('/api/jobs') || 
+          pathname.startsWith('/api/categories') || 
+          pathname.startsWith('/api/menu') || 
+          pathname.startsWith('/api/products') || 
+          pathname.startsWith('/api/payment') || 
           pathname.startsWith('/menu') || 
           pathname.startsWith('/cart') || 
           pathname.startsWith('/checkout') || 
