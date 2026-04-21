@@ -31,6 +31,21 @@ function getEnv() {
 
 async function fetchNewToken(): Promise<string> {
   const env = getEnv();
+  
+  // Safe logging for debugging .env propagation in Vercel
+  const safeLog = (name: string, val: string) => {
+    const v = val || '';
+    const masked = v.length > 6 
+      ? `${v.substring(0, 3)}...${v.substring(v.length - 3)}` 
+      : '***';
+    return `${name}: [${masked}] (len: ${v.length})`;
+  };
+
+  console.log(`[Olsera Auth] Attempting token fetch...`);
+  console.log(`[Olsera Auth] ${safeLog('APP_ID', env.APP_ID)}`);
+  console.log(`[Olsera Auth] ${safeLog('SECRET_KEY', env.SECRET_KEY)}`);
+  console.log(`[Olsera Auth] URL: ${env.API_BASE}/api/open-api/v1/id/token`);
+
   const formData = new URLSearchParams();
   formData.append('app_id', env.APP_ID);
   formData.append('secret_key', env.SECRET_KEY);
