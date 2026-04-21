@@ -179,5 +179,72 @@ export const olseraApi = {
       body: formData,
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
+  },
+
+  /**
+   * Fetch all active discount vouchers from Olsera
+   */
+  async getVouchers(): Promise<any[]> {
+    const data = await olseraFetch('/discountvoucher');
+    return data.data || data || [];
+  },
+
+  /**
+   * Validate a voucher code remotely via Olsera
+   */
+  async validateVoucherRemote(code: string, totalAmount: number): Promise<{
+    valid: boolean;
+    discountAmount: number;
+    message: string;
+  }> {
+    const uppercaseCode = code.toUpperCase().trim();
+    
+    // 1. Fetch available vouchers
+    const vouchers = await this.getVouchers();
+    
+    // 2. Find matching voucher by code
+    const voucher = vouchers.find((v: any) => 
+      (v.code?.toUpperCase() === uppercaseCode) || 
+      (v.voucher_code?.toUpperCase() === uppercaseCode)
+    );
+
+    if (!voucher) {
+      return { valid: false, discountAmount: 0, message: 'Kode voucher tidak valid.' };
+    }
+
+    // 3. Check status
+    if (voucher.status !== '1' && voucher.status !== 1 && voucher.status !== 'active') {
+      return { valid: false, discountAmount: 0, message: 'Voucher sudah tidak aktif.' };
+    }
+
+    // 4. Check min purchase
+    const minPurchase = Number(voucher.min_purchase || 0);
+    if (totalAmount < minPurchase) {
+      return { 
+        valid: false, 
+        discountAmount: 0, 
+        message: `Minimal pembelian Rp ${minPurchase.toLocaleString('id-ID')}` 
+      };
+    }
+
+    // 5. Calculate discount
+    let discountAmount = 0;
+    const type = voucher.discount_type || (voucher.type === '1' ? 'nominal' : 'percentage');
+    const value = Number(voucher.discount_value || voucher.value || 0);
+
+    if (type === 'nominal' || type === '1') {
+      discountAmount = value;
+    } else {
+      discountAmount = Math.floor(totalAmount * (value / 100));
+    }
+
+    // Cap discount at total amount
+    discountAmount = Math.min(discountAmount, totalAmount);
+
+    return {
+      valid: true,
+      discountAmount,
+      message: 'Voucher berhasil diterapkan!'
+    };
   }
 };
