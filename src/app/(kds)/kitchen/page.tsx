@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { getPusherClient } from '@/lib/pusher';
 
 interface OrderData {
   id: number | string;
@@ -67,31 +68,52 @@ export default function KitchenPage() {
     fetchOrders();
   }, [fetchOrders]);
 
-  // Listen for SSE updates
+  // Listen for Pusher updates
+  const subscribedRef = useRef(false);
+
   useEffect(() => {
-    const eventSource = new EventSource('/api/orders/stream');
+    if (subscribedRef.current) return;
+    subscribedRef.current = true;
 
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === 'ORDER_CREATED') {
-          setOrders((prev) => [data.order, ...prev]);
-        } else if (data.type === 'ORDER_UPDATED') {
-          if (data.order.status === 'COMPLETED') {
-            setOrders((prev) => prev.filter((o) => o.id !== data.order.id));
-          } else {
-            setOrders((prev) =>
-              prev.map((o) => (o.id === data.order.id ? data.order : o))
-            );
-          }
+    const pusher = getPusherClient();
+    const channel = pusher.subscribe('kitchen');
+
+    channel.bind('ORDER_CREATED', (data: any) => {
+      console.log('[KDS] ORDER_CREATED received:', data);
+      setOrders(prev => {
+        // Prevent duplicate append if network repeats
+        if (prev.some(o => String(o.id) === String(data.order.id))) return prev;
+        
+        // If it's just a minimalist payload from auto-settlement, trigger full refresh
+        if (data.order.refreshNeeded) {
+           fetchOrders();
+           return prev; // don't append incomplete data
         }
-      } catch {
-        // Ignore parse errors
-      }
-    };
+        
+        return [data.order, ...prev];
+      });
+    });
 
-    return () => eventSource.close();
-  }, []);
+    channel.bind('ORDER_UPDATED', (data: any) => {
+      console.log('[KDS] ORDER_UPDATED received:', data);
+      // Wait a moment before updating UI if we just sent an update to avoid race conditions
+      setTimeout(() => {
+        if (data.order.status === 'COMPLETED') {
+          setOrders(prev => prev.filter(o => String(o.id) !== String(data.order.id)));
+        } else {
+          setOrders(prev => 
+            prev.map(o => String(o.id) === String(data.order.id) ? { ...o, ...data.order } : o)
+          );
+        }
+      }, 300);
+    });
+
+    return () => {
+      channel.unbind_all();
+      pusher.unsubscribe('kitchen');
+      subscribedRef.current = false;
+    };
+  }, [fetchOrders]);
 
   const updateOrderStatus = async (orderId: number | string, newStatus: string) => {
     setUpdating(orderId);

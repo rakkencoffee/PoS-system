@@ -11,6 +11,7 @@
 
 import * as olsera from './olsera.service';
 import type { OlseraProduct, OlseraProductGroup } from './olsera.service';
+import { orderEvents } from '../events';
 
 const USE_OLSERA = process.env.USE_OLSERA === 'true';
 
@@ -393,6 +394,21 @@ export async function updateOrderPaymentStatus(
         // Step 3: Keep order in Pending (P) so it stays in Column 1 of KDS
         // The Barista will manually move it to PREPARING (A) by clicking "Start Making"
         console.log(`[Auto-Settlement] ✅ Order ${orderId} marked as PAID. Staying in PENDING for KDS check.`);
+        
+        // Trigger Pusher specifically for KDS
+        orderEvents.emit('ORDER_CREATED', {
+          order: {
+            id: orderId,
+            queueNumber: olseraOrderId % 1000,
+            status: 'PENDING',
+            totalAmount: actualOlseraTotal,
+            // Provide a minimalist representation of items for UI immediate feedback
+            // Often actual KDS relies on periodic sync OR detailed payload
+            // For now, let KDS refresh on this event to get full detailed data from Olsera
+            refreshNeeded: true 
+          }
+        });
+
       } catch (error: any) {
         // Log but don't throw — webhook must still return 200 to Midtrans
         console.error(`[Auto-Settlement] ❌ Failed to settle order ${orderId} in Olsera:`, error.message);

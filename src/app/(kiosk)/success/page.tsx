@@ -117,6 +117,15 @@ function SuccessContent() {
         {/* Buttons */}
         <div className="space-y-3 animate-fade-in delay-4" style={{ opacity: 0 }}>
           <button
+            onClick={() => window.open(`/receipt/${orderId}?queue=${queue}`, '_blank', 'width=400,height=600')}
+            className="btn-primary w-full bg-[#1e293b] hover:bg-[#334155] border-none shadow-md mb-2 flex items-center justify-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            Cetak Struk (Virtual)
+          </button>
+          <button
             onClick={() => router.push(`/status?orderId=${orderId}`)}
             className="btn-primary w-full"
           >

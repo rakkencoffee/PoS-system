@@ -1,28 +1,18 @@
-// Simple event emitter for SSE order updates
+import { pusherServer } from './pusher';
 
-type Listener = (data: string) => void;
-
-class OrderEventEmitter {
-  private listeners: Set<Listener> = new Set();
-
-  subscribe(listener: Listener) {
-    this.listeners.add(listener);
-    return () => {
-      this.listeners.delete(listener);
-    };
+export const orderEvents = {
+  /**
+   * Emit an event via Pusher to the 'kitchen' channel.
+   * Typical events: 'ORDER_CREATED', 'ORDER_UPDATED'
+   */
+  emit: async (event: string, data: any) => {
+    try {
+      // Broadcast non-blocking
+      pusherServer.trigger('kitchen', event, data)
+        .then(() => console.log(`[Pusher] Emitted ${event} to 'kitchen' channel`))
+        .catch((err) => console.error(`[Pusher] Emit failed for ${event}:`, err));
+    } catch (error) {
+      console.error(`[Pusher] Unexpected error on emit for ${event}:`, error);
+    }
   }
-
-  emit(event: string, data: unknown) {
-    const message = JSON.stringify({ type: event, ...data as object });
-    this.listeners.forEach((listener) => listener(message));
-  }
-}
-
-// Global singleton
-const globalForEvents = globalThis as unknown as {
-  orderEvents: OrderEventEmitter | undefined;
 };
-
-export const orderEvents = globalForEvents.orderEvents ?? new OrderEventEmitter();
-
-if (process.env.NODE_ENV !== 'production') globalForEvents.orderEvents = orderEvents;
