@@ -351,6 +351,17 @@ export async function getProducts(): Promise<OlseraProduct[]> {
 }
 
 /**
+ * Get stock level for a specific product
+ */
+export async function getProductStock(olseraProductId: string | number): Promise<number> {
+  const res = await olseraFetch(`/product?product_id=${olseraProductId}`);
+  if (!res.ok) return 0;
+  const data = await res.json();
+  const product = data.data?.[0] || data?.[0];
+  return product ? (product.stock || 0) : 0;
+}
+
+/**
  * Fetch product groups (categories) from Olsera
  */
 export async function getProductGroups(): Promise<OlseraProductGroup[]> {
@@ -805,6 +816,7 @@ export async function validateVoucherRemote(code: string, totalAmount: number): 
 export const olseraApi = {
   getProducts,
   getProductGroups,
+  getProductStock,
   getOrderDetail,
   createOrder,
   addItemToOrder,
