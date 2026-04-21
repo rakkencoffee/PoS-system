@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get('callbackUrl') || '/admin/dashboard';
@@ -40,6 +40,61 @@ export default function LoginPage() {
   };
 
   return (
+    <div className="glass-card p-8 shadow-2xl relative overflow-hidden">
+      {/* Decorative Glow */}
+      <div className="absolute -top-24 -right-24 w-48 h-48 bg-brand-500/20 blur-3xl rounded-full" />
+      
+      <form onSubmit={handleSubmit} className="space-y-6 relative z-10">
+        {error && (
+          <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm animate-shake">
+            {error}
+          </div>
+        )}
+
+        <div>
+          <label className="block text-sm font-medium text-white/60 mb-2 ml-1">Username</label>
+          <input
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+            disabled={isLoading}
+            className="w-full px-4 py-3.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all"
+            placeholder="Masukkan username"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-white/60 mb-2 ml-1">Password</label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            disabled={isLoading}
+            className="w-full px-4 py-3.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all"
+            placeholder="••••••••"
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={isLoading}
+          className="w-full btn-primary py-4 px-6 rounded-xl font-bold text-lg flex items-center justify-center gap-3 active:scale-[0.98] transition-all disabled:opacity-50"
+        >
+          {isLoading ? (
+            <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          ) : (
+            'Sign In'
+          )}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-brand-image">
       {/* Background Overlay */}
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm -z-10" />
@@ -56,57 +111,15 @@ export default function LoginPage() {
           </h1>
         </div>
 
-        {/* Login Card */}
-        <div className="glass-card p-8 shadow-2xl relative overflow-hidden">
-          {/* Decorative Glow */}
-          <div className="absolute -top-24 -right-24 w-48 h-48 bg-brand-500/20 blur-3xl rounded-full" />
-          
-          <form onSubmit={handleSubmit} className="space-y-6 relative z-10">
-            {error && (
-              <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm animate-shake">
-                {error}
-              </div>
-            )}
-
-            <div>
-              <label className="block text-sm font-medium text-white/60 mb-2 ml-1">Username</label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-                disabled={isLoading}
-                className="w-full px-4 py-3.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all"
-                placeholder="Masukkan username"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-white/60 mb-2 ml-1">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={isLoading}
-                className="w-full px-4 py-3.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all"
-                placeholder="••••••••"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full btn-primary py-4 px-6 rounded-xl font-bold text-lg flex items-center justify-center gap-3 active:scale-[0.98] transition-all disabled:opacity-50"
-            >
-              {isLoading ? (
-                <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                'Sign In'
-              )}
-            </button>
-          </form>
-        </div>
+        {/* Login Form with Suspense */}
+        <Suspense fallback={
+          <div className="glass-card p-12 flex flex-col items-center justify-center gap-4">
+             <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+             <p className="text-white/40 text-sm">Loading portal...</p>
+          </div>
+        }>
+          <LoginForm />
+        </Suspense>
 
         {/* Footer Info */}
         <p className="mt-8 text-center text-white/30 text-sm italic">
