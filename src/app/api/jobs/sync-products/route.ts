@@ -1,4 +1,4 @@
-import { verifySignature } from '@upstash/qstash/nextjs';
+import { verifySignatureAppRouter } from '@upstash/qstash/nextjs';
 import { NextResponse } from 'next/server';
 import { syncProductsFromOlsera } from '@/lib/integrations/olsera-sync';
 
@@ -31,5 +31,5 @@ async function handler(req: Request) {
 // Wrap with QStash signature verification for production security
 // In development/test mode, we might want to bypass this
 export const POST = process.env.NODE_ENV === 'production' 
-  ? verifySignature(handler) 
+  ? verifySignatureAppRouter(handler) 
   : handler;
