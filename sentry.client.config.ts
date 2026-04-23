@@ -10,7 +10,7 @@ Sentry.init({
   debug: false,
 
   // Use the tunnel route to circumvent ad-blockers
-  tunnel: "/monitoring",
+  tunnel: "/sentry-tunnel",
 
   replaysOnErrorSampleRate: 1.0,
 

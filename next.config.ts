@@ -31,7 +31,7 @@ export default withSentryConfig(nextConfig, {
   // Note: Turbopack handles this differently, keeping it simple for stability.
 
   // Routes browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers.
-  tunnelRoute: "/monitoring",
+  tunnelRoute: "/sentry-tunnel",
 
   // Hides source maps from visitors by deleting them after upload
   sourcemaps: {
