@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCartStore } from '@/stores/useCartStore';
 import { useDebouncedCallback } from 'use-debounce';
-import { useCategories, useMenuItems } from '@/hooks/useMenu';
+import { useCategories, useMenuItems, Category, MenuItem } from '@/hooks/useMenu';
 import CategoryBar from '@/components/kiosk/CategoryBar';
 import MenuCard from '@/components/kiosk/MenuCard';
 import CustomizeModal from '@/components/kiosk/CustomizeModal';
@@ -18,7 +18,7 @@ export default function MenuPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [selectedItem, setSelectedItem] = useState<any | null>(null);
+  const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
 
   // Use TanStack Query hooks instead of manual fetch
   const { data: categories = [] } = useCategories();
@@ -34,7 +34,7 @@ export default function MenuPage() {
     if (!debouncedSearch) return allItems;
     const q = debouncedSearch.toLowerCase();
     return allItems.filter(
-      (item: any) =>
+      (item: MenuItem) =>
         item.name.toLowerCase().includes(q) ||
         item.description.toLowerCase().includes(q)
     );
@@ -134,7 +134,7 @@ export default function MenuPage() {
         <div className="flex-1 px-6 pb-32 max-w-7xl mx-auto w-full">
           <h2 className="text-xl font-bold text-(--text-primary) mb-4">Select Category</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {categories.map((category) => (
+            {categories.map((category: Category) => (
               <button
                 key={category.id}
                 onClick={() => setSelectedCategory(category.slug)}

@@ -202,7 +202,7 @@ export default function CheckoutPage() {
                     {item.extraShot && <span className="text-xs text-(--text-muted)">+ Extra Shot</span>}
                     {item.toppings.length > 0 && (
                       <span className="text-xs text-(--text-muted)">
-                        Toppings: {item.toppings.map(t => t.topping.name).join(', ')}
+                        Toppings: {item.toppings.map(t => t.name).join(', ')}
                       </span>
                     )}
                   </div>

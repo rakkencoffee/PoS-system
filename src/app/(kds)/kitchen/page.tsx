@@ -3,8 +3,7 @@
 import { useEffect } from 'react';
 import { useKitchenOrders, useUpdateOrderStatus } from '@/hooks/useOrders';
 import { useQueryClient } from '@tanstack/react-query';
-
-// (Simplified OrderData interface if needed, or keep existing)
+import { OrderData } from '@/lib/types';
 
 export default function KitchenPage() {
   const queryClient = useQueryClient();
@@ -185,7 +184,7 @@ export default function KitchenPage() {
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={fetchOrders}
+              onClick={() => fetchOrders()}
               disabled={refreshing}
               className="btn-secondary flex items-center gap-2"
             >

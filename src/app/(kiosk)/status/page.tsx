@@ -2,20 +2,7 @@
 
 import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-
-interface OrderData {
-  id: number | string;
-  queueNumber: number;
-  status: string;
-  totalAmount: number;
-  createdAt: string;
-  items: {
-    id: number;
-    menuItem: { name: string };
-    quantity: number;
-    size: string;
-  }[];
-}
+import { OrderData } from '@/lib/types';
 
 function PublicBoard() {
   const [orders, setOrders] = useState<OrderData[]>([]);

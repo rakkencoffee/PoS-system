@@ -14,6 +14,7 @@ export interface CartItem {
   extraShot: boolean;
   toppings: { id: number; name: string; price: number }[];
   subtotal: number;
+  notes?: string;
 }
 
 export interface CartState {
@@ -26,25 +27,28 @@ export type OrderStatus = 'PENDING' | 'PREPARING' | 'READY' | 'COMPLETED';
 
 export type PaymentMethod = 'QRIS' | 'E-Wallet' | 'Debit/Credit' | 'Cash';
 
+export interface OrderData {
+  id: number | string;
+  queueNumber: number;
+  status: string;
+  totalAmount: number;
+  paymentMethod?: string;
+  createdAt: string;
+  items: {
+    id: number | string;
+    menuItem: { name: string };
+    quantity: number;
+    size: string;
+    sugarLevel?: string;
+    iceLevel?: string;
+    extraShot?: boolean;
+    subtotal?: number;
+    notes?: string;
+    toppings?: { topping: { name: string } }[];
+  }[];
+}
+
 export interface OrderEvent {
   type: 'ORDER_CREATED' | 'ORDER_UPDATED';
-  order: {
-    id: number;
-    queueNumber: number;
-    status: string;
-    totalAmount: number;
-    paymentMethod: string;
-    createdAt: string;
-    items: {
-      id: number;
-      menuItem: { name: string };
-      quantity: number;
-      size: string;
-      sugarLevel: string;
-      iceLevel: string;
-      extraShot: boolean;
-      subtotal: number;
-      toppings: { topping: { name: string } }[];
-    }[];
-  };
+  order: OrderData;
 }
