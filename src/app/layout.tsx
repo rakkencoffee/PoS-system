@@ -18,6 +18,7 @@ export const metadata: Metadata = {
 };
 
 import QueryProvider from "@/providers/QueryProvider";
+import SentryProvider from "@/components/SentryProvider";
 
 export default function RootLayout({
   children,
@@ -27,9 +28,11 @@ export default function RootLayout({
   return (
     <html lang="id">
       <body className={`${inter.variable} font-sans`}>
-        <QueryProvider>
-          {children}
-        </QueryProvider>
+        <SentryProvider>
+          <QueryProvider>
+            {children}
+          </QueryProvider>
+        </SentryProvider>
       </body>
     </html>
   );
