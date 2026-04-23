@@ -346,3 +346,109 @@ body {
     border-radius: 20px;
   }
 }
+
+/* ===== RECEIPT (VIRTUAL PRINT) ===== */
+.receipt-container {
+  /* Hidden off-screen on normal view */
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  font-family: 'Courier New', Courier, monospace;
+  width: 80mm;
+  padding: 10mm 5mm;
+  color: #000;
+  background: #fff;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.receipt-header { text-align: center; margin-bottom: 5mm; }
+.receipt-brand { font-size: 22px; font-weight: 900; margin: 0; letter-spacing: 1px; }
+.receipt-subtitle { font-size: 11px; margin: 2px 0; font-weight: 700; text-transform: uppercase; }
+.receipt-location { font-size: 9px; margin: 0; color: #333; }
+.receipt-date, .receipt-id { font-size: 10px; margin: 2px 0; }
+
+/* Dynamic Dividers */
+.receipt-divider-thick { 
+  border-top: 2px dashed #000; 
+  margin: 4mm 0;
+  width: 100%;
+}
+.receipt-divider-thin { 
+  border-top: 1px dashed #000; 
+  margin: 3mm 0;
+  width: 100%;
+}
+
+.receipt-queue-section { text-align: center; padding: 4mm 0; }
+.receipt-label { font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 2mm; }
+.receipt-queue-big { font-size: 84px; font-weight: 900; margin: 0; line-height: 0.9; }
+
+.receipt-items-list { margin: 4mm 0; }
+.receipt-item-group { margin-bottom: 3mm; }
+.receipt-item-main { display: flex; justify-content: space-between; font-weight: 700; font-size: 13px; }
+.receipt-qty { min-width: 25px; }
+.receipt-name { flex: 1; text-transform: uppercase; padding-right: 5px; }
+.receipt-price { text-align: right; }
+.receipt-variant, .receipt-note { font-size: 10px; color: #444; padding-left: 25px; margin-top: 1px; }
+
+.receipt-summary { margin-top: 4mm; }
+.receipt-total-row { display: flex; justify-content: space-between; font-weight: 900; font-size: 18px; border-top: 1px solid #000; padding-top: 2mm; }
+.receipt-payment { font-size: 11px; text-align: right; margin-top: 2mm; }
+
+.receipt-footer { text-align: center; margin-top: 6mm; padding-bottom: 10mm; }
+.receipt-thanks { font-size: 13px; font-weight: 900; margin-bottom: 2mm; }
+.receipt-feedback { font-size: 10px; margin-top: 3mm; }
+.receipt-cut-guide { text-align: center; font-size: 9px; color: #999; margin-top: 8mm; border-bottom: 1px dotted #ccc; padding-bottom: 2mm; }
+
+/* === PRINT MODE === */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  /* Force clean white background and hide web UI colors */
+  html, body {
+    background: #fff !important;
+    background-image: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+  }
+
+  /* Hide everything except the receipt */
+  body * {
+    visibility: hidden !important;
+  }
+
+  .receipt-container,
+  .receipt-container * {
+    visibility: visible !important;
+  }
+
+  /* Professional Centered POS Strip */
+  .receipt-container {
+    position: absolute !important;
+    left: 50% !important;
+    top: 0 !important;
+    transform: translateX(-50%) !important; /* Perfect Centering on A4 */
+    width: 80mm !important; /* Authentic POS width */
+    min-height: auto !important; 
+    padding: 10mm 5mm !important;
+    background: #fff !important;
+    color: #000 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+}
+
+
+
+
+
+
+
+
+

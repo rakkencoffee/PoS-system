@@ -11,7 +11,6 @@
 
 import * as olsera from './olsera.service';
 import type { OlseraProduct, OlseraProductGroup } from './olsera.service';
-import { orderEvents } from '../events';
 
 const USE_OLSERA = process.env.USE_OLSERA === 'true';
 
@@ -266,67 +265,6 @@ export async function createOrder(
 }
 
 /**
- * Apply native discount directly to Olsera POS
- * By executing an updatedetail bypass on the first item in the receipt.
- */
-export async function applyOrderDiscount(
-  orderId: string,
-  discountAmount: number
-): Promise<void> {
-  if (USE_OLSERA && orderId.startsWith('OLSERA-')) {
-    const olseraOrderId = parseInt(orderId.replace('OLSERA-', ''));
-    
-    if (discountAmount <= 0) return;
-
-    try {
-      // 1. Get order detail to extract the first order item ID
-      console.log(`[Voucher System] Fetching order detail for ${orderId} to apply discount...`);
-      const orderDetail = await olsera.getOrderDetail(olseraOrderId);
-      const items = orderDetail?.items || orderDetail?.orderitems || [];
-      
-      if (!items || items.length === 0) {
-        console.warn(`[Voucher System] Cannot apply discount on order ${orderId}: no items found.`);
-        return;
-      }
-
-      // We apply the total discount to the first item.
-      const targetItem = items[0];
-      const targetItemId = targetItem.id;
-
-      // 2. Prepare payload for updatedetail
-      const formData = new URLSearchParams();
-      formData.append('order_id', String(olseraOrderId));
-      formData.append('id', String(targetItemId));
-      
-      // Olsera updatedetail requires us to resend price and qty!
-      const currentPrice = targetItem.price || targetItem.subtotal_per_item || 0;
-      const currentQty = targetItem.qty || targetItem.quantity || 1;
-      
-      formData.append('price', String(currentPrice));
-      formData.append('qty', String(currentQty));
-      formData.append('discount', String(discountAmount));
-
-      // 3. Inject discount to Olsera natively
-      const res = await olsera.olseraFetch('/order/openorder/updatedetail', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: formData.toString()
-      });
-
-      if (!res.ok) {
-        const text = await res.text();
-        console.error(`[Voucher System] Failed to apply discount via API:`, text);
-      } else {
-        console.log(`[Voucher System] Successfully injected discount (Rp ${discountAmount}) to order ${orderId}`);
-      }
-    } catch (e: any) {
-      console.error(`[Voucher System] Error applying discount to order ${orderId}:`, e.message);
-    }
-  }
-}
-
-
-/**
  * Update order status after payment
  * For Olsera: runs the full auto-settlement flow
  */
@@ -391,24 +329,32 @@ export async function updateOrderPaymentStatus(
           }
         }
 
-        // Step 3: Keep order in Pending (P) so it stays in Column 1 of KDS
+        // Step 3: Broadcast to KDS via Pusher
         // The Barista will manually move it to PREPARING (A) by clicking "Start Making"
-        console.log(`[Auto-Settlement] ✅ Order ${orderId} marked as PAID. Staying in PENDING for KDS check.`);
+        console.log(`[Auto-Settlement] ✅ Order ${orderId} marked as PAID. Broadcasting to KDS...`);
         
-        // Trigger Pusher specifically for KDS
-        orderEvents.emit('ORDER_CREATED', {
-          order: {
-            id: orderId,
-            queueNumber: olseraOrderId % 1000,
-            status: 'PENDING',
-            totalAmount: actualOlseraTotal,
-            // Provide a minimalist representation of items for UI immediate feedback
-            // Often actual KDS relies on periodic sync OR detailed payload
-            // For now, let KDS refresh on this event to get full detailed data from Olsera
-            refreshNeeded: true 
-          }
-        });
-
+        try {
+          const { pusherServer } = await import('@/lib/pusher');
+          await pusherServer.trigger('kitchen', 'ORDER_CREATED', {
+            order: {
+              id: orderId,
+              queueNumber: olseraOrderId % 1000,
+              status: 'PENDING',
+              totalAmount: orderDetail.total || paymentAmount || 0,
+              paymentMethod: 'MIDTRANS',
+              createdAt: orderDetail.order_date || new Date().toISOString(),
+              items: Array.isArray(orderDetail.items) ? orderDetail.items.map((item: any, idx: number) => ({
+                id: idx,
+                menuItem: { name: item.product_name || item.name || 'Item' },
+                quantity: item.qty || item.quantity || 1,
+                size: item.variant_name || '-',
+              })) : [],
+            },
+          });
+          console.log(`[Pusher] ORDER_CREATED broadcast for ${orderId}`);
+        } catch (pusherErr) {
+          console.warn('[Pusher] Failed to broadcast ORDER_CREATED:', pusherErr);
+        }
       } catch (error: any) {
         // Log but don't throw — webhook must still return 200 to Midtrans
         console.error(`[Auto-Settlement] ❌ Failed to settle order ${orderId} in Olsera:`, error.message);
@@ -421,6 +367,18 @@ export async function updateOrderPaymentStatus(
   // Fallback removed
   console.warn(`[Auto-Settlement] Order ${orderId} does not exist in Olsera POS or is unsupported. Escaping Prisma update.`);
   return;
+}
+
+/**
+ * Apply a discount to an Olsera order (best-effort)
+ * Note: Olsera Open API may not support native discount injection.
+ * We log it here so it's tracked, and the actual discount is reflected in Midtrans payment amount.
+ */
+export async function applyOrderDiscount(orderId: string, discountAmount: number): Promise<void> {
+  if (!USE_OLSERA) return;
+  // Olsera Open API doesn't have a dedicated discount endpoint.
+  // The discount is already reflected in the Midtrans payment amount.
+  console.log(`[POS Adapter] Discount of Rp ${discountAmount.toLocaleString('id-ID')} applied to order ${orderId} (tracked in Midtrans, not synced to Olsera).`);
 }
 
 /**

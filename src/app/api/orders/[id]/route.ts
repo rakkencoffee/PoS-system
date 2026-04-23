@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { orderEvents } from '@/lib/events';
+import { pusherServer } from '@/lib/pusher';
 
 const USE_OLSERA = process.env.USE_OLSERA === 'true';
 
@@ -37,9 +37,9 @@ export async function GET(
           createdAt: orderDetail.order_date || new Date().toISOString(),
           items: items.map((item: any, idx: number) => ({
             id: idx,
-            menuItem: { name: item.product_name || item.name || item.item_name || 'Item' },
+            menuItem: { name: item.product_name || item.name || 'Item' },
             quantity: item.qty || item.quantity || 1,
-            size: item.variant_name || item.item_variant_name || '-',
+            size: item.variant_name || '-',
           })),
         });
       } catch (olseraError) {
@@ -56,9 +56,9 @@ export async function GET(
             createdAt: closedOrder.order_date || new Date().toISOString(),
             items: items.map((item: any, idx: number) => ({
               id: idx,
-              menuItem: { name: item.product_name || item.name || item.item_name || 'Item' },
+              menuItem: { name: item.product_name || item.name || 'Item' },
               quantity: item.qty || item.quantity || 1,
-              size: item.variant_name || item.item_variant_name || '-',
+              size: item.variant_name || '-',
             })),
           });
         } catch (closedError) {
@@ -179,11 +179,12 @@ export async function PATCH(
         })) : [],
       };
 
-      // Emit SSE so KDS updates in real-time
-      if (body.status === 'COMPLETED') {
-        orderEvents.emit('ORDER_UPDATED', { order: updatedOrder });
-      } else {
-        orderEvents.emit('ORDER_UPDATED', { order: updatedOrder });
+      // Broadcast via Pusher so KDS updates in real-time
+      try {
+        await pusherServer.trigger('kitchen', 'ORDER_UPDATED', { order: updatedOrder });
+        console.log(`[Pusher] ORDER_UPDATED broadcast for ${id}`);
+      } catch (pusherErr) {
+        console.warn('[Pusher] Failed to broadcast ORDER_UPDATED:', pusherErr);
       }
 
       return NextResponse.json(updatedOrder);

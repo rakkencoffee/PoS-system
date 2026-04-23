@@ -1,149 +1,59 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { getPusherClient } from '@/lib/pusher';
+import { useEffect } from 'react';
+import { useKitchenOrders, useUpdateOrderStatus } from '@/hooks/useOrders';
+import { useQueryClient } from '@tanstack/react-query';
 
-interface OrderData {
-  id: number | string;
-  queueNumber: number;
-  status: string;
-  totalAmount: number;
-  paymentMethod: string;
-  createdAt: string;
-  items: {
-    id: number;
-    menuItem: { name: string };
-    quantity: number;
-    size: string;
-    sugarLevel: string;
-    iceLevel: string;
-    extraShot: boolean;
-    notes: string;
-    toppings: { topping: { name: string } }[];
-  }[];
-}
-
-interface NewOrderPayload {
-  queueNumber: number;
-  paymentMethod: string;
-  items: {
-    menuItemId: number;
-    quantity: number;
-    price: number;
-    subtotal: number;
-    size: string;
-    sugarLevel: string;
-    iceLevel: string;
-    extraShot: boolean;
-    notes: string;
-    toppings: { topping: { name: string } }[];
-  }[];
-}
+// (Simplified OrderData interface if needed, or keep existing)
 
 export default function KitchenPage() {
-  const [orders, setOrders] = useState<OrderData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [updating, setUpdating] = useState<number | string | null>(null);
+  const queryClient = useQueryClient();
+  const { data: orders = [], isLoading: loading, refetch: fetchOrders, isFetching: refreshing } = useKitchenOrders();
+  const updateStatusMutation = useUpdateOrderStatus();
 
-  const fetchOrders = useCallback(async () => {
-    setRefreshing(true);
-    // Ensure the syncing indicator is visible for at least a brief moment for UI feedback and E2E robustness
-    await new Promise((resolve) => setTimeout(resolve, 600));
-
-    try {
-      const res = await fetch('/api/orders?today=true');
-      if (!res.ok) throw new Error('Network response was not ok');
-      const data = await res.json();
-      setOrders(Array.isArray(data) ? data.filter((o: OrderData) => o.status !== 'COMPLETED') : []);
-    } catch (error) {
-      console.error('Error fetching orders:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
-
+  // Listen for Pusher real-time updates (Sprint 3)
   useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
+    let channel: any = null;
 
-  // Listen for Pusher updates
-  const subscribedRef = useRef(false);
+    async function connectPusher() {
+      const { getPusherClient } = await import('@/lib/pusher');
+      const pusher = getPusherClient();
+      channel = pusher.subscribe('kitchen');
 
-  useEffect(() => {
-    if (subscribedRef.current) return;
-    subscribedRef.current = true;
+      channel.bind('ORDER_CREATED', (data: { order: any }) => {
+        console.log('[Pusher] New order received:', data.order);
+        // Invalidate orders to trigger refetch
+        queryClient.invalidateQueries({ queryKey: ['orders', 'kitchen'] });
 
-    const pusher = getPusherClient();
-    const channel = pusher.subscribe('kitchen');
-
-    channel.bind('ORDER_CREATED', (data: any) => {
-      console.log('[KDS] ORDER_CREATED received:', data);
-      setOrders(prev => {
-        // Prevent duplicate append if network repeats
-        if (prev.some(o => String(o.id) === String(data.order.id))) return prev;
-        
-        // If it's just a minimalist payload from auto-settlement, trigger full refresh
-        if (data.order.refreshNeeded) {
-           fetchOrders();
-           return prev; // don't append incomplete data
-        }
-        
-        return [data.order, ...prev];
+        // Play chime notification
+        try {
+          const audio = new Audio('/sounds/new-order.wav');
+          audio.play().catch(() => { /* user hasn't interacted yet */ });
+        } catch { /* silently fail */ }
       });
-    });
 
-    channel.bind('ORDER_UPDATED', (data: any) => {
-      console.log('[KDS] ORDER_UPDATED received:', data);
-      // Wait a moment before updating UI if we just sent an update to avoid race conditions
-      setTimeout(() => {
-        if (data.order.status === 'COMPLETED') {
-          setOrders(prev => prev.filter(o => String(o.id) !== String(data.order.id)));
-        } else {
-          setOrders(prev => 
-            prev.map(o => String(o.id) === String(data.order.id) ? { ...o, ...data.order } : o)
-          );
-        }
-      }, 300);
-    });
+      channel.bind('ORDER_UPDATED', (data: { order: any }) => {
+        console.log('[Pusher] Order updated:', data.order);
+        queryClient.invalidateQueries({ queryKey: ['orders', 'kitchen'] });
+      });
+    }
+
+    connectPusher();
 
     return () => {
-      channel.unbind_all();
-      pusher.unsubscribe('kitchen');
-      subscribedRef.current = false;
+      if (channel) {
+        channel.unbind_all();
+        channel.unsubscribe();
+      }
     };
-  }, [fetchOrders]);
+  }, [queryClient]);
 
   const updateOrderStatus = async (orderId: number | string, newStatus: string) => {
-    setUpdating(orderId);
     try {
-      const res = await fetch(`/api/orders/${orderId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
-      });
-      
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || 'Failed to update order');
-      }
-      
-      const updatedOrder = await res.json();
-
-      // Optimistic UI update — move card between columns immediately
-      if (newStatus === 'COMPLETED') {
-        setOrders((prev) => prev.filter((o) => String(o.id) !== String(orderId)));
-      } else {
-        setOrders((prev) =>
-          prev.map((o) => String(o.id) === String(orderId) ? { ...o, ...updatedOrder } : o)
-        );
-      }
+      await updateStatusMutation.mutateAsync({ orderId, status: newStatus });
     } catch (error: any) {
       console.error('Error updating order:', error);
       alert(`Gagal: ${error.message}`);
-    } finally {
-      setUpdating(null);
     }
   };
 
@@ -157,8 +67,8 @@ export default function KitchenPage() {
     PREPARING: 'border-blue-500/30 bg-blue-500/5',
   };
 
-  const pendingOrders = orders.filter((o) => o.status === 'PENDING');
-  const preparingOrders = orders.filter((o) => o.status === 'PREPARING');
+  const pendingOrders = orders.filter((o: any) => o.status === 'PENDING');
+  const preparingOrders = orders.filter((o: any) => o.status === 'PREPARING');
 
   const formatTime = (dateStr: string) => {
     return new Date(dateStr).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
@@ -243,19 +153,19 @@ export default function KitchenPage() {
         {order.status === 'PENDING' && (
           <button
             onClick={() => updateOrderStatus(order.id, 'PREPARING')}
-            disabled={updating === order.id}
+            disabled={updateStatusMutation.isPending && updateStatusMutation.variables?.orderId === order.id}
             className="flex-1 py-3 rounded-xl bg-linear-to-r from-blue-500 to-cyan-500 text-white font-semibold text-sm transition-all hover:shadow-lg hover:shadow-blue-500/25 active:scale-95 disabled:opacity-50"
           >
-            {updating === order.id ? '...' : '👨‍🍳 Start Making'}
+            {updateStatusMutation.isPending && updateStatusMutation.variables?.orderId === order.id ? '...' : '👨‍🍳 Start Making'}
           </button>
         )}
         {order.status === 'PREPARING' && (
           <button
             onClick={() => updateOrderStatus(order.id, 'COMPLETED')}
-            disabled={updating === order.id}
+            disabled={updateStatusMutation.isPending && updateStatusMutation.variables?.orderId === order.id}
             className="flex-1 py-3 rounded-xl bg-linear-to-r from-green-500 to-emerald-500 text-white font-semibold text-sm transition-all hover:shadow-lg hover:shadow-green-500/25 active:scale-95 disabled:opacity-50"
           >
-            {updating === order.id ? '...' : '🎉 Complete Order'}
+            {updateStatusMutation.isPending && updateStatusMutation.variables?.orderId === order.id ? '...' : '🎉 Complete Order'}
           </button>
         )}
       </div>

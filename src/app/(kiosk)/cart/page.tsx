@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useCart } from '@/context/CartContext';
+import { useCartStore } from '@/stores/useCartStore';
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('id-ID', {
@@ -14,9 +14,9 @@ function formatCurrency(amount: number): string {
 
 export default function CartPage() {
   const router = useRouter();
-  const { cart, removeItem, updateQuantity, itemCount, setCustomerName } = useCart();
+  const { items, removeItem, updateQuantity, itemCount, totalAmount, setCustomerName, customerName } = useCartStore();
 
-  const isNameValid = cart.customerName.trim().length >= 2;
+  const isNameValid = customerName.trim().length >= 2;
 
   if (itemCount === 0) {
     return (
@@ -61,7 +61,7 @@ export default function CartPage() {
       </header>
 
       <div className="flex-1 px-6 py-6 max-w-3xl mx-auto w-full space-y-4">
-        {cart.items.map((item, index) => (
+        {items.map((item, index) => (
           <div
             key={item.id}
             className="glass-card p-4 animate-fade-in"
@@ -151,7 +151,7 @@ export default function CartPage() {
             id="customerName"
             type="text"
             placeholder="Enter your name to proceed..."
-            value={cart.customerName}
+            value={customerName}
             onChange={(e) => setCustomerName(e.target.value)}
             className="w-full bg-(--bg-card) border border-(--border-subtle) rounded-xl px-4 py-3 text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:border-[#A8131E] transition-colors"
             required
@@ -168,7 +168,7 @@ export default function CartPage() {
         <div className="max-w-3xl mx-auto space-y-4">
           <div className="flex items-center justify-between">
             <span className="text-(--text-secondary)">Total</span>
-            <span className="text-2xl font-bold text-gradient">{formatCurrency(cart.totalAmount)}</span>
+            <span className="text-2xl font-bold text-gradient">{formatCurrency(totalAmount)}</span>
           </div>
           <div className="flex gap-3">
             <button

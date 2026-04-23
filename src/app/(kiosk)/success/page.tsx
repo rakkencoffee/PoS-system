@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { Receipt } from '@/components/pos/Receipt';
 
 function SuccessContent() {
   const router = useRouter();
@@ -23,10 +24,21 @@ function SuccessContent() {
   })();
   
   const [countdown, setCountdown] = useState(15);
+  const [orderData, setOrderData] = useState<any>(null);
+  const hasPrinted = useRef(false);
 
-  // Auto-verify payment & Test-Mode bypass
+  // Auto-verify payment & Fetch order detail for receipt
   useEffect(() => {
     if (orderId) {
+      // 1. Fetch order details for the receipt
+      fetch(`/api/orders/${orderId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (!data.error) setOrderData(data);
+        })
+        .catch(e => console.error('Failed to fetch order for receipt:', e));
+
+      // 2. Settlement logic
       if (process.env.NEXT_PUBLIC_TEST_MODE === 'true') {
         // [TEST MODE EXCLUSIVE] Auto settle the Olsera order since Webhooks can't reach us locally
         fetch('/api/test-settle', {
@@ -44,6 +56,22 @@ function SuccessContent() {
       }
     }
   }, [orderId, transactionStatus]);
+
+  // Auto-print when order data is ready
+  useEffect(() => {
+    if (orderData && !hasPrinted.current) {
+      hasPrinted.current = true;
+      // Small delay to ensure Receipt renders before print dialog opens
+      const timer = setTimeout(() => {
+        window.print();
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, [orderData]);
+
+  const handlePrint = () => {
+    window.print();
+  };
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -117,14 +145,15 @@ function SuccessContent() {
         {/* Buttons */}
         <div className="space-y-3 animate-fade-in delay-4" style={{ opacity: 0 }}>
           <button
-            onClick={() => window.open(`/receipt/${orderId}?queue=${queue}`, '_blank', 'width=400,height=600')}
-            className="btn-primary w-full bg-[#1e293b] hover:bg-[#334155] border-none shadow-md mb-2 flex items-center justify-center gap-2"
+            onClick={handlePrint}
+            className="w-full py-4 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold flex items-center justify-center gap-3 transition-all active:scale-95 border border-white/10"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
             </svg>
-            Cetak Struk (Virtual)
+            🧾 Cetak Struk
           </button>
+          
           <button
             onClick={() => router.push(`/status?orderId=${orderId}`)}
             className="btn-primary w-full"
@@ -138,6 +167,17 @@ function SuccessContent() {
             Back to Home ({countdown}s)
           </button>
         </div>
+
+        {/* Hidden Receipt — only visible during print */}
+        {orderData && (
+          <Receipt 
+            orderId={orderId || ''}
+            queueNumber={queue}
+            items={orderData.items || []}
+            total={orderData.totalAmount || 0}
+            paymentMethod={orderData.paymentMethod || 'E-Wallet'}
+          />
+        )}
       </div>
     </div>
   );

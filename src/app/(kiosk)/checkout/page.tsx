@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useCart } from '@/context/CartContext';
+import { useCartStore } from '@/stores/useCartStore';
+import { useCreateOrder, useValidateVoucher, usePaymentConfig } from '@/hooks/useOrders';
 
 declare global {
   interface Window {
@@ -31,7 +32,7 @@ function formatCurrency(amount: number): string {
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { cart, clearCart, itemCount } = useCart();
+  const { items, totalAmount, clearCart, itemCount, customerName } = useCartStore();
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<string>('');
   const [snapLoaded, setSnapLoaded] = useState(false);
@@ -41,8 +42,11 @@ export default function CheckoutPage() {
   const [voucherCode, setVoucherCode] = useState('');
   const [appliedDiscount, setAppliedDiscount] = useState<number>(0);
   const [voucherMessage, setVoucherMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
-  const [isValidatingVoucher, setIsValidatingVoucher] = useState(false);
 
+  // TanStack Query Hooks
+  const createOrderMutation = useCreateOrder();
+  const validateVoucherMutation = useValidateVoucher();
+  const { data: paymentConfig } = usePaymentConfig();
 
   useEffect(() => {
     if (itemCount === 0 && !checkoutInProgress.current) {
@@ -51,48 +55,31 @@ export default function CheckoutPage() {
   }, [itemCount, router]);
 
   // Load Midtrans Snap.js dynamically
-  const loadSnapScript = useCallback(async () => {
-    if (window.snap) {
-      setSnapLoaded(true);
+  const loadSnapScript = useCallback(() => {
+    if (window.snap || !paymentConfig) {
+      if (window.snap) setSnapLoaded(true);
       return;
     }
 
-    try {
-      const res = await fetch('/api/payment/config');
-      const config = await res.json();
-
-      const script = document.createElement('script');
-      script.src = config.snapUrl;
-      script.setAttribute('data-client-key', config.clientKey);
-      script.onload = () => setSnapLoaded(true);
-      script.onerror = () => console.error('Failed to load Midtrans Snap');
-      document.head.appendChild(script);
-    } catch (error) {
-      console.error('Error loading payment config:', error);
-    }
-  }, []);
+    const script = document.createElement('script');
+    script.src = paymentConfig.snapUrl;
+    script.setAttribute('data-client-key', paymentConfig.clientKey);
+    script.onload = () => setSnapLoaded(true);
+    script.onerror = () => console.error('Failed to load Midtrans Snap');
+    document.head.appendChild(script);
+  }, [paymentConfig]);
 
   useEffect(() => {
     loadSnapScript();
   }, [loadSnapScript]);
-
-  const [snapTokenCache, setSnapTokenCache] = useState<string | null>(null);
-  const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
-  const [redirectUrlCache, setRedirectUrlCache] = useState<string | null>(null);
 
   const triggerSnapPopup = (token: string, id: string, redirectPath?: string) => {
     setPaymentStatus('Opening payment...');
     if (window.snap) {
       window.snap.pay(token, {
         onSuccess: async () => {
-          setPaymentStatus('Payment successful! Verifying...');
-          try {
-            await fetch(`/api/payment/verify?orderId=${id}`, { method: 'POST' });
-          } catch (e) {
-            console.error('Failed to manually verify payment:', e);
-          }
+          setPaymentStatus('Payment successful!');
           clearCart();
-          
           const numericId = id.replace('OLSERA-', '');
           const queueNum = numericId.slice(-3);
           router.push(`/success?orderId=${id}&queue=${queueNum}`);
@@ -114,250 +101,223 @@ export default function CheckoutPage() {
           checkoutInProgress.current = false;
         },
       });
-    } else {
-      if (redirectPath) {
-        window.location.href = redirectPath;
-      } else {
-        alert('Payment system failed to load. Please try again later.');
-        setIsProcessing(false);
-      }
+    } else if (redirectPath) {
+      window.location.href = redirectPath;
     }
   };
 
   const handleCheckout = async () => {
-    if (snapTokenCache && createdOrderId && redirectUrlCache) {
-      setIsProcessing(true);
-      setPaymentStatus('Redirecting to payment...');
-      // FORCE REDIRECT for TestSprite E2E Resilience during Retry
-      window.location.href = redirectUrlCache;
-      return;
-    }
-
     checkoutInProgress.current = true;
     setIsProcessing(true);
     setPaymentStatus('Creating payment...');
 
     try {
-      const res = await fetch('/api/payment/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: cart.items.map((item) => ({
-            productId: String(item.menuItemId),
-            name: item.name,
-            price: item.subtotal / item.quantity,
-            quantity: item.quantity,
-            variantId: item.olseraVariantId ? String(item.olseraVariantId) : undefined,
-            note: [
-              item.sugarLevel && item.sugarLevel !== 'normal' && `Sugar: ${item.sugarLevel}`,
-              item.iceLevel && item.iceLevel !== 'normal' && `Ice: ${item.iceLevel}`,
-              item.extraShot && 'Extra Shot',
-              item.toppings.length && `Toppings: ${item.toppings.map((t) => t.name).join(', ')}`,
-            ].filter(Boolean).join('; '),
-          })),
-          totalAmount: cart.totalAmount,
-          customerName: cart.customerName,
-          discountAmount: appliedDiscount > 0 ? appliedDiscount : undefined,
-          voucherCode: appliedDiscount > 0 ? voucherCode.toUpperCase().trim() : undefined,
-        }),
+      const data = await createOrderMutation.mutateAsync({
+        items: items.map((item) => ({
+          productId: String(item.menuItemId),
+          name: item.name,
+          price: item.subtotal / item.quantity,
+          quantity: item.quantity,
+          variantId: item.olseraVariantId ? String(item.olseraVariantId) : undefined,
+          notes: item.notes,
+          options: {
+            size: item.size,
+            sugarLevel: item.sugarLevel,
+            iceLevel: item.iceLevel,
+            extraShot: item.extraShot,
+            toppings: item.toppings.map(t => t.id)
+          }
+        })),
+        customerName: customerName,
+        voucherCode: appliedDiscount > 0 ? voucherCode : undefined
       });
 
-      if (!res.ok) throw new Error('Failed to create payment');
-
-      const { snapToken, orderId, redirectUrl } = await res.json();
-      setSnapTokenCache(snapToken);
-      setCreatedOrderId(orderId);
-      setRedirectUrlCache(redirectUrl);
-
-      if (window.snap) {
-        triggerSnapPopup(snapToken, orderId, redirectUrl);
-      } else if (redirectUrl) {
-        window.location.href = redirectUrl;
+      if (data.token) {
+        triggerSnapPopup(data.token, data.orderId, data.redirectUrl);
+      } else {
+        throw new Error('No payment token received');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Checkout error:', error);
+      alert('Failed to process checkout: ' + error.message);
       setIsProcessing(false);
-      setPaymentStatus('');
       checkoutInProgress.current = false;
-      alert('Failed to create payment. Please try again.');
     }
   };
 
   const handleApplyVoucher = async () => {
     if (!voucherCode.trim()) return;
-    setIsValidatingVoucher(true);
+    
     setVoucherMessage(null);
     try {
-      const res = await fetch('/api/payment/validate-voucher', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: voucherCode, totalAmount: cart.totalAmount })
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setVoucherMessage({ type: 'error', text: data.error || 'Voucher invalid' });
-        setAppliedDiscount(0);
-      } else {
-        setVoucherMessage({ type: 'success', text: data.message });
-        setAppliedDiscount(data.discountAmount);
-      }
-    } catch(e) {
-      setVoucherMessage({ type: 'error', text: 'Error contacting server' });
-    } finally {
-      setIsValidatingVoucher(false);
+      const data = await validateVoucherMutation.mutateAsync(voucherCode);
+      setAppliedDiscount(data.discountAmount);
+      setVoucherMessage({type: 'success', text: `Voucher applied! Discount: ${formatCurrency(data.discountAmount)}`});
+    } catch (error: any) {
+      setAppliedDiscount(0);
+      setVoucherMessage({type: 'error', text: error.message});
     }
   };
 
-  const finalTotalToPay = Math.max(0, cart.totalAmount - appliedDiscount);
+  const subtotal = totalAmount;
+  const discount = appliedDiscount;
+  const total = Math.max(0, subtotal - discount);
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen pb-32">
       {/* Header */}
       <header className="glass sticky top-0 z-50 px-6 py-4">
         <div className="max-w-3xl mx-auto flex items-center justify-between">
-          <button onClick={() => router.push('/cart')} className="btn-ghost flex items-center gap-2">
+          <button onClick={() => router.back()} className="btn-ghost flex items-center gap-2">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            Cart
+            Back
           </button>
           <h1 className="text-xl font-bold text-gradient">Checkout</h1>
-          <div className="w-16" />
+          <div className="w-20"></div>
         </div>
       </header>
 
-      <div className="flex-1 px-6 py-6 max-w-3xl mx-auto w-full space-y-6">
+      <main className="px-6 py-8 max-w-3xl mx-auto">
         {/* Order Summary */}
-        <div className="glass-card p-5 animate-fade-in">
-          <h2 className="text-lg font-semibold text-(--text-primary) mb-4">Order Summary</h2>
-          <div className="space-y-3">
-            {cart.items.map((item) => (
-              <div key={item.id} className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-(--text-muted)">{item.quantity}x</span>
-                  <span className="text-sm text-(--text-primary)">{item.name}</span>
-                  <span className="text-xs text-(--text-muted)">({item.size})</span>
+        <section className="glass-card p-6 mb-6">
+          <h2 className="text-lg font-bold text-(--text-primary) mb-4 flex items-center gap-2">
+            <span className="w-8 h-8 rounded-lg bg-[#A8131E]/20 text-[#A8131E] flex items-center justify-center">📋</span>
+            Order Summary
+          </h2>
+          <div className="space-y-4">
+            {items.map((item) => (
+              <div key={item.id} className="flex justify-between items-start gap-4 pb-4 border-b border-(--border-subtle) last:border-0 last:pb-0">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-[#A8131E]">{item.quantity}x</span>
+                    <h3 className="font-medium text-(--text-primary)">{item.name}</h3>
+                  </div>
+                  {/* Item customization details */}
+                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                    <span className="text-xs text-(--text-muted)">Size: {item.size}</span>
+                    {item.sugarLevel && <span className="text-xs text-(--text-muted)">Sugar: {item.sugarLevel}</span>}
+                    {item.iceLevel && <span className="text-xs text-(--text-muted)">Ice: {item.iceLevel}</span>}
+                    {item.extraShot && <span className="text-xs text-(--text-muted)">+ Extra Shot</span>}
+                    {item.toppings.length > 0 && (
+                      <span className="text-xs text-(--text-muted)">
+                        Toppings: {item.toppings.map(t => t.topping.name).join(', ')}
+                      </span>
+                    )}
+                  </div>
+                  {item.notes && <p className="text-xs text-[#A8131E] mt-1 italic">"{item.notes}"</p>}
                 </div>
-                <span className="text-sm text-(--text-secondary)">{formatCurrency(item.subtotal)}</span>
+                <span className="font-medium text-(--text-primary)">{formatCurrency(item.subtotal)}</span>
               </div>
             ))}
           </div>
-          <div className="border-t border-(--border-subtle) mt-4 pt-4 space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-(--text-muted)">Subtotal</span>
-              <span className="text-(--text-primary)">{formatCurrency(cart.totalAmount)}</span>
-            </div>
-            {appliedDiscount > 0 && (
-              <div className="flex items-center justify-between text-sm text-green-500 font-medium">
-                <span>Discount Promo</span>
-                <span>- {formatCurrency(appliedDiscount)}</span>
-              </div>
-            )}
-            <div className="flex items-center justify-between pt-2">
-              <span className="font-semibold text-(--text-primary)">Total</span>
-              <span className="text-xl font-bold text-gradient">{formatCurrency(finalTotalToPay)}</span>
-            </div>
-          </div>
-        </div>
+        </section>
 
-        {/* Voucher Section */}
-        <div className="glass-card p-5 animate-fade-in">
-          <div className="flex items-center gap-3 mb-3">
-            <span className="text-2xl">🎟️</span>
-            <div>
-              <h2 className="text-lg font-semibold text-(--text-primary)">Promo & Voucher</h2>
+        {/* Customer & Voucher */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <section className="glass-card p-6">
+            <h2 className="text-lg font-bold text-(--text-primary) mb-4 flex items-center gap-2">
+              <span className="w-8 h-8 rounded-lg bg-[#A8131E]/20 text-[#A8131E] flex items-center justify-center">👤</span>
+              Customer
+            </h2>
+            <div className="space-y-1">
+              <p className="text-sm text-(--text-muted)">Order for:</p>
+              <p className="text-lg font-bold text-(--text-primary)">{customerName}</p>
             </div>
-          </div>
-          <div className="flex flex-col gap-2">
+          </section>
+
+          <section className="glass-card p-6">
+            <h2 className="text-lg font-bold text-(--text-primary) mb-4 flex items-center gap-2">
+              <span className="w-8 h-8 rounded-lg bg-[#A8131E]/20 text-[#A8131E] flex items-center justify-center">🏷️</span>
+              Voucher
+            </h2>
             <div className="flex gap-2">
-              <input 
-                type="text" 
-                placeholder="Enter promo code (e.g. STARTFRIDAY10)" 
+              <input
+                type="text"
+                placeholder="Voucher code"
+                readOnly={appliedDiscount > 0}
                 value={voucherCode}
                 onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
-                className="flex-1 px-4 py-3 rounded-xl bg-(--bg-card) border border-(--border-subtle) text-(--text-primary) placeholder:text-(--text-muted) focus:outline-none focus:ring-2 focus:ring-(--brand-primary)"
+                className="flex-1 px-4 py-2 rounded-xl bg-white/5 border border-(--border-subtle) text-(--text-primary) focus:outline-none focus:border-[#A8131E] transition-colors"
               />
-              <button 
-                onClick={handleApplyVoucher}
-                disabled={isValidatingVoucher || !voucherCode.trim()}
-                className="px-6 py-3 bg-(--brand-primary) text-white font-medium rounded-xl disabled:opacity-50"
-              >
-                {isValidatingVoucher ? '...' : 'Apply'}
-              </button>
+              {appliedDiscount > 0 ? (
+                <button 
+                  onClick={() => { setAppliedDiscount(0); setVoucherCode(''); setVoucherMessage(null); }}
+                  className="px-4 py-2 rounded-xl bg-[#A8131E]/20 text-[#A8131E] font-medium"
+                >
+                  Remove
+                </button>
+              ) : (
+                <button 
+                  onClick={handleApplyVoucher}
+                  disabled={validateVoucherMutation.isPending || !voucherCode.trim()}
+                  className="px-4 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:bg-white/5 transition-colors disabled:opacity-50"
+                >
+                  {validateVoucherMutation.isPending ? '...' : 'Apply'}
+                </button>
+              )}
             </div>
             {voucherMessage && (
-              <p className={`text-sm mt-1 px-1 ${voucherMessage.type === 'success' ? 'text-green-500' : 'text-red-500'}`}>
+              <p className={`text-xs mt-2 ${voucherMessage.type === 'success' ? 'text-green-400' : 'text-red-400'}`}>
                 {voucherMessage.text}
               </p>
             )}
-            {appliedDiscount > 0 && (
-              <button 
-                onClick={() => {
-                  setAppliedDiscount(0);
-                  setVoucherCode('');
-                  setVoucherMessage(null);
-                }}
-                className="text-xs text-red-400 mt-2 text-left px-1 hover:underline w-fit"
-              >
-                Remove Voucher
-              </button>
-            )}
-          </div>
+          </section>
         </div>
 
-        {/* Payment Info */}
-        <div className="glass-card p-5 animate-fade-in">
-          <div className="flex items-center gap-3 mb-4">
-            <span className="text-2xl">🔒</span>
-            <div>
-              <h2 className="text-lg font-semibold text-(--text-primary)">Secure Payment</h2>
-              <p className="text-sm text-(--text-muted)">Powered by Midtrans</p>
+        {/* Payment Details */}
+        <section className="glass-card p-6 mb-24">
+          <h2 className="text-lg font-bold text-(--text-primary) mb-4 flex items-center gap-2">
+            <span className="w-8 h-8 rounded-lg bg-[#A8131E]/20 text-[#A8131E] flex items-center justify-center">💳</span>
+            Payment Details
+          </h2>
+          <div className="space-y-3">
+            <div className="flex justify-between text-(--text-secondary)">
+              <span>Subtotal</span>
+              <span>{formatCurrency(subtotal)}</span>
+            </div>
+            {discount > 0 && (
+              <div className="flex justify-between text-green-400">
+                <span>Voucher Discount</span>
+                <span>-{formatCurrency(discount)}</span>
+              </div>
+            )}
+            <div className="h-px bg-(--border-subtle) my-2" />
+            <div className="flex justify-between text-xl font-bold text-(--text-primary)">
+              <span>Total Amount</span>
+              <span className="text-gradient">{formatCurrency(total)}</span>
             </div>
           </div>
-          <div className="flex flex-wrap gap-3">
-            {['QRIS', 'GoPay', 'ShopeePay', 'DANA', 'OVO', 'Virtual Account'].map((method) => (
-              <span
-                key={method}
-                className="px-3 py-1.5 rounded-xl bg-(--bg-card) text-xs text-(--text-secondary) border border-(--border-subtle)"
-              >
-                {method}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
+        </section>
+      </main>
 
-      {/* Pay Button */}
-      <div className="sticky bottom-0 glass p-6 border-t border-(--border-subtle)">
+      {/* Fixed Bottom Action */}
+      <footer className="fixed bottom-0 left-0 right-0 p-6 glass border-t border-(--border-subtle) z-40">
         <div className="max-w-3xl mx-auto">
           <button
             onClick={handleCheckout}
-            disabled={isProcessing || !snapLoaded}
-            className="btn-primary w-full py-5 text-lg rounded-2xl flex items-center justify-center gap-3"
+            disabled={isProcessing || !snapLoaded || createOrderMutation.isPending}
+            className="btn-primary w-full py-4 text-lg font-bold shadow-2xl relative overflow-hidden flex items-center justify-center gap-3 disabled:opacity-70"
           >
-            {isProcessing ? (
+            {isProcessing || createOrderMutation.isPending ? (
               <>
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                {paymentStatus || 'Processing...'}
-              </>
-            ) : !snapLoaded ? (
-              <>
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Loading payment...
+                <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" />
+                <span>{paymentStatus || 'Processing...'}</span>
               </>
             ) : (
-              <>Pay {formatCurrency(finalTotalToPay)}</>
+              <>
+                <span>Pay Now</span>
+                <div className="w-1.5 h-1.5 rounded-full bg-white/40" />
+                <span>{formatCurrency(total)}</span>
+              </>
             )}
           </button>
-          
-          {/* Tunnel Fallback Link */}
-          {snapLoaded && !isProcessing && (
-            <p className="text-center text-[10px] text-(--text-muted) mt-3">
-              Payment pop-up not appearing? <button onClick={handleCheckout} className="underline text-blue-400">Click here to retry</button>
-            </p>
-          )}
+          <p className="text-center text-[10px] text-(--text-muted) mt-3 uppercase tracking-widest font-bold">
+            Payments secured by Midtrans
+          </p>
         </div>
-      </div>
+      </footer>
     </div>
   );
 }

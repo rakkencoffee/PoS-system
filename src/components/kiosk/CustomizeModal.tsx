@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useCart } from '@/context/CartContext';
+import { useCartStore } from '@/stores/useCartStore';
 
 interface Topping {
   id: number;
@@ -44,7 +44,7 @@ function formatCurrency(amount: number): string {
 const OPTIONAL_CHOICE_CATEGORIES = ['coffee-based', 'milk-based'];
 
 export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
-  const { addItem } = useCart();
+  const { addItem } = useCartStore();
   const [optionalChoices, setOptionalChoices] = useState<Topping[]>([]);
   const [selectedSize, setSelectedSize] = useState('');
   const [sugarLevel, setSugarLevel] = useState('normal');

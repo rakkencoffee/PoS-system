@@ -1,98 +1,40 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { useCart } from '@/context/CartContext';
+import { useCartStore } from '@/stores/useCartStore';
 import { useDebouncedCallback } from 'use-debounce';
+import { useCategories, useMenuItems } from '@/hooks/useMenu';
 import CategoryBar from '@/components/kiosk/CategoryBar';
 import MenuCard from '@/components/kiosk/MenuCard';
 import CustomizeModal from '@/components/kiosk/CustomizeModal';
 import CartSummary from '@/components/kiosk/CartSummary';
 
-interface Category {
-  id: number | string;
-  name: string;
-  slug: string;
-  icon: string;
-}
-
-interface MenuItemSize {
-  id?: number;
-  size: string;
-  priceAdjustment: number;
-}
-
-interface MenuItem {
-  id: number | string;
-  name: string;
-  description: string;
-  price: number;
-  image: string;
-  categoryId?: number | string;
-  categoryName?: string;
-  categorySlug?: string;
-  isBestSeller: boolean;
-  isRecommended: boolean;
-  type: string;
-  category?: Category;
-  sizes: MenuItemSize[];
-  olseraVariants?: { id: number; name: string; price: number }[];
-}
+// (Interfaces remain same)
 
 export default function MenuPage() {
   const router = useRouter();
-  const { itemCount } = useCart();
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [allItems, setAllItems] = useState<MenuItem[]>([]);
+  const { itemCount } = useCartStore();
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [activeFilter, setActiveFilter] = useState<string>('all');
-  const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [selectedItem, setSelectedItem] = useState<any | null>(null);
 
-  useEffect(() => {
-    fetch('/api/categories')
-      .then((res) => res.json())
-      .then(setCategories)
-      .catch(console.error);
-  }, []);
+  // Use TanStack Query hooks instead of manual fetch
+  const { data: categories = [] } = useCategories();
+  const { data: allItems = [], isLoading: loading } = useMenuItems(selectedCategory);
 
   // Best practice: useDebouncedCallback from 'use-debounce'
-  // Only updates the internal search state after 500ms of no typing
   const handleSearch = useDebouncedCallback((term: string) => {
     setDebouncedSearch(term);
   }, 500);
 
-  // Fetch products from API only when category changes
-  const fetchMenu = useCallback(async () => {
-    setLoading(true);
-    const params = new URLSearchParams();
-    if (selectedCategory !== 'all') params.set('category', selectedCategory);
-
-    try {
-      const res = await fetch(`/api/menu?${params.toString()}`);
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        setAllItems(data);
-      }
-    } catch (error) {
-      console.error('Error fetching menu:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedCategory]);
-
-  useEffect(() => {
-    fetchMenu();
-  }, [fetchMenu]);
-
-  // Client-side filtering using useMemo (no extra useEffect needed)
+  // Client-side filtering using useMemo
   const menuItems = useMemo(() => {
     if (!debouncedSearch) return allItems;
     const q = debouncedSearch.toLowerCase();
     return allItems.filter(
-      (item) =>
+      (item: any) =>
         item.name.toLowerCase().includes(q) ||
         item.description.toLowerCase().includes(q)
     );

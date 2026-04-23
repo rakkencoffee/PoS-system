@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useCart } from '@/context/CartContext';
+import { useCartStore } from '@/stores/useCartStore';
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('id-ID', {
@@ -14,7 +14,7 @@ function formatCurrency(amount: number): string {
 
 export default function CartSummary() {
   const router = useRouter();
-  const { cart, itemCount } = useCart();
+  const { itemCount, totalAmount } = useCartStore();
 
   if (itemCount === 0) return null;
 
@@ -31,7 +31,7 @@ export default function CartSummary() {
             </span>
             <span className="font-semibold">View Cart</span>
           </div>
-          <span className="font-bold text-lg">{formatCurrency(cart.totalAmount)}</span>
+          <span className="font-bold text-lg">{formatCurrency(totalAmount)}</span>
         </button>
       </div>
     </div>
