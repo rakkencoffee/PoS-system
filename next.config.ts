@@ -33,14 +33,14 @@ export default withSentryConfig(nextConfig, {
   // Routes browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers.
   tunnelRoute: "/monitoring",
 
-  // Hides source maps from visitors
+  // Hides source maps from visitors by deleting them after upload
   sourcemaps: {
-    hideSources: true,
+    deleteSourcemapsAfterUpload: true,
   },
 
-  // Enables automatic instrumentation of Vercel Cron Monitors. (Does not yet work with App Router config.js or env vars.)
+  // Enables automatic instrumentation of Vercel Cron Monitors. 
   // See the following for more information:
   // https://docs.sentry.io/product/crons/
   // https://vercel.com/docs/cron-jobs
-  automaticVercelCronInstrumentation: true,
+  automaticVercelMonitors: true,
 });
