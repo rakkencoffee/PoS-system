@@ -1,13 +1,20 @@
 'use client';
 
 import { useState } from 'react';
+import * as Sentry from "@sentry/nextjs";
 
 export default function SentryExamplePage() {
   const [errorStatus, setErrorStatus] = useState<string | null>(null);
 
   const triggerFrontendError = () => {
     setErrorStatus('Frontend Error Triggered');
-    throw new Error('Sentry Frontend Test Error: ' + new Date().toISOString());
+    const errorMessage = 'Sentry Frontend Test Error: ' + new Date().toISOString();
+    
+    // Explicitly capture exception for testing
+    Sentry.captureException(new Error(errorMessage));
+    
+    // Also throw to see how it's handled by boundaries
+    throw new Error(errorMessage);
   };
 
   const triggerApiError = async () => {
