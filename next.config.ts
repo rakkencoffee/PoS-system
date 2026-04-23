@@ -26,14 +26,6 @@ export default withSentryConfig(nextConfig, {
   // Upload a larger set of source maps for prettier stack traces (increases build time)
   widenClientFileUpload: true,
 
-  // Automatically annotate React components to show their full name in breadcrumbs and session replay
-  // reactComponentAnnotation is moved under 'wepback' in v8, but we'll use the recommended way for now
-  // Note: Turbopack handles this differently, keeping it simple for stability.
-
-  // Note: tunnelRoute is currently disabled due to Turbopack 404 issues in v8. 
-  // Next.js rewrites for Sentry Tunnel are not yet fully supported in Turbopack.
-  // tunnelRoute: "/sentry-tunnel",
-
   // Hides source maps from visitors by deleting them after upload
   sourcemaps: {
     deleteSourcemapsAfterUpload: true,
@@ -44,4 +36,8 @@ export default withSentryConfig(nextConfig, {
   // https://docs.sentry.io/product/crons/
   // https://vercel.com/docs/cron-jobs
   automaticVercelMonitors: true,
+
+  // Note: tunnelRoute is currently disabled due to Turbopack 404 issues in v8. 
+  // Next.js rewrites for Sentry Tunnel are not yet fully supported in Turbopack.
+  // tunnelRoute: "/sentry-tunnel",
 });
