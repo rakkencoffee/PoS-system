@@ -27,20 +27,16 @@ export default withSentryConfig(nextConfig, {
   widenClientFileUpload: true,
 
   // Automatically annotate React components to show their full name in breadcrumbs and session replay
-  reactComponentAnnotation: {
-    enabled: true,
-  },
+  // reactComponentAnnotation is moved under 'wepback' in v8, but we'll use the recommended way for now
+  // Note: Turbopack handles this differently, keeping it simple for stability.
 
   // Routes browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers.
-  // This can increase your server load as well as your hosting bill.
-  // Note: Check that the configured route does not match with your Next.js middleware, otherwise reporting of client-side errors will fail.
   tunnelRoute: "/monitoring",
 
   // Hides source maps from visitors
-  hideSourceMaps: true,
-
-  // Automatically tree-shake Sentry logger statements to reduce bundle size
-  disableLogger: true,
+  sourcemaps: {
+    hideSources: true,
+  },
 
   // Enables automatic instrumentation of Vercel Cron Monitors. (Does not yet work with App Router config.js or env vars.)
   // See the following for more information:
