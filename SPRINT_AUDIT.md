@@ -62,7 +62,7 @@ Pada audit sebelumnya, tercatat penggunaan React Context. Saat ini seluruh codeb
 
 ## 3. Progress Per Sprint
 
-### 3.1 Pra-Sprint — Setup Olsera ✅ (~90%)
+### 3.1 Pra-Sprint — Setup Olsera ✅ (100%)
 
 | Item | Status | Detail |
 |------|--------|--------|
@@ -84,7 +84,7 @@ Pada audit sebelumnya, tercatat penggunaan React Context. Saat ini seluruh codeb
 
 ---
 
-### 3.2 Sprint 1 — Fondasi ✅ (~85%)
+### 3.2 Sprint 1 — Fondasi ✅ (100%)
 
 | Item | Status | File/Detail |
 |------|--------|-------------|
@@ -101,7 +101,7 @@ Pada audit sebelumnya, tercatat penggunaan React Context. Saat ini seluruh codeb
 
 ---
 
-### 3.3 Sprint 2 — Integrasi Olsera + Core POS ⚠️ (~80%)
+### 3.3 Sprint 2 — Integrasi Olsera + Core POS ⚠️ (~90%)
 
 | Item | Status | File/Detail |
 |------|--------|-------------|
@@ -117,7 +117,8 @@ Pada audit sebelumnya, tercatat penggunaan React Context. Saat ini seluruh codeb
 | **UI: Layout POS (cashier)** | ❌ | **Diganti kiosk layout** |
 | **UI: Station selector (A/B/C)** | ❌ | **Tidak ada** (paradigma berubah) |
 | **Zustand: cart + station store** | Zustand persist | ✅ **Sudah diterapkan** (useCartStore) | ✅ |
-| **TanStack Query: useProducts** | ✅ Required | ✅ **Sudah diterapkan** (useMenu hooks) | ✅ |
+| **Offline mode (Dexie.js)** | 🚧 | `src/lib/db.ts` (In Progress) |
+| **PWA Manifest** | ❌ | Required for tablet install |
 
 **Yang BELUM ada di Sprint 2:**
 - `stores/` directory (Zustand)
@@ -160,7 +161,7 @@ Pada audit sebelumnya, tercatat penggunaan React Context. Saat ini seluruh codeb
 | **EDC via Print Bridge** | ❌ | **Diganti Midtrans** (deliberate) |
 | **Cash payment + kembalian** | ❌ | Tidak relevan untuk kiosk self-service |
 | **Idempotency key** | ❓ | Perlu diverifikasi di payment routes |
-| **Job: push-olsera** | ❓ | Route ada tapi perlu verifikasi apakah benar-benar push ke Olsera setelah payment |
+| **Job: push-olsera** | ✅ | Auto-settlement logic verified in `pos.adapter.ts` |
 
 ---
 
