@@ -9,8 +9,8 @@ Sentry.init({
   // Setting this option to true will print useful information to the console while you're setting up Sentry.
   debug: false,
 
-  // Use the tunnel route to circumvent ad-blockers
-  tunnel: "/sentry-tunnel",
+  // Note: tunnel is temporarily disabled to resolve 404 issues with Turbopack builds
+  // tunnel: "/sentry-tunnel",
 
   replaysOnErrorSampleRate: 1.0,
 

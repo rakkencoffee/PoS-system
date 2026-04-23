@@ -30,8 +30,9 @@ export default withSentryConfig(nextConfig, {
   // reactComponentAnnotation is moved under 'wepback' in v8, but we'll use the recommended way for now
   // Note: Turbopack handles this differently, keeping it simple for stability.
 
-  // Routes browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers.
-  tunnelRoute: "/sentry-tunnel",
+  // Note: tunnelRoute is currently disabled due to Turbopack 404 issues in v8. 
+  // Next.js rewrites for Sentry Tunnel are not yet fully supported in Turbopack.
+  // tunnelRoute: "/sentry-tunnel",
 
   // Hides source maps from visitors by deleting them after upload
   sourcemaps: {
