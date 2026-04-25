@@ -117,12 +117,13 @@ Pada audit sebelumnya, tercatat penggunaan React Context. Saat ini seluruh codeb
 
 ---
 
-### 3.5 Sprint 4 — Admin & Reports ⚠️ (~10%)
+### 3.5 Sprint 4 — Admin & Reports ✅ (100%)
 | Item | Status | Detail |
 |------|--------|--------|
-| **Real-time Sales Report** | ❌ | **NEW**: Laporan penjualan per produk/hari |
-| Admin dashboard UI | ✅ | `src/app/(admin)/admin/dashboard/page.tsx` (basic) |
-| Admin menu management | ✅ | `src/app/api/admin/menu/route.ts` |
+| **Real-time Sales Report** | ✅ | API aggregated from local Prisma |
+| **Admin Dashboard UI** | ✅ | Interactive charts via `recharts` |
+| **Dual-Sync Persistence** | ✅ | Mirroring orders to Prisma & Olsera |
+| **Unified Admin Auth** | ✅ | Secure access via Auth.js (Role-based) |
 
 ---
 

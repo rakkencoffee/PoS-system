@@ -255,6 +255,33 @@ export async function createOrder(
       }
     }
 
+    // 3. Save to local Prisma for Dashboard/Reporting (Sprint 4)
+    try {
+      const { prisma } = await import('@/lib/db');
+      await prisma.order.create({
+        data: {
+          id: `OLSERA-${orderId}`,
+          stationId: 'KIOSK', // Kiosk self-service
+          cashierId: 'clw1234567890', // Placeholder or system user
+          total: items.reduce((acc, item) => acc + ((item.price || 0) * item.quantity), 0),
+          status: 'PENDING',
+          items: {
+            create: items.map((item) => ({
+              olseraId: item.productId,
+              name: 'Item', // Will be enriched or kept as Item
+              quantity: item.quantity,
+              price: item.price || 0,
+              subtotal: (item.price || 0) * item.quantity,
+              notes: item.note || '',
+            })),
+          },
+        },
+      });
+      console.log(`[Sync] Order OLSERA-${orderId} mirrored to local database.`);
+    } catch (dbErr) {
+      console.warn(`[Sync] Failed to mirror order to local database:`, dbErr);
+    }
+
     return {
       orderId: `OLSERA-${orderId}`,
       olseraOrderId: orderId,
@@ -355,6 +382,31 @@ export async function updateOrderPaymentStatus(
         } catch (pusherErr) {
           console.warn('[Pusher] Failed to broadcast ORDER_CREATED:', pusherErr);
         }
+
+        // Step 4: Broadcast to Admin Reports (Sprint 4)
+        try {
+          const { pusherServer } = await import('@/lib/pusher');
+          await pusherServer.trigger('admin-reports', 'SALES_UPDATED', {
+            orderId,
+            amount: actualOlseraTotal,
+          });
+          console.log(`[Pusher] SALES_UPDATED broadcast for ${orderId}`);
+        } catch (adminPusherErr) {
+          console.warn('[Pusher] Failed to broadcast SALES_UPDATED:', adminPusherErr);
+        }
+
+        // Step 5: Update local Prisma status (Sprint 4)
+        try {
+          const { prisma } = await import('@/lib/db');
+          await prisma.order.update({
+            where: { id: orderId },
+            data: { status: 'PAID' },
+          });
+          console.log(`[Sync] Local order ${orderId} updated to PAID.`);
+        } catch (dbUpdateErr) {
+          console.warn(`[Sync] Failed to update local order status:`, dbUpdateErr);
+        }
+
       } catch (error: any) {
         // Log but don't throw — webhook must still return 200 to Midtrans
         console.error(`[Auto-Settlement] ❌ Failed to settle order ${orderId} in Olsera:`, error.message);
