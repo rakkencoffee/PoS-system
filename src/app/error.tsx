@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import * as Sentry from '@sentry/nextjs';
+import * as Sentry from "@sentry/nextjs";
 
 export default function Error({
   error,
@@ -13,44 +13,36 @@ export default function Error({
   useEffect(() => {
     // Log the error to Sentry
     Sentry.captureException(error);
+    console.error(error);
   }, [error]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-[#A8131E]/5">
-      <div className="max-w-md w-full glass p-8 rounded-3xl shadow-2xl border border-[#A8131E]/20 text-center animate-fade-in">
-        <div className="w-20 h-20 bg-[#A8131E]/10 rounded-full flex items-center justify-center mx-auto mb-6">
-          <span className="text-4xl">⚠️</span>
-        </div>
-        
-        <h2 className="text-2xl font-bold text-(--text-primary) mb-3">
-          Terjadi Kesalahan
-        </h2>
-        
-        <p className="text-(--text-muted) mb-8 text-sm leading-relaxed">
-          Mohon maaf atas ketidaknyamanan ini. Sistem kami telah mencatat masalah ini secara otomatis untuk segera kami perbaiki.
+    <div className="min-h-screen flex items-center justify-center p-8 bg-[#0a0a0a]">
+      <div className="max-w-md w-full text-center space-y-6">
+        <div className="text-6xl mb-4">☕</div>
+        <h1 className="text-3xl font-black text-white tracking-tight">SIBUK MENYEDUH...</h1>
+        <p className="text-zinc-400 text-base leading-relaxed">
+          Terjadi kendala teknis saat memproses halaman ini. Mohon maaf atas ketidaknyamanannya.
         </p>
-
-        <div className="flex flex-col gap-3">
+        <div className="pt-4 flex flex-col gap-3">
           <button
             onClick={() => reset()}
-            className="btn-primary w-full py-3 font-semibold shadow-lg hover:shadow-[#A8131E]/20 transition-all active:scale-95"
+            className="w-full py-4 rounded-2xl bg-[#A8131E] text-white font-bold shadow-xl shadow-[#A8131E]/20 active:scale-95 transition-all"
           >
-            Coba Lagi
+            Coba Segarkan Halaman
           </button>
-          
-          <button
-            onClick={() => window.location.href = '/menu'}
-            className="btn-secondary w-full py-3 font-semibold transition-all active:scale-95"
+          <a
+            href="/"
+            className="w-full py-4 rounded-2xl bg-white/5 text-zinc-300 font-medium border border-white/10"
           >
-            Kembali ke Menu
-          </button>
+            Kembali ke Awal
+          </a>
         </div>
-        
-        {error.digest && (
-          <p className="mt-6 text-[10px] text-(--text-muted) font-mono opacity-50">
-            Error ID: {error.digest}
+        <div className="pt-10">
+          <p className="text-[10px] text-zinc-700 uppercase tracking-[0.2em]">
+            SYSTEM_ERROR_LOGGED_SENTRY
           </p>
-        )}
+        </div>
       </div>
     </div>
   );

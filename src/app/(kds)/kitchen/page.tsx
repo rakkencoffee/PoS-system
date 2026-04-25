@@ -10,7 +10,7 @@ export default function KitchenPage() {
   const { data: orders = [], isLoading: loading, refetch: fetchOrders, isFetching: refreshing } = useKitchenOrders();
   const updateStatusMutation = useUpdateOrderStatus();
 
-  // Listen for Pusher real-time updates (Sprint 3)
+  // Listen for Pusher real-time updates + Network Reconnect (Sprint 3)
   useEffect(() => {
     let channel: any = null;
 
@@ -21,25 +21,38 @@ export default function KitchenPage() {
 
       channel.bind('ORDER_CREATED', (data: { order: any }) => {
         console.log('[Pusher] New order received:', data.order);
-        // Invalidate orders to trigger refetch
         queryClient.invalidateQueries({ queryKey: ['orders', 'kitchen'] });
 
-        // Play chime notification
         try {
           const audio = new Audio('/sounds/new-order.wav');
-          audio.play().catch(() => { /* user hasn't interacted yet */ });
-        } catch { /* silently fail */ }
+          audio.play().catch(() => { /* user interaction required */ });
+        } catch { /* ignore */ }
       });
 
       channel.bind('ORDER_UPDATED', (data: { order: any }) => {
-        console.log('[Pusher] Order updated:', data.order);
         queryClient.invalidateQueries({ queryKey: ['orders', 'kitchen'] });
+      });
+
+      // Refetch when Pusher reconnects (Sprint 3)
+      pusher.connection.bind('state_change', (states: any) => {
+        if (states.current === 'connected') {
+          console.log('[Pusher] Connected/Reconnected, refetching...');
+          queryClient.invalidateQueries({ queryKey: ['orders', 'kitchen'] });
+        }
       });
     }
 
+    // Auto-refresh when internet is back (Sprint 3)
+    const handleOnline = () => {
+      console.log('[Kitchen] Back online, refetching...');
+      queryClient.invalidateQueries({ queryKey: ['orders', 'kitchen'] });
+    };
+
+    window.addEventListener('online', handleOnline);
     connectPusher();
 
     return () => {
+      window.removeEventListener('online', handleOnline);
       if (channel) {
         channel.unbind_all();
         channel.unsubscribe();
@@ -177,7 +190,15 @@ export default function KitchenPage() {
       <div className="mb-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gradient">Kitchen Display</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-3xl font-bold text-gradient">Kitchen Display</h1>
+              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
+                <div className={`w-1.5 h-1.5 rounded-full ${typeof window !== 'undefined' && navigator.onLine ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-tight">
+                  {typeof window !== 'undefined' && navigator.onLine ? 'Live' : 'Offline'}
+                </span>
+              </div>
+            </div>
             <p className="text-(--text-muted) text-sm mt-1">
               {orders.length} active orders
             </p>
