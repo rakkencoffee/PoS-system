@@ -109,7 +109,7 @@ Pada audit sebelumnya, tercatat penggunaan React Context. Saat ini seluruh codeb
 | `lib/olsera-sync.ts` | ✅ | `src/lib/integrations/olsera-sync.ts` |
 | POS Adapter layer | ✅ | `src/lib/integrations/pos.adapter.ts` (14KB) — abstraksi tambahan |
 | Job: sync-products (QStash) | ✅ | `src/app/api/jobs/sync-products/route.ts` |
-| Webhook: `/api/webhooks/olsera` | ✅ | `src/app/api/webhooks/olsera/route.ts` |
+| Webhook: `/api/webhooks/olsera` | ✅ | `src/app/api/webhooks/olsera/route.ts` — **100% Verified via Olsera Portal** |
 | `product_cache` terisi dari Olsera | ✅ | Data tampil di `/menu` |
 | `GET /api/products` | ✅ | `src/app/api/products/route.ts` |
 | Generator Order ID (#A001) | ✅ | `src/lib/order-id.ts` (Redis atomic + fallback) |

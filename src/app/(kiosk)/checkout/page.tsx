@@ -4,6 +4,8 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCartStore } from '@/stores/useCartStore';
 import { useCreateOrder, useValidateVoucher, usePaymentConfig } from '@/hooks/useOrders';
+import { db } from '@/lib/dexie';
+import * as Sentry from "@sentry/nextjs";
 
 declare global {
   interface Window {
@@ -139,6 +141,50 @@ export default function CheckoutPage() {
       }
     } catch (error: any) {
       console.error('Checkout error:', error);
+      
+      // Check if it's a network error (offline)
+      const isNetworkError = error.name === 'TypeError' && 
+                             (error.message.includes('fetch') || error.message.includes('NetworkError'));
+      
+      if (isNetworkError || !navigator.onLine) {
+        try {
+          const orderPayload = {
+            orderId: `OFFLINE-${Date.now()}`,
+            items: items.map((item) => ({
+              productId: String(item.menuItemId),
+              name: item.name,
+              price: item.subtotal / item.quantity,
+              quantity: item.quantity,
+              variantId: item.olseraVariantId ? String(item.olseraVariantId) : undefined,
+              notes: item.notes,
+              options: {
+                size: item.size,
+                sugarLevel: item.sugarLevel,
+                iceLevel: item.iceLevel,
+                extraShot: item.extraShot,
+                toppings: item.toppings.map(t => t.id)
+              }
+            })),
+            customerName: customerName,
+            totalAmount: total,
+            createdAt: new Date().toISOString(),
+            status: 'pending' as const
+          };
+
+          await db.pendingOrders.add(orderPayload);
+          
+          setPaymentStatus('Order saved offline!');
+          clearCart();
+          
+          // Redirect to success with offline flag
+          router.push(`/success?orderId=${orderPayload.orderId}&offline=true`);
+          return;
+        } catch (dexieError) {
+          console.error('Failed to save to Dexie:', dexieError);
+          Sentry.captureException(dexieError);
+        }
+      }
+
       alert('Failed to process checkout: ' + error.message);
       setIsProcessing(false);
       checkoutInProgress.current = false;

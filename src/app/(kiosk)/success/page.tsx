@@ -13,23 +13,24 @@ function SuccessContent() {
   const transactionStatus = searchParams.get('transaction_status');
   
   // Extract queue: either from explicit param or from order ID (last 3 digits)
+  const isOffline = searchParams.get('offline') === 'true';
   const rawQueue = searchParams.get('queue');
   const queue = rawQueue || (() => {
     if (!orderId) return '123';
     
-    const numericId = orderId.replace('OLSERA-', '').replace(/[^0-9]/g, '');
+    const numericId = orderId.replace('OLSERA-', '').replace(/OFFLINE-/, '').replace(/[^0-9]/g, '');
     if (!numericId) return '123';
     
     return numericId.length > 3 ? numericId.slice(-3) : numericId;
   })();
   
-  const [countdown, setCountdown] = useState(15);
+  const [countdown, setCountdown] = useState(isOffline ? 30 : 15);
   const [orderData, setOrderData] = useState<any>(null);
   const hasPrinted = useRef(false);
 
   // Auto-verify payment & Fetch order detail for receipt
   useEffect(() => {
-    if (orderId) {
+    if (orderId && !isOffline) {
       // 1. Fetch order details for the receipt
       fetch(`/api/orders/${orderId}`)
         .then(res => res.json())
@@ -93,20 +94,32 @@ function SuccessContent() {
         {/* Success Animation */}
         <div className="mb-8 animate-scale-in">
           <div className="relative inline-block">
-            <div className="w-28 h-28 rounded-full bg-linear-to-r from-green-500 to-emerald-500 flex items-center justify-center mx-auto shadow-2xl shadow-green-500/30">
+            <div className={`w-28 h-28 rounded-full flex items-center justify-center mx-auto shadow-2xl ${
+              isOffline 
+                ? 'bg-linear-to-r from-amber-500 to-orange-500 shadow-amber-500/30' 
+                : 'bg-linear-to-r from-green-500 to-emerald-500 shadow-green-500/30'
+            }`}>
               <svg className="w-14 h-14 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                {isOffline ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                )}
               </svg>
             </div>
-            <div className="absolute -inset-4 rounded-full bg-green-500/20 blur-xl animate-pulse" />
+            <div className={`absolute -inset-4 rounded-full blur-xl animate-pulse ${
+              isOffline ? 'bg-amber-500/20' : 'bg-green-500/20'
+            }`} />
           </div>
         </div>
 
         <h1 className="text-3xl font-bold text-(--text-primary) mb-2 animate-fade-in-up">
-          Payment Successful!
+          {isOffline ? 'Order Queued Offline' : 'Payment Successful!'}
         </h1>
-        <p className="text-(--text-muted) mb-8 animate-fade-in delay-1">
-          Your order has been placed
+        <p className="text-(--text-muted) mb-8 animate-fade-in delay-1 text-sm">
+          {isOffline 
+            ? 'We saved your order locally. It will be sent to the kitchen as soon as internet is restored.' 
+            : 'Your order has been placed and sent to the kitchen.'}
         </p>
 
         {/* Queue Number */}
@@ -144,21 +157,24 @@ function SuccessContent() {
 
         {/* Buttons */}
         <div className="space-y-3 animate-fade-in delay-4" style={{ opacity: 0 }}>
-          <button
-            onClick={handlePrint}
-            className="w-full py-4 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold flex items-center justify-center gap-3 transition-all active:scale-95 border border-white/10"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-            </svg>
-            🧾 Cetak Struk
-          </button>
+          {!isOffline && (
+            <button
+              onClick={handlePrint}
+              className="w-full py-4 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold flex items-center justify-center gap-3 transition-all active:scale-95 border border-white/10"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+              </svg>
+              🧾 Cetak Struk
+            </button>
+          )}
           
           <button
-            onClick={() => router.push(`/status?orderId=${orderId}`)}
-            className="btn-primary w-full"
+            onClick={() => !isOffline && router.push(`/status?orderId=${orderId}`)}
+            disabled={isOffline}
+            className="btn-primary w-full disabled:opacity-50 disabled:grayscale"
           >
-            Track My Order
+            {isOffline ? 'Tracking Unavailable (Offline)' : 'Track My Order'}
           </button>
           <button
             onClick={() => router.push('/')}
