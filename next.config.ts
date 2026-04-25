@@ -37,7 +37,7 @@ export default withSentryConfig(nextConfig, {
   // https://vercel.com/docs/cron-jobs
   automaticVercelMonitors: true,
 
-  // Note: tunnelRoute is currently disabled due to Turbopack 404 issues in v8. 
-  // Next.js rewrites for Sentry Tunnel are not yet fully supported in Turbopack.
-  // tunnelRoute: "/sentry-tunnel",
+  // Note: Re-enabling tunnelRoute to bypass DNS blocking (ERR_NAME_NOT_RESOLVED)
+  // Next.js rewrites for Sentry Tunnel are now placed correctly in SDK options
+  tunnelRoute: "/sentry-tunnel",
 });

@@ -14,6 +14,6 @@ Sentry.init({
   replaysOnErrorSampleRate: 0,
   replaysSessionSampleRate: 0,
 
-  // Note: tunnel is temporarily disabled to resolve 404 issues with Turbopack builds
-  // tunnel: "/sentry-tunnel",
+  // Use the tunnel route to circumvent ad-blockers and DNS filters
+  tunnel: "/sentry-tunnel",
 });

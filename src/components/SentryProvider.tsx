@@ -17,6 +17,7 @@ export default function SentryProvider({ children }: { children: React.ReactNode
         tracesSampleRate: 1.0,
         replaysOnErrorSampleRate: 0,
         replaysSessionSampleRate: 0,
+        tunnel: "/sentry-tunnel",
       });
     }
   }, []);
