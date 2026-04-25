@@ -1,0 +1,33 @@
+{
+  "name": "Rakken Coffee POS",
+  "short_name": "Rakken POS",
+  "description": "Premium Self-Service Kiosk for Rakken Coffee",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#A8131E",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "orientation": "landscape",
+  "categories": ["food", "productivity"],
+  "screenshots": [
+    {
+      "src": "/screenshots/menu.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "label": "Menu Page"
+    }
+  ]
+}
