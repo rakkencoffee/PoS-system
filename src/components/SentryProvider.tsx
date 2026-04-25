@@ -23,6 +23,13 @@ export default function SentryProvider({ children }: { children: React.ReactNode
           Sentry.consoleLoggingIntegration({ levels: ["log", "warn", "error"] }),
         ],
       });
+
+      // Pancingan: Kirim log pertama untuk membuka dashboard Sentry Logs
+      console.log('[Sentry] System check: Logging integration is now active.');
+      Sentry.logger.info('POS System Sentry Logs Activated', { 
+        log_source: 'sentry_init_pancingan',
+        environment: process.env.NODE_ENV 
+      });
     }
   }, []);
 
