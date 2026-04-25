@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/db';
+import { pusherServer } from '@/lib/pusher';
 
 /**
  * Olsera Webhook Receiver
@@ -15,36 +17,70 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}));
 
     console.log(`[Olsera Webhook] [${timestamp}] Received event`);
-    console.log(`[Olsera Webhook] Headers:`, {
-      'x-olsera-event': headers['x-olsera-event'],
-      'x-olsera-signature': headers['x-olsera-signature'] ? '***PRESENT***' : 'MISSING'
-    });
-    console.log(`[Olsera Webhook] Payload:`, JSON.stringify(body, null, 2));
+    const event = headers['x-olsera-event'] || body.flag_webhook || body.event;
 
-    const event = headers['x-olsera-event'];
+    // Handle Order Status Updates (Matches Olsera Documentation Exactly)
+    // Ref: https://docs-api-open.olsera.co.id/documentation/webhook/open-order-update-status
+    if (event === 'openOrderUpdateStatus' || event === 'order.status_updated' || body.openorder_id || body.order_id) {
+      const orderId = body.openorder_id || body.order_id;
+      const olseraStatus = body.status; // 'P', 'A', 'Z', 'C', etc.
+      
+      console.log(`[Olsera Webhook] Order ${orderId} updated to status: ${olseraStatus} via ${event}`);
 
-    // Handle specific events
-    switch (event) {
-      case 'product.updated':
-        console.log(`[Olsera Webhook] Handling product update for SKU: ${body.sku || 'unknown'}`);
-        // Action: Invalidate cache or update DB (Sprint 2 integration)
-        break;
-      case 'stock.updated':
-        console.log(`[Olsera Webhook] Handling stock update`);
-        break;
-      default:
-        console.log(`[Olsera Webhook] Event ${event} received but not specifically handled.`);
+      // Map Olsera status to our OrderStatus enum
+      const statusMap: Record<string, any> = {
+        'P': 'PENDING',
+        'A': 'PREPARING',
+        'Z': 'COMPLETED',
+        'C': 'CANCELLED',
+        'X': 'CANCELLED',
+        'S': 'READY'
+      };
+
+      const newStatus = statusMap[olseraStatus];
+
+      if (newStatus && orderId) {
+        const localOrderId = `OLSERA-${orderId}`;
+
+        // 1. Update local database
+        try {
+          await prisma.order.update({
+            where: { id: localOrderId },
+            data: { status: newStatus }
+          });
+          console.log(`[Olsera Webhook] Local order ${localOrderId} synced to ${newStatus}`);
+        } catch (dbErr) {
+          console.warn(`[Olsera Webhook] Order ${localOrderId} not found in local DB, skipping sync.`);
+        }
+
+        // 2. Broadcast to Kitchen (KDS)
+        await pusherServer.trigger('kitchen', 'ORDER_UPDATED', {
+          orderId: localOrderId,
+          status: newStatus
+        });
+
+        // 3. Broadcast to Admin Reports
+        await pusherServer.trigger('admin-reports', 'SALES_UPDATED', {
+          orderId: localOrderId,
+          status: newStatus
+        });
+      }
+    }
+
+    // Handle Product Updates (Menu Refresh)
+    if (event === 'product.updated') {
+      console.log(`[Olsera Webhook] Product updated. Invalidating local cache...`);
+      // Future: Trigger revalidation of /menu tags or Pusher signal to kiosks
     }
 
     return NextResponse.json({ 
       success: true, 
-      message: 'Event received and logged',
+      message: 'Event processed',
       receivedAt: timestamp
     }, { status: 200 });
 
   } catch (err: any) {
-    console.error(`[Olsera Webhook] [${timestamp}] Error tracking webhook:`, err.message);
-    // Always return 200 during initial setup to keep Olsera happy
+    console.error(`[Olsera Webhook] [${timestamp}] Error:`, err.message);
     return NextResponse.json({ success: true, error: 'Partial processing error' }, { status: 200 });
   }
 }
@@ -52,8 +88,6 @@ export async function POST(req: Request) {
 export async function GET() {
   return NextResponse.json({ 
     status: 'active',
-    service: 'Rakken POS Connector',
-    endpoint: '/api/webhooks/olsera',
-    documentation: 'https://developer.olsera.com/webhooks'
+    endpoint: '/api/webhooks/olsera'
   }, { status: 200 });
 }

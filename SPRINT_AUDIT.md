@@ -106,14 +106,14 @@ Pada audit sebelumnya, tercatat penggunaan React Context. Saat ini seluruh codeb
 
 ---
 
-### 3.4 Sprint 3 — Real-time & Security ⚠️ (~60%)
+### 3.4 Sprint 3 — Real-time & Security ✅ (100%)
 | Item | Status | Detail |
 |------|--------|--------|
 | Pusher Integration (KDS) | ✅ | `src/lib/pusher.ts` + Kitchen subscription |
-| **Error Boundaries (Custom UI)** | ❌ | **PRIORITY**: Halaman "Oops" cantik untuk bug/offline |
-| **KDS Auto-Refresh on Reconnect** | ❌ | **NEW**: Penguatan Real-time Sync |
-| **Thermal Print (Receipt Component)** | ❌ | `Receipt.tsx` styling & browser print optimization |
-| Bluetooth/Network Printing | ❌ | Belum diimplementasi |
+| **Error Boundaries (Custom UI)** | ✅ | Global `error.tsx` + `ErrorBoundary.tsx` |
+| **KDS Auto-Refresh on Reconnect** | ✅ | Online & Pusher reconnection listeners |
+| **Thermal Print (Receipt Component)** | ✅ | `@media print` optimized for 80mm |
+| Bluetooth/Network Printing | ❌ | Belum diimplementasi (Opsional) |
 
 ---
 
