@@ -10,6 +10,12 @@ Sentry.init({
 
   tracesSampleRate: 1.0,
 
+  // Enable Logs for better debug visibility
+  enableLogs: true,
+  integrations: [
+    Sentry.consoleLoggingIntegration({ levels: ["log", "warn", "error"] }),
+  ],
+
   // Temporarily disable Replay to ensure basic error reporting is stable
   replaysOnErrorSampleRate: 0,
   replaysSessionSampleRate: 0,

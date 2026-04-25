@@ -101,7 +101,7 @@ Pada audit sebelumnya, tercatat penggunaan React Context. Saat ini seluruh codeb
 
 ---
 
-### 3.3 Sprint 2 — Integrasi Olsera + Core POS ⚠️ (~90%)
+### 3.3 Sprint 2 — Integrasi Olsera + Core POS ✅ (95%)
 
 | Item | Status | File/Detail |
 |------|--------|-------------|
@@ -114,10 +114,8 @@ Pada audit sebelumnya, tercatat penggunaan React Context. Saat ini seluruh codeb
 | `GET /api/products` | ✅ | `src/app/api/products/route.ts` |
 | Generator Order ID (#A001) | ✅ | `src/lib/order-id.ts` (Redis atomic + fallback) |
 | `POST /api/orders` | ✅ | `src/app/api/orders/route.ts` |
-| **UI: Layout POS (cashier)** | ❌ | **Diganti kiosk layout** |
-| **UI: Station selector (A/B/C)** | ❌ | **Tidak ada** (paradigma berubah) |
-| **Zustand: cart + station store** | Zustand persist | ✅ **Sudah diterapkan** (useCartStore) | ✅ |
-| **Offline mode (Dexie.js)** | 🚧 | `src/lib/db.ts` (In Progress) |
+| **Offline mode (Dexie.js)** | ✅ | `src/lib/dexie.ts` + `useMenu` Fallback Integrated |
+| **Sentry Monitoring** | ✅ | Full-stack active (Tunnel + Manual Init) |
 | **PWA Manifest** | ❌ | Required for tablet install |
 
 **Yang BELUM ada di Sprint 2:**

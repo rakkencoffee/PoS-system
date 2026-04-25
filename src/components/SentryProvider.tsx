@@ -18,6 +18,10 @@ export default function SentryProvider({ children }: { children: React.ReactNode
         replaysOnErrorSampleRate: 0,
         replaysSessionSampleRate: 0,
         tunnel: "/sentry-tunnel",
+        enableLogs: true,
+        integrations: [
+          Sentry.consoleLoggingIntegration({ levels: ["log", "warn", "error"] }),
+        ],
       });
     }
   }, []);
