@@ -1,7 +1,7 @@
 # SPRINT_AUDIT.md — POS Rakken Coffee
 
 > Dokumen audit progress sprint untuk referensi AI dan developer.
-> **Terakhir diupdate:** 25 April 2026
+> **Terakhir diupdate:** 28 April 2026
 > **Arsitektur:** Pilihan A — Olsera Native
 > **Referensi utama:** `PLAN.md`
 
@@ -12,7 +12,7 @@
 | Key | Value |
 |-----|-------|
 | **Nama** | POS System — Rakken Coffee (StartFriday) |
-| **Framework** | Next.js 16.1.6 (App Router) |
+| **Framework** | Next.js 15.1.6 (App Router) |
 | **Language** | TypeScript |
 | **Styling** | Tailwind CSS v4 |
 | **Database** | Neon PostgreSQL (Prisma ORM v6) |
@@ -70,8 +70,8 @@ Pada audit sebelumnya, tercatat penggunaan React Context. Saat ini seluruh codeb
 | Input semua produk menu | ✅ | 6 kategori: Coffee Based, Milk Based, Main Course, Dessert, Snack, Refreshment |
 | Setup kategori produk | ✅ | Terkonfirmasi dari API response |
 | Dapatkan API Token | ✅ | Di `.env` sebagai `OLSERA_CLIENT_ID` + `OLSERA_SECRET_KEY` |
-| Catat format respons API | ✅ | Adapter lengkap di `olsera.service.ts` (28KB) |
-| Konfigurasi webhook Olsera | ✅ | Endpoint `/api/webhooks/olsera` ditingkatkan dengan diagnostic logs & event handling |
+| Catat format respons API | ✅ | Adapter lengkap di `olsera.service.ts` |
+| Konfigurasi webhook Olsera | ✅ | **100% Synchronized** with `openOrderUpdateStatus` spec |
 
 ---
 
@@ -79,7 +79,7 @@ Pada audit sebelumnya, tercatat penggunaan React Context. Saat ini seluruh codeb
 
 | Item | Status | File/Detail |
 |------|--------|-------------|
-| Next.js + TypeScript + Tailwind | ✅ | Next.js **16.1.6** |
+| Next.js + TypeScript + Tailwind | ✅ | Next.js **15.1.6** |
 | Neon DB + Prisma schema + migration | ✅ | `prisma/schema.prisma` |
 | Upstash Redis | ✅ | `src/lib/redis.ts` |
 | Upstash QStash | ✅ | `src/lib/qstash.ts` |
@@ -94,15 +94,12 @@ Pada audit sebelumnya, tercatat penggunaan React Context. Saat ini seluruh codeb
 | Item | Status | File/Detail |
 |------|--------|-------------|
 | `lib/olsera.ts` adapter | ✅ | `src/lib/integrations/olsera.service.ts` |
-| Webhook: `/api/webhooks/olsera` | ✅ | **100% Verified via Olsera Portal** |
+| Webhook: `/api/webhooks/olsera` | ✅ | **Verified with Olsera standard** |
 | Generator Order ID (#A001) | ✅ | `src/lib/order-id.ts` |
 | **Offline mode (Dexie.js)** | ✅ | `src/lib/dexie.ts` + `OfflineSyncProvider` |
 | **Offline Fallback Checkout** | ✅ | Pesanan disimpan ke Dexie saat internet mati |
 | **PWA Manifest + Service Worker** | ✅ | `@ducanh2912/next-pwa` (Anti-Dino Page) |
 | **Payment Gateway** | ✅ | Midtrans Snap (Sandbox/Production) |
-
-**Yang BELUM ada di Sprint 2:**
-- (Semua item inti Sprint 2 telah selesai)
 
 ---
 
@@ -113,7 +110,7 @@ Pada audit sebelumnya, tercatat penggunaan React Context. Saat ini seluruh codeb
 | **Error Boundaries (Custom UI)** | ✅ | Global `error.tsx` + `ErrorBoundary.tsx` |
 | **KDS Auto-Refresh on Reconnect** | ✅ | Online & Pusher reconnection listeners |
 | **Thermal Print (Receipt Component)** | ✅ | `@media print` optimized for 80mm |
-| Bluetooth/Network Printing | ❌ | Belum diimplementasi (Opsional) |
+| Bluetooth/Network Printing | ⏳ | Under discussion (Browser print ready) |
 
 ---
 

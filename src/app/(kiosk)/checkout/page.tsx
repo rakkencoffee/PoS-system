@@ -130,6 +130,8 @@ export default function CheckoutPage() {
             toppings: item.toppings.map(t => t.id)
           }
         })),
+        totalAmount: subtotal,
+        discountAmount: appliedDiscount,
         customerName: customerName,
         voucherCode: appliedDiscount > 0 ? voucherCode : undefined
       });
