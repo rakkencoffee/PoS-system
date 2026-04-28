@@ -14,9 +14,32 @@ export async function GET(request: NextRequest) {
       let orders: any[] = [];
       try {
         // Use consolidated fetching if 'today' is requested, otherwise fallback to open orders
-        const rawData = today === 'true' 
+        let rawOrders = today === 'true' 
           ? await olsera.getAllOrders({ today: true })
           : await olsera.olseraFetch('/order/openorder?per_page=50').then(res => res.json().then(d => d.data || d || []));
+
+        if (!Array.isArray(rawOrders)) rawOrders = [];
+
+        // HANYA ambil order yang belum selesai untuk di-fetch detailnya 
+        // (KDS butuh items, list API Olsera tidak mengembalikan items)
+        const activeOrders = rawOrders.filter(o => {
+          const s = (o.status || '').toUpperCase();
+          return s !== 'Z' && s !== 'T' && s !== 'COMPLETED'; // Filter out completed
+        });
+
+        // Fetch detail secara paralel (maks 10-20 order biasanya di KDS)
+        const detailedOrders = await Promise.all(
+          activeOrders.map(async (o) => {
+            try {
+              return await olsera.getOrderDetail(o.id || o.order_id);
+            } catch (err) {
+              console.warn(`Failed to fetch detail for order ${o.id}:`, err);
+              return o; // Fallback to raw if detail fails
+            }
+          })
+        );
+
+        const rawData = detailedOrders;
 
         // Normalize orders to match frontend format
         orders = (Array.isArray(rawData) ? rawData : []).map((order: any) => {

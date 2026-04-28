@@ -89,6 +89,16 @@ export async function POST(request: NextRequest) {
     // Agar barista langsung lihat order baru tanpa menunggu Midtrans webhook
     try {
       const { pusherServer } = await import('@/lib/pusher');
+      
+      const coffeeKeywords = ['coffee', 'kopi', 'espresso', 'latte', 'cappuccino', 'americano', 'mocha', 'macchiato', 'v60', 'affogato'];
+      const coffeeCategories = ['coffee-based', 'coffee based', 'milk-based', 'milk based'];
+      
+      const isCoffeeOrder = items.some((item: any) => {
+        const itemName = (item.name || '').toLowerCase();
+        const catName = (item.categoryName || item.group_name || item.product_group_name || '').toLowerCase();
+        return coffeeCategories.some(c => catName.includes(c)) || coffeeKeywords.some(k => itemName.includes(k));
+      });
+
       await pusherServer.trigger('kitchen', 'ORDER_CREATED', {
         order: {
           id: dbOrderId || orderId,
@@ -99,11 +109,13 @@ export async function POST(request: NextRequest) {
           totalAmount: finalGrossAmount,
           paymentMethod: 'MIDTRANS',
           createdAt: new Date().toISOString(),
+          isCoffeeOrder,
           items: items.map((item: any, idx: number) => ({
             id: idx,
             menuItem: { name: item.name || 'Item' },
             quantity: item.quantity || 1,
             size: item.variantName || '-',
+            categoryName: item.categoryName || item.group_name || item.product_group_name || '',
           })),
         },
       });
