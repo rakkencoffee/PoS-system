@@ -262,7 +262,7 @@ export async function createOrder(
         data: {
           id: `OLSERA-${orderId}`,
           stationId: 'KIOSK', // Kiosk self-service
-          cashierId: 'clw1234567890', // Placeholder or system user
+          cashierId: 'cmo83g6140000vq5g10u03858', // Valid system user for Kiosk sync
           total: items.reduce((acc, item) => acc + ((item.price || 0) * item.quantity), 0),
           status: 'PENDING',
           items: {
