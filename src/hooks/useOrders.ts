@@ -9,7 +9,7 @@ export function useKitchenOrders() {
       const data = await res.json();
       return Array.isArray(data) ? data.filter((o: any) => o.status !== 'COMPLETED') : [];
     },
-    refetchInterval: 60000, 
+    refetchInterval: 10000, // 10 detik polling sebagai backup jika Pusher miss
   });
 }
 

@@ -85,8 +85,32 @@ export async function POST(request: NextRequest) {
       items: midtransItems,
     });
 
-    // 3. Auto-settlement logic removed to prevent premature KDS appearance.
-    // Orders will now only be marked as paid via the Midtrans webhook or manual verification.
+    // 4. Broadcast ke Kitchen Display (KDS) via Pusher — IMMEDIATELY
+    // Agar barista langsung lihat order baru tanpa menunggu Midtrans webhook
+    try {
+      const { pusherServer } = await import('@/lib/pusher');
+      await pusherServer.trigger('kitchen', 'ORDER_CREATED', {
+        order: {
+          id: dbOrderId || orderId,
+          queueNumber: dbOrderId?.startsWith('OLSERA-') 
+            ? parseInt(dbOrderId.replace('OLSERA-', '')) % 1000 
+            : Math.floor(Math.random() * 900) + 100,
+          status: 'PENDING',
+          totalAmount: finalGrossAmount,
+          paymentMethod: 'MIDTRANS',
+          createdAt: new Date().toISOString(),
+          items: items.map((item: any, idx: number) => ({
+            id: idx,
+            menuItem: { name: item.name || 'Item' },
+            quantity: item.quantity || 1,
+            size: item.variantName || '-',
+          })),
+        },
+      });
+      console.log(`[Pusher] ORDER_CREATED broadcast for ${dbOrderId || orderId}`);
+    } catch (pusherErr) {
+      console.warn('[Pusher] Failed to broadcast ORDER_CREATED (non-blocking):', pusherErr);
+    }
 
     return NextResponse.json({
       snapToken: snapResult.token,
