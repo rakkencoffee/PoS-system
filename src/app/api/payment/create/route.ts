@@ -28,7 +28,8 @@ export async function POST(request: NextRequest) {
     // Generate unique order ID
     const orderId = `SF-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
 
-    // 1. Create order in POS (Olsera)
+    // 1. Create order in POS (Olsera) — NON-BLOCKING
+    // Best Practice POS: Jangan pernah gagalkan pembayaran pelanggan karena API backend error.
     let dbOrderId: string | null = null;
     try {
       const posAdapter = await import('@/lib/integrations/pos.adapter');
@@ -51,8 +52,10 @@ export async function POST(request: NextRequest) {
       }
 
     } catch (posError) {
-      console.error('CRITICAL: Could not create POS order in Olsera:', posError);
-      throw new Error('Gagal menyinkronkan pesanan dengan sistem POS. Harap coba lagi atau hubungi kasir.');
+      // RESILIENT: Jika Olsera gagal, tetap lanjutkan pembayaran dengan order ID lokal.
+      // Pesanan akan disinkronkan ke Olsera nanti via webhook atau manual reconciliation.
+      console.error('WARNING: Could not create POS order in Olsera (non-blocking):', posError);
+      dbOrderId = orderId; // Gunakan orderId lokal (SF-xxxx) sebagai fallback
     }
 
     // 2. Format Midtrans Items
