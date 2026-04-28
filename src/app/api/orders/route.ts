@@ -22,14 +22,14 @@ export async function GET(request: NextRequest) {
 
         // HANYA ambil order yang belum selesai untuk di-fetch detailnya 
         // (KDS butuh items, list API Olsera tidak mengembalikan items)
-        const activeOrders = rawOrders.filter(o => {
+        const activeOrders = rawOrders.filter((o: any) => {
           const s = (o.status || '').toUpperCase();
           return s !== 'Z' && s !== 'T' && s !== 'COMPLETED'; // Filter out completed
         });
 
         // Fetch detail secara paralel (maks 10-20 order biasanya di KDS)
         const detailedOrders = await Promise.all(
-          activeOrders.map(async (o) => {
+          activeOrders.map(async (o: any) => {
             try {
               return await olsera.getOrderDetail(o.id || o.order_id);
             } catch (err) {
