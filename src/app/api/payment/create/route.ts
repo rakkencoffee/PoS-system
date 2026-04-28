@@ -90,13 +90,12 @@ export async function POST(request: NextRequest) {
     try {
       const { pusherServer } = await import('@/lib/pusher');
       
-      const coffeeKeywords = ['coffee', 'kopi', 'espresso', 'latte', 'cappuccino', 'americano', 'mocha', 'macchiato', 'v60', 'affogato'];
-      const coffeeCategories = ['coffee-based', 'coffee based', 'milk-based', 'milk based'];
+      // Deteksi HANYA berdasarkan kategori
+      const coffeeCategories = ['coffee-based', 'coffee based', 'milk-based', 'milk based', 'coffee', 'kopi'];
       
       const isCoffeeOrder = items.some((item: any) => {
-        const itemName = (item.name || '').toLowerCase();
-        const catName = (item.categoryName || item.group_name || item.product_group_name || '').toLowerCase();
-        return coffeeCategories.some(c => catName.includes(c)) || coffeeKeywords.some(k => itemName.includes(k));
+        const catName = (item.category || item.categoryName || item.group_name || item.product_group_name || '').toLowerCase();
+        return coffeeCategories.some(c => catName.includes(c));
       });
 
       await pusherServer.trigger('kitchen', 'ORDER_CREATED', {

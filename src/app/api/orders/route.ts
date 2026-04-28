@@ -118,15 +118,12 @@ export async function GET(request: NextRequest) {
               };
             });
 
-          // Deteksi apakah order mengandung item coffee/milk-based
-          const coffeeKeywords = ['coffee', 'kopi', 'espresso', 'latte', 'cappuccino', 'americano', 'mocha', 'macchiato', 'v60', 'affogato'];
-          const coffeeCategories = ['coffee-based', 'coffee based', 'milk-based', 'milk based'];
+          // Deteksi HANYA berdasarkan kategori, jangan nama menu
+          const coffeeCategories = ['coffee-based', 'coffee based', 'milk-based', 'milk based', 'coffee', 'kopi'];
           
           const isCoffeeOrder = orderItems.some((item: any) => {
-            const itemName = (item.menuItem?.name || '').toLowerCase();
             const catName = (item.categoryName || '').toLowerCase();
-            return coffeeCategories.some(c => catName.includes(c)) 
-              || coffeeKeywords.some(k => itemName.includes(k));
+            return coffeeCategories.some(c => catName.includes(c));
           });
 
           return {

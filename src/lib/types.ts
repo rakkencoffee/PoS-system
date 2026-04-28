@@ -15,6 +15,7 @@ export interface CartItem {
   toppings: { id: number; name: string; price: number }[];
   subtotal: number;
   notes?: string;
+  category?: string;
 }
 
 export interface CartState {
