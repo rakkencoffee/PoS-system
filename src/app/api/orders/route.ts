@@ -53,14 +53,7 @@ export async function GET(request: NextRequest) {
             createdAtStr = order.created_at || new Date().toISOString();
           }
 
-          return {
-            id: `OLSERA-${numericId}`,
-            queueNumber: numericId % 1000,
-            status: kdsStatus,
-            totalAmount: Number(order.total || order.total_amount || order.grand_total || 0),
-            paymentMethod: pMethod,
-            createdAt: createdAtStr,
-            items: (order.items || order.orderitems || order.order_items || []).map((item: any, idx: number) => {
+          const orderItems = (order.items || order.orderitems || order.order_items || []).map((item: any, idx: number) => {
               const rawNote = item.note || item.notes || '';
               let sugarLevel = 'normal';
               let iceLevel = 'normal';
@@ -76,13 +69,17 @@ export async function GET(request: NextRequest) {
                 });
               }
 
-              // Variant/size: try multiple fields. Olsera list API often
-              // doesn't return variant_name, so also check variant object.
               let size = item.variant_name
                 || item.product_variant_name
                 || item.variant?.name
                 || item.size
                 || '-';
+
+              const categoryName = item.product_group_name 
+                || item.klasifikasi 
+                || item.category_name 
+                || item.group_name 
+                || '';
 
               return {
                 id: idx,
@@ -94,8 +91,30 @@ export async function GET(request: NextRequest) {
                 extraShot: isExtraShot,
                 notes: rawNote,
                 subtotal: Number(item.price || 0),
+                categoryName,
               };
-            }),
+            });
+
+          // Deteksi apakah order mengandung item coffee/milk-based
+          const coffeeKeywords = ['coffee', 'kopi', 'espresso', 'latte', 'cappuccino', 'americano', 'mocha', 'macchiato', 'v60', 'affogato'];
+          const coffeeCategories = ['coffee-based', 'coffee based', 'milk-based', 'milk based'];
+          
+          const isCoffeeOrder = orderItems.some((item: any) => {
+            const itemName = (item.menuItem?.name || '').toLowerCase();
+            const catName = (item.categoryName || '').toLowerCase();
+            return coffeeCategories.some(c => catName.includes(c)) 
+              || coffeeKeywords.some(k => itemName.includes(k));
+          });
+
+          return {
+            id: `OLSERA-${numericId}`,
+            queueNumber: numericId % 1000,
+            status: kdsStatus,
+            totalAmount: Number(order.total || order.total_amount || order.grand_total || 0),
+            paymentMethod: pMethod,
+            createdAt: createdAtStr,
+            isCoffeeOrder,
+            items: orderItems,
           };
         });
 

@@ -34,6 +34,7 @@ export interface OrderData {
   totalAmount: number;
   paymentMethod?: string;
   createdAt: string;
+  isCoffeeOrder?: boolean;
   items: {
     id: number | string;
     menuItem: { name: string };
@@ -45,6 +46,7 @@ export interface OrderData {
     subtotal?: number;
     notes?: string;
     toppings?: { topping: { name: string } }[];
+    categoryName?: string;
   }[];
 }
 

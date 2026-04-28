@@ -79,12 +79,18 @@ export default function KitchenPage() {
     PREPARING: 'border-blue-500/30 bg-blue-500/5',
   };
 
-  const pendingOrders = orders.filter((o: any) => o.status === 'PENDING');
-  const preparingOrders = orders.filter((o: any) => o.status === 'PREPARING');
-
   const formatTime = (dateStr: string) => {
     return new Date(dateStr).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
   };
+
+  // ═══ SORTING: Coffee orders selalu di atas ═══
+  const coffeeOrders = orders.filter((o: any) => o.isCoffeeOrder);
+  const foodOrders = orders.filter((o: any) => !o.isCoffeeOrder);
+
+  const coffeeOrdersPending = coffeeOrders.filter((o: any) => o.status === 'PENDING');
+  const coffeeOrdersPreparing = coffeeOrders.filter((o: any) => o.status === 'PREPARING');
+  const foodOrdersPending = foodOrders.filter((o: any) => o.status === 'PENDING');
+  const foodOrdersPreparing = foodOrders.filter((o: any) => o.status === 'PREPARING');
 
   if (loading) {
     return (
@@ -97,10 +103,14 @@ export default function KitchenPage() {
     );
   }
 
-  const renderOrderCard = (order: OrderData) => (
+  const renderOrderCard = (order: OrderData & { _isCoffee?: boolean }) => (
     <div
       key={order.id}
-      className={`rounded-2xl border-2 p-5 transition-all animate-fade-in ${statusBg[order.status] || ''}`}
+      className={`rounded-2xl border-2 p-5 transition-all animate-fade-in ${
+        order._isCoffee
+          ? 'border-amber-500/40 bg-amber-500/5'
+          : statusBg[order.status] || ''
+      }`}
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
@@ -109,11 +119,18 @@ export default function KitchenPage() {
             #{order.queueNumber}
           </span>
           <div>
-            <span className={`badge text-[10px] ${
-              order.status === 'PENDING' ? 'badge-status-pending' : 'badge-status-preparing'
-            }`}>
-              {order.status}
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className={`badge text-[10px] ${
+                order.status === 'PENDING' ? 'badge-status-pending' : 'badge-status-preparing'
+              }`}>
+                {order.status}
+              </span>
+              {order._isCoffee && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
+                  ☕ COFFEE
+                </span>
+              )}
+            </div>
             <p className="text-xs text-(--text-muted) mt-0.5">{formatTime(order.createdAt)}</p>
           </div>
         </div>
@@ -231,32 +248,114 @@ export default function KitchenPage() {
           <p className="text-(--text-muted)">Waiting for new orders...</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Pending */}
-          <div>
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-3 h-3 rounded-full bg-yellow-500 animate-pulse" />
-              <h2 className="text-lg font-semibold text-yellow-400">
-                Pending ({pendingOrders.length})
-              </h2>
-            </div>
-            <div className="space-y-4">
-              {pendingOrders.map(renderOrderCard)}
-            </div>
-          </div>
+        <div className="space-y-6">
+          {/* ═══ COFFEE SECTION ═══ */}
+          {(coffeeOrdersPending.length > 0 || coffeeOrdersPreparing.length > 0) && (
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-900/40 border border-amber-500/30">
+                  <span className="text-2xl">☕</span>
+                  <h2 className="text-lg font-bold text-amber-300 uppercase tracking-wide">Barista Station — Coffee & Drinks</h2>
+                </div>
+                <div className="flex-1 h-px bg-amber-500/20" />
+                <span className="text-sm text-amber-400/60 font-medium">{coffeeOrdersPending.length + coffeeOrdersPreparing.length} orders</span>
+              </div>
 
-          {/* Preparing */}
-          <div>
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-3 h-3 rounded-full bg-blue-500 animate-pulse" />
-              <h2 className="text-lg font-semibold text-blue-400">
-                Preparing ({preparingOrders.length})
-              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Coffee Pending */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-3 h-3 rounded-full bg-yellow-500 animate-pulse" />
+                    <h3 className="text-base font-semibold text-yellow-400">
+                      Pending ({coffeeOrdersPending.length})
+                    </h3>
+                  </div>
+                  <div className="space-y-4">
+                    {coffeeOrdersPending.map((o: any) => renderOrderCard({ ...o, _isCoffee: true }))}
+                    {coffeeOrdersPending.length === 0 && (
+                      <p className="text-sm text-zinc-500 italic">No pending coffee orders</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Coffee Preparing */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-3 h-3 rounded-full bg-blue-500 animate-pulse" />
+                    <h3 className="text-base font-semibold text-blue-400">
+                      Preparing ({coffeeOrdersPreparing.length})
+                    </h3>
+                  </div>
+                  <div className="space-y-4">
+                    {coffeeOrdersPreparing.map((o: any) => renderOrderCard({ ...o, _isCoffee: true }))}
+                    {coffeeOrdersPreparing.length === 0 && (
+                      <p className="text-sm text-zinc-500 italic">No coffee being prepared</p>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="space-y-4">
-              {preparingOrders.map(renderOrderCard)}
+          )}
+
+          {/* ═══ DIVIDER ═══ */}
+          {(coffeeOrdersPending.length > 0 || coffeeOrdersPreparing.length > 0) && 
+           (foodOrdersPending.length > 0 || foodOrdersPreparing.length > 0) && (
+            <div className="flex items-center gap-4 py-2">
+              <div className="flex-1 h-0.5 bg-gradient-to-r from-transparent via-zinc-600 to-transparent" />
+              <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-zinc-800 border border-zinc-700">
+                <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">▼ Food & Snacks Below ▼</span>
+              </div>
+              <div className="flex-1 h-0.5 bg-gradient-to-r from-transparent via-zinc-600 to-transparent" />
             </div>
-          </div>
+          )}
+
+          {/* ═══ FOOD / NON-COFFEE SECTION ═══ */}
+          {(foodOrdersPending.length > 0 || foodOrdersPreparing.length > 0) && (
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-900/40 border border-emerald-500/30">
+                  <span className="text-2xl">🍽️</span>
+                  <h2 className="text-lg font-bold text-emerald-300 uppercase tracking-wide">Kitchen Station — Food & Snacks</h2>
+                </div>
+                <div className="flex-1 h-px bg-emerald-500/20" />
+                <span className="text-sm text-emerald-400/60 font-medium">{foodOrdersPending.length + foodOrdersPreparing.length} orders</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Food Pending */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-3 h-3 rounded-full bg-yellow-500 animate-pulse" />
+                    <h3 className="text-base font-semibold text-yellow-400">
+                      Pending ({foodOrdersPending.length})
+                    </h3>
+                  </div>
+                  <div className="space-y-4">
+                    {foodOrdersPending.map((o: any) => renderOrderCard({ ...o, _isCoffee: false }))}
+                    {foodOrdersPending.length === 0 && (
+                      <p className="text-sm text-zinc-500 italic">No pending food orders</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Food Preparing */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-3 h-3 rounded-full bg-blue-500 animate-pulse" />
+                    <h3 className="text-base font-semibold text-blue-400">
+                      Preparing ({foodOrdersPreparing.length})
+                    </h3>
+                  </div>
+                  <div className="space-y-4">
+                    {foodOrdersPreparing.map((o: any) => renderOrderCard({ ...o, _isCoffee: false }))}
+                    {foodOrdersPreparing.length === 0 && (
+                      <p className="text-sm text-zinc-500 italic">No food being prepared</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
