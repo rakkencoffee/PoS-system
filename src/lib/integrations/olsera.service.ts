@@ -498,7 +498,10 @@ export async function createOrder(
     formData.append('customer_phone', `08123${uniqueId}`);
     formData.append('customer_type_id', '0'); // Guest type ID found from API
   } else {
+    const uniqueId = Date.now().toString().slice(-6);
     formData.append('customer_name', 'Guest');
+    formData.append('customer_email', `guest${uniqueId}@rakkencoffee.com`);
+    formData.append('customer_phone', `08100${uniqueId}`);
     formData.append('customer_type_id', '0');
   }
 
