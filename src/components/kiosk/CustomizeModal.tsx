@@ -120,7 +120,7 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
       extraShot: false,
       toppings: selectedChoices.map((t) => ({ id: t.id, name: t.name, price: t.price })),
       subtotal: totalPrice,
-      category: item.category, // Pass the category along
+      category: typeof item.category === 'string' ? item.category : item.category?.name || '', // Pass the category along
     });
     onClose();
   };
