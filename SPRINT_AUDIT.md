@@ -12,7 +12,7 @@
 | Key | Value |
 |-----|-------|
 | **Nama** | POS System — Rakken Coffee (StartFriday) |
-| **Framework** | Next.js 15.1.6 (App Router) |
+| **Framework** | Next.js 16.0.3 (App Router) |
 | **Language** | TypeScript |
 | **Styling** | Tailwind CSS v4 |
 | **Database** | Neon PostgreSQL (Prisma ORM v6) |

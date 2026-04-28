@@ -136,8 +136,8 @@ export default function CheckoutPage() {
         voucherCode: appliedDiscount > 0 ? voucherCode : undefined
       });
 
-      if (data.token) {
-        triggerSnapPopup(data.token, data.orderId, data.redirectUrl);
+      if (data.snapToken) {
+        triggerSnapPopup(data.snapToken, data.orderId, data.redirectUrl);
       } else {
         throw new Error('No payment token received');
       }
