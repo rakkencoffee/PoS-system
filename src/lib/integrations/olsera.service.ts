@@ -9,13 +9,15 @@
  * 2. Use token in Authorization header for all subsequent calls
  * 3. Endpoints use store alias in URL path: /{storeAlias}/api/open-api/v1/en/...
  *
- * DEV MODE FIX: Token is persisted to a temp file to survive Next.js HMR resets.
+ * CACHING STRATEGY (3-layer):
+ * Layer 1: In-memory (fastest ~0ms) — survives within warm Vercel container
+ * Layer 2: Upstash Redis (~5ms) — survives Vercel cold starts and container recycling
+ * Layer 3: Fresh API call (~500-2000ms) — last resort with retry + exponential backoff
+ *
  * A mutex prevents concurrent token requests that cause Olsera rate-limiting/401s.
  */
 
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
+import { redis } from '@/lib/redis';
 
 // ──────────────────────────────
 // LAZY ENV GETTERS: Read from process.env on every call.
@@ -32,16 +34,17 @@ function getEnv() {
 }
 
 // ──────────────────────────────
-// File-Based Token Cache (survives HMR in dev mode)
+// Redis-Based Token Cache (survives Vercel cold starts)
 // ──────────────────────────────
-const TOKEN_CACHE_FILE = path.join(os.tmpdir(), '.olsera_token_cache.json');
+const REDIS_TOKEN_KEY = 'olsera:access_token';
+const REDIS_TOKEN_TTL_SECONDS = 3000; // 50 minutes (token valid 1hr, 10min buffer)
 
 interface TokenCache {
   token: string;
   expiresAt: number;
 }
 
-// In-memory fast cache (primary)
+// In-memory fast cache (primary — survives within a warm container)
 let cachedToken: TokenCache | null = null;
 let cachedStoreAlias: string | null = null;
 
@@ -49,32 +52,30 @@ let cachedStoreAlias: string | null = null;
 let tokenRefreshPromise: Promise<string> | null = null;
 
 /**
- * Read token from temp file (fallback when in-memory cache is wiped by HMR)
+ * Read token from Redis (fallback when in-memory cache is empty after cold start)
  */
-function readTokenFromDisk(): TokenCache | null {
+async function readTokenFromRedis(): Promise<TokenCache | null> {
   try {
-    if (!fs.existsSync(TOKEN_CACHE_FILE)) return null;
-    const raw = fs.readFileSync(TOKEN_CACHE_FILE, 'utf-8');
-    const data = JSON.parse(raw) as TokenCache;
-    // Validate: token must exist and not be expired (with 5 min buffer)
-    if (data.token && data.expiresAt > Date.now() + 300_000) {
+    const data = await redis.get<TokenCache>(REDIS_TOKEN_KEY);
+    if (data && data.token && data.expiresAt > Date.now() + 300_000) {
       return data;
     }
     return null;
-  } catch {
+  } catch (err) {
+    console.warn('[Olsera Auth] Could not read token from Redis:', err);
     return null;
   }
 }
 
 /**
- * Write token to temp file for persistence across HMR
+ * Write token to Redis for persistence across Vercel cold starts
  */
-function writeTokenToDisk(cache: TokenCache): void {
+async function writeTokenToRedis(cache: TokenCache): Promise<void> {
   try {
-    fs.writeFileSync(TOKEN_CACHE_FILE, JSON.stringify(cache), 'utf-8');
+    await redis.set(REDIS_TOKEN_KEY, cache, { ex: REDIS_TOKEN_TTL_SECONDS });
   } catch (err) {
-    // Non-fatal: if we can't write, we just won't have disk persistence
-    console.warn('[Olsera Auth] Could not persist token to disk:', err);
+    // Non-fatal: if we can't write, we just won't have Redis persistence
+    console.warn('[Olsera Auth] Could not persist token to Redis:', err);
   }
 }
 
@@ -121,10 +122,17 @@ async function fetchNewToken(): Promise<string> {
     }
 
     try {
+      // Add explicit timeout for cold-start resilience on Vercel
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
       const res = await fetch(`${env.API_BASE}/api/open-api/v1/id/token`, {
         method: 'POST',
         body: formData,
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (res.ok) {
         const data = await res.json();
@@ -135,7 +143,8 @@ async function fetchNewToken(): Promise<string> {
             expiresAt: Date.now() + 3600_000, // 1 hour validity
           };
           cachedToken = newCache;
-          writeTokenToDisk(newCache);
+          // Persist to Redis (non-blocking — don't await to avoid slowing response)
+          writeTokenToRedis(newCache).catch(() => {});
           console.log(`[Olsera Auth] ✅ Token acquired successfully (attempt ${attempt + 1})`);
           return token;
         }
@@ -162,20 +171,20 @@ async function fetchNewToken(): Promise<string> {
 }
 
 /**
- * Get access token from Olsera API (with file cache, mutex, and retry)
+ * Get access token from Olsera API (with Redis cache, mutex, and retry)
  */
 async function getAccessToken(): Promise<string> {
-  // 1. Check in-memory cache first (fastest)
+  // 1. Check in-memory cache first (fastest — ~0ms)
   if (cachedToken && cachedToken.expiresAt > Date.now() + 300_000) {
     return cachedToken.token;
   }
 
-  // 2. Check disk cache (survives HMR in dev mode)
-  const diskCache = readTokenFromDisk();
-  if (diskCache) {
-    cachedToken = diskCache; // warm the in-memory cache
-    console.log('[Olsera Auth] 🔄 Recovered token from disk cache (survived HMR)');
-    return diskCache.token;
+  // 2. Check Redis cache (survives Vercel cold starts — ~5ms)
+  const redisCache = await readTokenFromRedis();
+  if (redisCache) {
+    cachedToken = redisCache; // warm the in-memory cache
+    console.log('[Olsera Auth] 🔄 Recovered token from Redis cache (survived cold start)');
+    return redisCache.token;
   }
 
   // 3. Need to fetch a new token — use mutex to prevent concurrent requests
@@ -239,8 +248,8 @@ export async function olseraFetch(
     if (res.status === 401 && retryCount < 2) {
       console.warn(`[Olsera API] 401 on ${path}. Invalidating token & retrying (attempt ${retryCount + 1}/2)...`);
       cachedToken = null;
-      // Also delete disk cache to force a truly fresh token
-      try { fs.unlinkSync(TOKEN_CACHE_FILE); } catch { /* ignore */ }
+      // Also delete Redis cache to force a truly fresh token
+      redis.del(REDIS_TOKEN_KEY).catch(() => {});
       // Backoff before retry
       await new Promise(r => setTimeout(r, 1000 * (retryCount + 1)));
       return olseraFetch(path, options, retryCount + 1);
