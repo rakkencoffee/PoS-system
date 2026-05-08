@@ -59,15 +59,18 @@ export interface NormalizedCategory {
 // ──────────────────────────────
 
 const CATEGORY_ICONS: Record<string, string> = {
+  'rakken-signature': '☕',
+  'rakken-style': '☕',
+  'non-coffee': '🧋',
+  'refreshment': '🍹',
+  'dessert': '🧁',
+  'bites': '🥐',
+  'main-course': '🍝',
   coffee: '☕',
   'coffee-based': '☕',
-  'non-coffee': '🧋',
   'milk-based': '🥛',
-  refreshment: '🍹',
   pastry: '🍰',
-  dessert: '🧁',
   snack: '🍿',
-  'main-course': '🍝',
   'add-ons': '✨',
   default: '📦',
 };
@@ -205,12 +208,13 @@ export async function getMenuItems(filters?: {
 export async function getCategories(): Promise<NormalizedCategory[]> {
   // Custom display order: lower number = higher priority (shown first)
   const CATEGORY_ORDER: Record<string, number> = {
-    'coffee-based': 1,
-    'milk-based': 2,
-    'main-course': 3,
-    'dessert': 4,
-    'snack': 5,
-    'refreshment': 6,
+    'rakken-signature': 1,
+    'rakken-style': 2,
+    'non-coffee': 3,
+    'refreshment': 4,
+    'dessert': 5,
+    'bites': 6,
+    'main-course': 7,
   };
 
   if (USE_OLSERA) {
@@ -416,8 +420,119 @@ export async function updateOrderPaymentStatus(
     }
     return;
   }
-  // Fallback removed
-  console.warn(`[Auto-Settlement] Order ${orderId} does not exist in Olsera POS or is unsupported. Escaping Prisma update.`);
+  // ═══════════════════════════════════════════════════════════════
+  // SYNC RECOVERY: Order SF- (Fallback) yang sudah dibayar
+  // ═══════════════════════════════════════════════════════════════
+  // Skenario: Saat checkout, Olsera API gagal → ID jadi SF-xxxx.
+  // Pelanggan tetap bayar via Midtrans → webhook masuk dengan SF-xxxx.
+  // Kita HARUS recover order ini ke Olsera agar tidak hilang.
+  if (USE_OLSERA && orderId.startsWith('SF-') && status === 'paid') {
+    console.log(`[Recovery] ⚠️ Order fallback terdeteksi: ${orderId}`);
+    console.log(`[Recovery] Attempting to create order in Olsera for reconciliation...`);
+
+    let recoveredOlseraId: string | null = null;
+
+    try {
+      // Step 1: Buat order baru di Olsera (tanpa item — hanya header)
+      // Item tidak bisa di-recovery karena data cart sudah hilang dari konteks webhook.
+      // Tapi order tetap tercatat di Olsera untuk keperluan audit/reconciliation.
+      const newOrder = await olsera.createOrder([], { 
+        customer_name: `Recovery ${orderId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 20)}` 
+      });
+      const newOlseraId = (newOrder.id || newOrder.order_id) as number;
+      recoveredOlseraId = `OLSERA-${newOlseraId}`;
+      console.log(`[Recovery] ✅ Order created in Olsera: ${recoveredOlseraId}`);
+
+      // Step 2: Settlement di Olsera (mark as paid)
+      try {
+        let paymentModeId = 1;
+        try {
+          const paymentMethods = await olsera.getPaymentMethods();
+          const targetNames = ['qris', 'midtrans', 'e-wallet', 'ewallet', 'online', 'transfer'];
+          for (const method of paymentMethods) {
+            if (targetNames.some(t => String(method.name).toLowerCase().includes(t))) {
+              paymentModeId = method.id;
+              break;
+            }
+          }
+        } catch { /* use default */ }
+
+        if (paymentAmount && paymentAmount > 0) {
+          await olsera.updateOrderPayment(newOlseraId, paymentAmount, paymentModeId);
+          await olsera.markOrderAsPaid(newOlseraId, true);
+          await olsera.updateOrderStatus(newOlseraId, 'P');
+          console.log(`[Recovery] ✅ Settlement completed for ${recoveredOlseraId}`);
+        }
+      } catch (settlementErr: any) {
+        console.warn(`[Recovery] Settlement partially failed (non-blocking): ${settlementErr.message}`);
+      }
+    } catch (recoveryErr: any) {
+      console.warn(`[Recovery] ⚠️ Could not create Olsera order (non-blocking): ${recoveryErr.message}`);
+      // Even if Olsera fails again, we still broadcast to KDS and update local DB
+    }
+
+    // Step 3: Broadcast ke KDS via Pusher — pelanggan sudah bayar, barista HARUS tahu
+    try {
+      const { pusherServer } = await import('@/lib/pusher');
+      await pusherServer.trigger('kitchen', 'ORDER_CREATED', {
+        order: {
+          id: recoveredOlseraId || orderId,
+          queueNumber: Math.floor(Math.random() * 900) + 100,
+          status: 'PENDING',
+          totalAmount: paymentAmount || 0,
+          paymentMethod: 'MIDTRANS',
+          createdAt: new Date().toISOString(),
+          items: [], // Items tidak tersedia dari webhook context
+          isRecovered: true, // Flag agar KDS tahu ini order recovery
+        },
+      });
+      console.log(`[Recovery] ✅ KDS broadcast sent for ${recoveredOlseraId || orderId}`);
+    } catch (pusherErr) {
+      console.warn('[Recovery] Pusher broadcast failed (non-blocking):', pusherErr);
+    }
+
+    // Step 4: Update database lokal
+    try {
+      const { prisma } = await import('@/lib/db');
+      // Coba update jika sudah ada
+      const existing = await prisma.order.findUnique({ where: { id: orderId } });
+      if (existing) {
+        await prisma.order.update({
+          where: { id: orderId },
+          data: { 
+            status: 'PAID',
+            olseraSynced: recoveredOlseraId !== null,
+            olseraTransactionId: recoveredOlseraId || undefined,
+          },
+        });
+        console.log(`[Recovery] ✅ Local DB updated for ${orderId}`);
+      } else {
+        // Buat record baru jika belum ada (checkout awal gagal total)
+        await prisma.order.create({
+          data: {
+            id: recoveredOlseraId || orderId,
+            stationId: 'KIOSK',
+            cashierId: 'cmo83g6140000vq5g10u03858',
+            total: paymentAmount || 0,
+            status: 'PAID',
+            paymentMethod: 'MIDTRANS',
+            olseraSynced: recoveredOlseraId !== null,
+            olseraTransactionId: recoveredOlseraId || undefined,
+            items: { create: [] },
+          },
+        });
+        console.log(`[Recovery] ✅ New local DB record created for ${recoveredOlseraId || orderId}`);
+      }
+    } catch (dbErr: any) {
+      console.warn(`[Recovery] DB update failed (non-blocking): ${dbErr.message}`);
+    }
+
+    console.log(`[Recovery] 🏁 Reconciliation complete for ${orderId} → ${recoveredOlseraId || '(local only)'}`);
+    return;
+  }
+
+  // Non-SF, Non-OLSERA orders — truly unsupported
+  console.warn(`[Auto-Settlement] Order ${orderId} is not recognized. No action taken.`);
   return;
 }
 

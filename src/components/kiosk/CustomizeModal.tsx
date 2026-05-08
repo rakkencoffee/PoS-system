@@ -43,32 +43,104 @@ function formatCurrency(amount: number): string {
 // Categories that show Optional Choice
 const OPTIONAL_CHOICE_CATEGORIES = ['coffee-based', 'milk-based'];
 
+function getMenuConfig(itemName: string, categorySlug: string) {
+  const name = itemName.toLowerCase();
+  const slug = categorySlug;
+
+  let config = {
+    showIce: false,
+    showSugar: false,
+    showMilk: false,
+    showCream: false,
+    showBeans: false,
+    showShot: false,
+    freeCream: false,
+  };
+
+  if (slug === 'rakken-signature') {
+    if (name.includes('kyoto origin')) {
+      config = { showIce: true, showSugar: true, showMilk: false, showCream: false, showBeans: true, showShot: true, freeCream: false };
+    } else if (name.includes('kyoto house blend') || name.includes('kyoto sakura latte')) {
+      config = { showIce: true, showSugar: true, showMilk: true, showCream: true, showBeans: true, showShot: true, freeCream: false };
+    } else if (name.includes('yuzu coffee')) {
+      config = { showIce: true, showSugar: true, showMilk: false, showCream: false, showBeans: true, showShot: true, freeCream: false };
+    } else if (name.includes('dirty matcha')) {
+      config = { showIce: true, showSugar: true, showMilk: true, showCream: true, showBeans: true, showShot: true, freeCream: true };
+    }
+  } else if (slug === 'rakken-style') {
+    if (name.includes('rakken house blend') || name.includes('cafe latte') || name.includes('café latte') || name.includes('kokuto latte')) {
+      config = { showIce: true, showSugar: true, showMilk: true, showCream: true, showBeans: true, showShot: true, freeCream: false };
+    } else if (name.includes('cappuccino')) {
+      config = { showIce: false, showSugar: true, showMilk: true, showCream: false, showBeans: true, showShot: true, freeCream: false };
+    } else if (name.includes('long black') || name.includes('coconut coffee') || name.includes('apple spark coffee')) {
+      config = { showIce: true, showSugar: true, showMilk: false, showCream: false, showBeans: true, showShot: true, freeCream: false };
+    } else if (name.includes('sea salt caramel latte')) {
+      config = { showIce: true, showSugar: true, showMilk: true, showCream: false, showBeans: true, showShot: true, freeCream: false };
+    } else if (name.includes('butterscotch cloud coffee')) {
+      config = { showIce: true, showSugar: true, showMilk: true, showCream: true, showBeans: true, showShot: true, freeCream: true };
+    } else if (name.includes('kakao coffee') || name.includes('peach coffee') || name.includes('shakerato') || name.includes('shakareto')) {
+      config = { showIce: false, showSugar: true, showMilk: true, showCream: false, showBeans: true, showShot: true, freeCream: false };
+    }
+  } else if (slug === 'non-coffee') {
+    const isMatchaBerryLatte = name.includes('matcha berry latte');
+    config = { showIce: true, showSugar: true, showMilk: true, showCream: !isMatchaBerryLatte, showBeans: false, showShot: false, freeCream: false };
+  } else {
+    // Fallback for other drinks
+    const FOOD_CATEGORIES = ['dessert', 'snack', 'main-course', 'bites'];
+    const isFood = FOOD_CATEGORIES.includes(slug);
+    if (!isFood) {
+      config.showIce = true;
+      config.showSugar = true;
+    }
+    // Backward compatibility for old categories
+    if (OPTIONAL_CHOICE_CATEGORIES.includes(slug)) {
+      config.showCream = true;
+    }
+  }
+
+  return config;
+}
+
 export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
   const { addItem } = useCartStore();
   const [optionalChoices, setOptionalChoices] = useState<Topping[]>([]);
   const [selectedSize, setSelectedSize] = useState('');
   const [sugarLevel, setSugarLevel] = useState('normal');
   const [iceLevel, setIceLevel] = useState('normal');
+  const [milkChoice, setMilkChoice] = useState('dairy');
+  const [beansChoice, setBeansChoice] = useState('rakken-blend');
+  const [shotChoice, setShotChoice] = useState('normal');
   const [selectedChoices, setSelectedChoices] = useState<Topping[]>([]);
   const [quantity, setQuantity] = useState(1);
 
   const slug = item.category?.slug || item.categorySlug || '';
-  const FOOD_CATEGORIES = ['dessert', 'snack', 'main-course'];
-  const isFood = slug ? FOOD_CATEGORIES.includes(slug) : item.type === 'none';
+  const config = getMenuConfig(item.name as string, slug);
   const hasSizes = item.sizes.length > 0;
+
+  const FOOD_CATEGORIES = ['dessert', 'snack', 'main-course', 'bites'];
+  const isFood = slug ? FOOD_CATEGORIES.includes(slug) : item.type === 'none';
   const isDrink = !isFood;
-  const showOptionalChoice = OPTIONAL_CHOICE_CATEGORIES.includes(slug);
 
   useEffect(() => {
-    if (showOptionalChoice) {
-      // Hardcoded addons logic for Coffee Based & Milk Based
-      setOptionalChoices([
-        { id: 9001, name: 'Almond Milk', price: 6000 },
-        { id: 9002, name: 'Espresso Shot', price: 6000 },
-        { id: 9003, name: 'Whip Cream', price: 6000 },
-      ]);
+    if (config.showCream) {
+      if (slug === 'rakken-signature' || slug === 'rakken-style' || slug === 'non-coffee') {
+        const creamPrice = config.freeCream ? 0 : 6000;
+        setOptionalChoices([
+          { id: 9004, name: 'Sea Salt Cream', price: creamPrice },
+          { id: 9005, name: 'Cheese Cream', price: creamPrice },
+        ]);
+      } else {
+        // Fallback logic
+        setOptionalChoices([
+          { id: 9001, name: 'Almond Milk', price: 6000 },
+          { id: 9002, name: 'Espresso Shot', price: 6000 },
+          { id: 9003, name: 'Whip Cream', price: 6000 },
+        ]);
+      }
+    } else {
+      setOptionalChoices([]);
     }
-  }, [showOptionalChoice]);
+  }, [slug, config.showCream, config.freeCream]);
 
   // Set default selected size
   useEffect(() => {
@@ -78,20 +150,50 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
     }
   }, [item.sizes]);
 
+  const milkChoices = [
+    { key: 'dairy', label: 'Dairy Milk', sub: 'Susu standar', price: 0 },
+    { key: 'skim', label: 'Skim Milk', sub: 'Low-fat', price: 6000 },
+    { key: 'oat', label: 'Oat Milk', sub: 'Plant-based', price: 6000 },
+  ];
+  
+  const beansChoices = [
+    { key: 'rakken-blend', label: 'RAKKEN Blend', sub: 'House blend', price: 0 },
+    { key: 'png-signature', label: 'PNG Signature', sub: 'Nutty profile', price: 6000 },
+  ];
+
+  const shotChoices = [
+    { key: 'normal', label: 'Normal Shot', sub: 'Standar recipe', price: 0 },
+    { key: 'extra-1', label: 'Extra 1 Shot', sub: '+1 shot', price: 6000 },
+    { key: 'extra-2', label: 'Extra 2 Shots', sub: '+2 shots', price: 12000 },
+  ];
+
+  const selectedMilkPrice = config.showMilk ? (milkChoices.find(m => m.key === milkChoice)?.price || 0) : 0;
+  const selectedBeansPrice = config.showBeans ? (beansChoices.find(b => b.key === beansChoice)?.price || 0) : 0;
+  const selectedShotPrice = config.showShot ? (shotChoices.find(s => s.key === shotChoice)?.price || 0) : 0;
+
   const sizeAdjustment = item.sizes.find((s) => s.size === selectedSize)?.priceAdjustment || 0;
-  const choicesTotal = selectedChoices.reduce((sum, t) => sum + t.price, 0);
-  const unitPrice = item.price + sizeAdjustment + choicesTotal;
+  
+  const choicesTotal = selectedChoices.reduce((sum, t) => {
+    // Determine price dynamically in case freeCream config applies
+    const isCream = (t.id === 9004 || t.id === 9005 || t.id === 9003);
+    const price = (config.freeCream && isCream) ? 0 : t.price;
+    return sum + price;
+  }, 0);
+
+  const unitPrice = item.price + sizeAdjustment + choicesTotal + selectedMilkPrice + selectedBeansPrice + selectedShotPrice;
   const totalPrice = unitPrice * quantity;
 
   const sugarLevels = [
-    { key: 'less', label: 'Less' },
-    { key: 'normal', label: 'Normal' },
-    { key: 'more', label: 'More' }
+    { key: 'none', label: 'No Sugar', sub: 'Tanpa gula/syrup' },
+    { key: 'less', label: 'Less Sugar', sub: 'gula 70%' },
+    { key: 'normal', label: 'Normal Sugar', sub: 'Standar penyajian' },
+    { key: 'more', label: 'More Sugar', sub: 'gula 130%' }
   ];
   const iceLevels = [
-    { key: 'less', label: 'Less', icon: '🧊' },
-    { key: 'normal', label: 'Normal', icon: '🧊🧊' },
-    { key: 'more', label: 'More', icon: '🧊🧊🧊' },
+    { key: 'none', label: 'No Ice', sub: 'Tanpa es', icon: '🚫🧊' },
+    { key: 'less', label: 'Less Ice', sub: 'es 70%', icon: '🧊' },
+    { key: 'normal', label: 'Normal Ice', sub: 'Standar penyajian', icon: '🧊🧊' },
+    { key: 'more', label: 'More Ice', sub: 'es 130%', icon: '🧊🧊🧊' },
   ];
 
   const toggleChoice = (choice: Topping) => {
@@ -106,6 +208,24 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
     // Look up the Olsera variant ID that matches the selected size name
     const matchedVariant = item.olseraVariants?.find((v) => v.name === selectedSize);
     
+    const finalToppings = selectedChoices.map((t) => {
+      const isCream = (t.id === 9004 || t.id === 9005 || t.id === 9003);
+      return { id: t.id, name: t.name, price: (config.freeCream && isCream) ? 0 : t.price };
+    });
+
+    if (config.showMilk && milkChoice !== 'dairy') {
+      const selectedMilk = milkChoices.find(m => m.key === milkChoice);
+      if (selectedMilk) finalToppings.push({ id: `milk-${selectedMilk.key}` as any, name: selectedMilk.label, price: selectedMilk.price });
+    }
+    if (config.showBeans && beansChoice !== 'rakken-blend') {
+      const selectedBeans = beansChoices.find(b => b.key === beansChoice);
+      if (selectedBeans) finalToppings.push({ id: `beans-${selectedBeans.key}` as any, name: selectedBeans.label, price: selectedBeans.price });
+    }
+    if (config.showShot && shotChoice !== 'normal') {
+      const selectedShot = shotChoices.find(s => s.key === shotChoice);
+      if (selectedShot) finalToppings.push({ id: `shot-${selectedShot.key}` as any, name: selectedShot.label, price: selectedShot.price });
+    }
+    
     addItem({
       id: `${item.id}-${Date.now()}`,
       menuItemId: item.id as number | string,
@@ -115,17 +235,15 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
       quantity,
       size: selectedSize || '-',
       olseraVariantId: matchedVariant?.id,
-      sugarLevel: isDrink ? sugarLevel : 'normal',
-      iceLevel: isDrink ? iceLevel : 'normal',
+      sugarLevel: config.showSugar ? sugarLevel : 'normal',
+      iceLevel: config.showIce ? iceLevel : 'normal',
       extraShot: false,
-      toppings: selectedChoices.map((t) => ({ id: t.id, name: t.name, price: t.price })),
+      toppings: finalToppings,
       subtotal: totalPrice,
       category: typeof item.category === 'string' ? item.category : item.category?.name || '', // Pass the category along
     });
     onClose();
   };
-
-  const showIceOption = isDrink && (item.type === 'iced' || item.type === 'both');
 
   // Size label mapping
   const sizeLabel = (size: string) => {
@@ -176,7 +294,7 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
                     onClick={() => setSelectedSize(size.size)}
                     className={`py-2.5 rounded-xl text-center transition-all ${
                       selectedSize === size.size
-                        ? 'bg-linear-to-r from-[#c41525] to-[#A8131E] text-white shadow-lg'
+                        ? 'bg-[var(--brand-500)] text-white shadow-lg'
                         : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle) hover:border-(--border-default)'
                     }`}
                   >
@@ -192,60 +310,142 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
             </div>
           )}
 
-          {/* Sugar Level (drinks only) */}
-          {isDrink && (
+          {/* Sugar Level */}
+          {config.showSugar && (
             <div>
               <h3 className="text-sm font-semibold text-(--text-secondary) uppercase tracking-wider mb-3">
                 Sugar Level
               </h3>
-              <div className="flex gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 {sugarLevels.map((level) => (
                   <button
                     key={level.key}
                     onClick={() => setSugarLevel(level.key)}
-                    className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                    className={`py-2 px-1 rounded-xl text-center transition-all flex flex-col items-center justify-center min-h-[60px] ${
                       sugarLevel === level.key
-                        ? 'bg-linear-to-r from-[#c41525] to-[#A8131E] text-white shadow-lg'
+                        ? 'bg-[var(--brand-500)] text-white shadow-md'
                         : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle)'
                     }`}
                   >
-                    {level.label}
+                    <span className="text-sm font-bold block leading-tight">{level.label}</span>
+                    <span className="text-[10px] opacity-80 block mt-0.5 leading-tight">{level.sub}</span>
                   </button>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Ice Level (drinks only, if applicable) */}
-          {showIceOption && (
+          {/* Ice Level */}
+          {config.showIce && (
             <div>
               <h3 className="text-sm font-semibold text-(--text-secondary) uppercase tracking-wider mb-3">Ice Level</h3>
-              <div className="flex gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 {iceLevels.map((ice) => (
                   <button
                     key={ice.key}
                     onClick={() => setIceLevel(ice.key)}
-                    className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                    className={`py-2 px-1 rounded-xl text-center transition-all flex flex-col items-center justify-center min-h-[60px] ${
                       iceLevel === ice.key
-                        ? 'bg-linear-to-r from-[#c41525] to-[#A8131E] text-white shadow-lg'
+                        ? 'bg-[var(--brand-500)] text-white shadow-md'
                         : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle)'
                     }`}
                   >
-                    <span className="mr-1">{ice.icon}</span>
-                    {ice.label}
+                    <span className="text-sm font-bold block flex items-center justify-center gap-1 leading-tight">
+                      {ice.icon} {ice.label}
+                    </span>
+                    <span className="text-[10px] opacity-80 block mt-0.5 leading-tight">{ice.sub}</span>
                   </button>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Optional Choice (Coffee & Milk Based only) */}
-          {showOptionalChoice && optionalChoices.length > 0 && (
+          {/* Beans Choice */}
+          {config.showBeans && (
             <div>
-              <h3 className="text-sm font-semibold text-(--text-secondary) uppercase tracking-wider mb-3">Optional Choice</h3>
+              <h3 className="text-sm font-semibold text-(--text-secondary) uppercase tracking-wider mb-3">Beans Choice</h3>
+              <div className="grid grid-cols-2 gap-2">
+                {beansChoices.map((bean) => (
+                  <button
+                    key={bean.key}
+                    onClick={() => setBeansChoice(bean.key)}
+                    className={`py-2 px-2 rounded-xl text-center transition-all flex flex-col items-center justify-center min-h-[60px] ${
+                      beansChoice === bean.key
+                        ? 'bg-[var(--brand-500)] text-white shadow-md'
+                        : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle)'
+                    }`}
+                  >
+                    <span className="text-sm font-bold block leading-tight">{bean.label}</span>
+                    <span className="text-[10px] opacity-80 block mt-0.5 leading-tight">{bean.sub}</span>
+                    {bean.price > 0 && <span className="text-xs font-bold mt-1">+{formatCurrency(bean.price)}</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Coffee Shot */}
+          {config.showShot && (
+            <div>
+              <h3 className="text-sm font-semibold text-(--text-secondary) uppercase tracking-wider mb-3">Coffee Shot</h3>
+              <div className="grid grid-cols-3 gap-2">
+                {shotChoices.map((shot) => (
+                  <button
+                    key={shot.key}
+                    onClick={() => setShotChoice(shot.key)}
+                    className={`py-2 px-1 rounded-xl text-center transition-all flex flex-col items-center justify-center min-h-[60px] ${
+                      shotChoice === shot.key
+                        ? 'bg-[var(--brand-500)] text-white shadow-md'
+                        : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle)'
+                    }`}
+                  >
+                    <span className="text-xs font-bold block leading-tight">{shot.label}</span>
+                    <span className="text-[9px] opacity-80 block mt-0.5 leading-tight">{shot.sub}</span>
+                    {shot.price > 0 && <span className="text-xs font-bold mt-1">+{formatCurrency(shot.price)}</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Milk Choice */}
+          {config.showMilk && (
+            <div>
+              <h3 className="text-sm font-semibold text-(--text-secondary) uppercase tracking-wider mb-3">
+                Milk Choice
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {milkChoices.map((milk) => (
+                  <button
+                    key={milk.key}
+                    onClick={() => setMilkChoice(milk.key)}
+                    className={`py-2 px-3 rounded-xl text-center transition-all flex flex-col items-center justify-center min-h-[60px] ${
+                      milkChoice === milk.key
+                        ? 'bg-[var(--brand-500)] text-white shadow-md'
+                        : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle)'
+                    }`}
+                  >
+                    <span className="text-sm font-bold block leading-tight">{milk.label}</span>
+                    <span className="text-[10px] opacity-80 block mt-0.5 leading-tight">{milk.sub}</span>
+                    {milk.price > 0 && (
+                      <span className="text-xs mt-1 block font-semibold">+{formatCurrency(milk.price)}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Optional Choice / Cream Add On */}
+          {config.showCream && optionalChoices.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-(--text-secondary) uppercase tracking-wider mb-3">
+                Cream Add On
+              </h3>
               <div className="space-y-2">
                 {optionalChoices.map((choice) => {
                   const isSelected = selectedChoices.find((t) => t.id === choice.id);
+                  const isFree = config.freeCream && (choice.id === 9004 || choice.id === 9005 || choice.id === 9003);
                   return (
                     <button
                       key={choice.id}
@@ -264,7 +464,9 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
                         </div>
                         <span className="text-sm text-(--text-primary) font-medium">{choice.name}</span>
                       </div>
-                      <span className="text-xs text-(--text-muted)">+{formatCurrency(choice.price)}</span>
+                      <span className="text-xs font-bold text-(--text-primary)">
+                        {isFree ? 'FREE' : `+${formatCurrency(choice.price)}`}
+                      </span>
                     </button>
                   );
                 })}
@@ -285,7 +487,7 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
               <span className="text-3xl font-bold text-(--text-primary) w-12 text-center">{quantity}</span>
               <button
                 onClick={() => setQuantity(quantity + 1)}
-                className="w-12 h-12 rounded-full bg-linear-to-r from-[#c41525] to-[#A8131E] flex items-center justify-center text-xl text-white shadow-lg hover:shadow-xl transition-all active:scale-90"
+                className="w-12 h-12 rounded-full bg-[var(--brand-500)] flex items-center justify-center text-xl text-white shadow-lg hover:shadow-xl transition-all active:scale-90"
               >
                 +
               </button>

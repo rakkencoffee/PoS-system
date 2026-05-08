@@ -4,7 +4,7 @@ interface Category {
   id: number | string;
   name: string;
   slug: string;
-  icon: string;
+  icon?: string;
 }
 
 interface CategoryBarProps {
@@ -14,22 +14,17 @@ interface CategoryBarProps {
 }
 
 export default function CategoryBar({ categories, selected, onSelect }: CategoryBarProps) {
-  const allCategories = [
-    { id: 0, name: 'All', slug: 'all', icon: '🍽️' },
-    ...categories,
-  ];
-
   return (
-    <div className="px-6 mb-4 max-w-7xl mx-auto w-full">
-      <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-        {allCategories.map((cat) => (
+    <div className="w-full">
+      <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide px-6 max-w-7xl mx-auto">
+        {categories.map((cat) => (
           <button
             key={cat.slug}
             onClick={() => onSelect(cat.slug)}
             className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-semibold whitespace-nowrap transition-all ${
               selected === cat.slug
-                ? 'bg-linear-to-r from-[#c41525] to-[#A8131E] text-white shadow-lg shadow-red-900/30 scale-105'
-                : 'glass-card rounded-2xl! hover:bg-(--bg-card-hover)!'
+                ? 'bg-[var(--brand-500)] text-white shadow-lg shadow-red-900/30 scale-105'
+                : 'bg-(--bg-card) text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-card-hover) border border-(--border-subtle)'
             }`}
           >
             <span className="text-lg">{cat.icon}</span>

@@ -131,7 +131,7 @@ export default function CartPage() {
                     <span className="font-semibold text-(--text-primary) w-6 text-center">{item.quantity}</span>
                     <button
                       onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                      className="w-8 h-8 rounded-full bg-linear-to-r from-[#c41525] to-[#A8131E] flex items-center justify-center text-white active:scale-90 transition-transform"
+                      className="w-8 h-8 rounded-full bg-[var(--brand-500)] flex items-center justify-center text-white active:scale-90 transition-transform"
                     >
                       +
                     </button>

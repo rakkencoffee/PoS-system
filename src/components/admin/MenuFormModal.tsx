@@ -240,7 +240,7 @@ export default function MenuFormModal({ isOpen, onClose, onSave, editItem }: Men
                     onClick={() => setForm({ ...form, type: t })}
                     className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all ${
                       form.type === t
-                        ? 'bg-linear-to-r from-[#c41525] to-[#A8131E] text-white'
+                        ? 'bg-[var(--brand-500)] text-white'
                         : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle)'
                     }`}
                   >

@@ -7,7 +7,7 @@ export default function AdminLayout({
     <div
       className="min-h-screen relative"
       style={{
-        backgroundImage: "url('/images/bg.webp')",
+        backgroundImage: "url('/images/bg-putih.webp')",
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
