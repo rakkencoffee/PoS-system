@@ -206,7 +206,10 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
 
   const handleAddToCart = () => {
     // Look up the Olsera variant ID that matches the selected size name
-    const matchedVariant = item.olseraVariants?.find((v) => v.name === selectedSize);
+    // Use robust matching (lowercase + trim) to handle subtle discrepancies in Olsera data
+    const matchedVariant = item.olseraVariants?.find((v) => 
+      v.name.toLowerCase().trim() === (selectedSize || '').toLowerCase().trim()
+    );
     
     const finalToppings = selectedChoices.map((t) => {
       const isCream = (t.id === 9004 || t.id === 9005 || t.id === 9003);

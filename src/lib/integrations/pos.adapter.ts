@@ -304,7 +304,8 @@ export async function createOrder(
           parseInt(item.productId),
           item.variantId ? parseInt(item.variantId) : null,
           item.quantity,
-          fullNote
+          fullNote,
+          item.price
         );
       } catch (err) {
         console.error(`Failed to add item ${item.productId} to order ${orderId}:`, err);
