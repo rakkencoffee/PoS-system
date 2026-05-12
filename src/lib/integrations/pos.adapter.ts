@@ -279,6 +279,7 @@ export async function createOrder(
     options?: any;
   }[],
   customerName?: string,
+  discountAmount?: number,
 ): Promise<{ orderId: string; olseraOrderId?: number }> {
   if (USE_OLSERA) {
     // 1. Create order in POS (Olsera) with all items in one go
@@ -303,7 +304,10 @@ export async function createOrder(
       };
     });
 
-    const order = await olsera.createOrder(posItems, { customer_name: customerName });
+    const order = await olsera.createOrder(posItems, { 
+      customer_name: customerName,
+      discount_amount: discountAmount
+    });
     const orderId = (order.id || order.order_id) as number;
 
     // 3. Mirror to local Prisma for Dashboard/Reporting (Sprint 4)

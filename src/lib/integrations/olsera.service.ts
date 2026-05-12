@@ -516,7 +516,7 @@ export async function updateOrderStatus(orderId: number, status: 'P' | 'A' | 'S'
  */
 export async function createOrder(
   items: { productId: string; variantId?: string; quantity: number; price?: number; note?: string }[] = [],
-  options: { currencyId?: string | number; customer_name?: string; notes?: string } = {}
+  options: { currencyId?: string | number; customer_name?: string; notes?: string; discount_amount?: number } = {}
 ): Promise<{ id: number; order_id?: number; [key: string]: unknown }> {
   const { currencyId = 'IDR', customer_name, notes } = options;
   const uniqueId = Date.now().toString().slice(-6);
@@ -541,6 +541,19 @@ export async function createOrder(
       notes: item.note || ''
     }))
   };
+
+  // Calculate totals to ensure Dashboard displays correct values
+  const subtotal = payload.items.reduce((sum: number, item: any) => sum + (item.qty * item.price), 0);
+  payload.subtotal = subtotal;
+  payload.total_amount = subtotal;
+  payload.amount = subtotal; 
+  payload.order_items = payload.items; // Alias for different API versions
+
+  // Handle discount if provided in options
+  if (options.discount_amount) {
+    payload.total_amount = Math.max(0, subtotal - options.discount_amount);
+    payload.amount = payload.total_amount;
+  }
 
   console.log(`[Olsera API] createOrder JSON payload:`, JSON.stringify(payload));
 
