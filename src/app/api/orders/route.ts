@@ -49,6 +49,13 @@ export async function GET(request: NextRequest) {
           }
         }
 
+        // 4. Fetch master menu to map categories accurately based on product names
+        // This is the most reliable fallback if order details lack category info.
+        const { getMenuItems } = await import('@/lib/integrations/pos.adapter');
+        const menuItemsMaster = await getMenuItems();
+        const masterCategoryMap = new Map();
+        menuItemsMaster.forEach(m => masterCategoryMap.set(m.name.toLowerCase(), m.categorySlug));
+
         // 5. Normalize enriched orders
         orders = enrichedOrders.map((order: any) => {
           let kdsStatus = 'PENDING';
@@ -74,13 +81,15 @@ export async function GET(request: NextRequest) {
             items: rawItems.map((item: any, idx: number) => {
               const name = item.product_name || item.name || 'Item';
               
-              // Normalize category from Olsera group name or category name
-              const groupName = (item.product_group_name || item.group_name || item.category_name || '').toLowerCase();
+              // 1. Try to get category from master menu mapping (most accurate)
+              let cat = masterCategoryMap.get(name.toLowerCase()) || 'other';
               
-              let cat = 'other';
-              // Check for Rakken Signature or Rakken Style specifically
-              if (groupName.includes('signature')) cat = 'rakken-signature';
-              else if (groupName.includes('style')) cat = 'rakken-style';
+              // 2. Fallback to Olsera's group/category fields if not found in master menu
+              if (cat === 'other') {
+                const groupName = (item.product_group_name || item.group_name || item.category_name || item.klasifikasi || '').toLowerCase();
+                if (groupName.includes('signature')) cat = 'rakken-signature';
+                else if (groupName.includes('style')) cat = 'rakken-style';
+              }
 
               return {
                 id: idx,
