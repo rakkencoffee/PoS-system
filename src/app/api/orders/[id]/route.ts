@@ -29,18 +29,72 @@ export async function GET(
           kdsStatus = 'PENDING'; // Paid but not yet prepared
         }
 
+        // Fetch menu items for category mapping
+        let menuItems: any[] = [];
+        try {
+          const { getMenuItems } = await import('@/lib/integrations/pos.adapter');
+          menuItems = await getMenuItems();
+        } catch (mErr) {}
+        const catMap = new Map();
+        menuItems.forEach(m => catMap.set(m.name, m.categorySlug));
+
+        // Determine base data from Olsera
+        const olseraItems = Array.isArray(orderDetail.items) ? orderDetail.items : [];
+        let totalAmount = parseFloat(orderDetail.total || orderDetail.grand_total || '0');
+        let finalItems = olseraItems.map((item: any, idx: number) => {
+          const name = item.product_name || item.name || 'Item';
+          return {
+            id: idx,
+            menuItem: { name },
+            quantity: item.qty || item.quantity || 1,
+            price: parseFloat(item.price || item.product_price || '0'),
+            size: item.variant_name || '-',
+            categorySlug: catMap.get(name) || 'other',
+          };
+        });
+
+        // FALLBACK: If Olsera has no items or 0 total, fetch from local Prisma mirror
+        // This is the most robust way to handle Olsera's sync delays.
+        if (totalAmount === 0 || finalItems.length === 0 || finalItems.every(i => i.price === 0)) {
+          console.log(`[Sync] Olsera data incomplete for ${id}, fetching from local Prisma fallback...`);
+          try {
+            const { prisma } = await import('@/lib/db');
+            const localOrder = await prisma.order.findUnique({
+              where: { id: id },
+              include: { items: true }
+            });
+
+            if (localOrder) {
+              totalAmount = localOrder.total;
+              finalItems = localOrder.items.map((item: any, idx: number) => {
+                // Try to extract size from notes if notes contains "Size: ..."
+                let displaySize = '-';
+                const sizeMatch = item.notes?.match(/Size: ([^,)]+)/);
+                if (sizeMatch) displaySize = sizeMatch[1];
+
+                return {
+                  id: idx,
+                  menuItem: { name: item.name },
+                  quantity: item.quantity,
+                  price: item.price,
+                  notes: item.notes,
+                  size: displaySize,
+                };
+              });
+              console.log(`[Sync] Successfully used local fallback for ${id}. Total: ${totalAmount}`);
+            }
+          } catch (prismaError) {
+            console.error('[Sync] Local fallback failed:', prismaError);
+          }
+        }
+
         return NextResponse.json({
           id: id,
           queueNumber: olseraOrderId % 1000,
           status: kdsStatus,
-          totalAmount: orderDetail.total || 0,
+          totalAmount: totalAmount,
           createdAt: orderDetail.order_date || new Date().toISOString(),
-          items: items.map((item: any, idx: number) => ({
-            id: idx,
-            menuItem: { name: item.product_name || item.name || 'Item' },
-            quantity: item.qty || item.quantity || 1,
-            size: item.variant_name || '-',
-          })),
+          items: finalItems,
         });
       } catch (olseraError) {
         console.warn(`Order ${olseraOrderId} not in open orders, checking closed orders...`);
@@ -52,7 +106,7 @@ export async function GET(
             id: id,
             queueNumber: olseraOrderId % 1000,
             status: 'COMPLETED', // Found in closed orders, must be completed
-            totalAmount: closedOrder.total || 0,
+            totalAmount: parseFloat(closedOrder.total || closedOrder.grand_total || '0'),
             createdAt: closedOrder.order_date || new Date().toISOString(),
             items: items.map((item: any, idx: number) => ({
               id: idx,
@@ -164,6 +218,15 @@ export async function PATCH(
         }
       }
 
+      // Build category lookup for final response
+      let menuItems: any[] = [];
+      try {
+        const { getMenuItems } = await import('@/lib/integrations/pos.adapter');
+        menuItems = await getMenuItems();
+      } catch (mErr) {}
+      const catMap = new Map();
+      menuItems.forEach(m => catMap.set(m.name, m.categorySlug));
+
       const updatedOrder = {
         id: id,
         queueNumber: olseraOrderId % 1000,
@@ -171,12 +234,16 @@ export async function PATCH(
         totalAmount: detail ? (detail.total || detail.grand_total || 0) : 0,
         paymentMethod: 'MIDTRANS',
         createdAt: detail ? (detail.order_date || detail.created_at || new Date().toISOString()) : new Date().toISOString(),
-        items: detail && Array.isArray(detail.items) ? detail.items.map((item: any, idx: number) => ({
-          id: idx,
-          menuItem: { name: item.product_name || item.name || 'Item' },
-          quantity: item.qty || item.quantity || 1,
-          size: item.variant_name || '-',
-        })) : [],
+        items: detail && Array.isArray(detail.items) ? detail.items.map((item: any, idx: number) => {
+          const name = item.product_name || item.name || 'Item';
+          return {
+            id: idx,
+            menuItem: { name },
+            quantity: item.qty || item.quantity || 1,
+            size: item.variant_name || '-',
+            categorySlug: catMap.get(name) || 'other',
+          };
+        }) : [],
       };
 
       // Broadcast via Pusher so KDS updates in real-time

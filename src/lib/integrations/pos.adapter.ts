@@ -9,10 +9,10 @@
  * - false → fetch data from local Prisma database (development fallback)
  */
 
-import * as olsera from './olsera.service';
-import type { OlseraProduct, OlseraProductGroup } from './olsera.service';
+import * as olsera from "./olsera.service";
+import type { OlseraProduct, OlseraProductGroup } from "./olsera.service";
 
-const USE_OLSERA = process.env.USE_OLSERA === 'true';
+const USE_OLSERA = process.env.USE_OLSERA === "true";
 
 // ──────────────────────────────
 // In-Memory Cache for Test Resiliency
@@ -59,73 +59,95 @@ export interface NormalizedCategory {
 // ──────────────────────────────
 
 const CATEGORY_ICONS: Record<string, string> = {
-  'rakken-signature': '☕',
-  'rakken-style': '☕',
-  'non-coffee': '🧋',
-  'refreshment': '🍹',
-  'dessert': '🧁',
-  'bites': '🥐',
-  'main-course': '🍝',
-  coffee: '☕',
-  'coffee-based': '☕',
-  'milk-based': '🥛',
-  pastry: '🍰',
-  snack: '🍿',
-  'add-ons': '✨',
-  default: '📦',
+  "rakken-signature": "☕",
+  "rakken-style": "☕",
+  "non-coffee": "🧋",
+  refreshment: "🍹",
+  dessert: "🧁",
+  bites: "🥐",
+  "main-course": "🍝",
+  coffee: "☕",
+  "coffee-based": "☕",
+  "milk-based": "🥛",
+  pastry: "🍰",
+  snack: "🍿",
+  "add-ons": "✨",
+  default: "📦",
 };
 
 function slugify(str: string): string {
-  return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return str
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
-function mapOlseraProduct(product: OlseraProduct, groups: OlseraProductGroup[]): NormalizedMenuItem {
-  const groupId = product.product_group_id || product.klasifikasi_id || product.category_id;
+function mapOlseraProduct(
+  product: OlseraProduct,
+  groups: OlseraProductGroup[],
+): NormalizedMenuItem {
+  const groupId =
+    product.product_group_id || product.klasifikasi_id || product.category_id;
   const group = groups.find((g) => String(g.id) === String(groupId));
   const groupName = String(
-    group?.name || 
-    product.klasifikasi || 
-    product.category_name || 
-    product.product_group_name || 
-    product.group_name || 
-    'Other'
+    group?.name ||
+      product.klasifikasi ||
+      product.category_name ||
+      product.product_group_name ||
+      product.group_name ||
+      "Other",
   );
   const groupSlug = slugify(groupName);
 
   // Price in Olsera API: "sell_price_pos" is Harga Jual Toko, "sell_price" is Harga Jual Online
-  const rawPrice = product.sell_price_pos != null ? product.sell_price_pos : (product.sell_price || 0);
-  const price = typeof rawPrice === 'string' ? parseFloat(rawPrice) : Number(rawPrice);
-  
+  const rawPrice =
+    product.sell_price_pos != null
+      ? product.sell_price_pos
+      : product.sell_price || 0;
+  const price =
+    typeof rawPrice === "string" ? parseFloat(rawPrice) : Number(rawPrice);
+
   const variants = product.variants || [];
 
   // Map variants to sizes if they look like size variants
-  let sizes = variants.length > 0
-    ? variants.map((v) => {
-        const vPrice = v.sell_price_pos != null ? v.sell_price_pos : (v.sell_price || 0);
-        const parsedVPrice = typeof vPrice === 'string' ? parseFloat(vPrice) : Number(vPrice);
-        return {
-          size: v.name,
-          priceAdjustment: parsedVPrice - price,
-        };
-      })
-    : [];
+  let sizes =
+    variants.length > 0
+      ? variants.map((v) => {
+          const vPrice =
+            v.sell_price_pos != null ? v.sell_price_pos : v.sell_price || 0;
+          const parsedVPrice =
+            typeof vPrice === "string" ? parseFloat(vPrice) : Number(vPrice);
+          return {
+            size: v.name,
+            priceAdjustment: parsedVPrice - price,
+          };
+        })
+      : [];
 
   // Fallback for drinks (Coffee/Milk based) that might not have variants in Olsera but need size selection in Kiosk
-  if (sizes.length === 0 && (groupSlug === 'coffee-based' || groupSlug === 'milk-based' || groupSlug === 'coffee')) {
-    sizes = [{ size: 'Regular', priceAdjustment: 0 }];
+  if (
+    sizes.length === 0 &&
+    (groupSlug === "coffee-based" ||
+      groupSlug === "milk-based" ||
+      groupSlug === "coffee")
+  ) {
+    sizes = [{ size: "Regular", priceAdjustment: 0 }];
   }
 
   return {
     id: String(product.id || product.product_id),
     name: product.name,
-    description: product.description || '',
+    description: product.description || "",
     price,
-    image: product.photo_md || product.photo || product.image || '',
+    image: product.photo_md || product.photo || product.image || "",
     // "pos_hidden": 0 means it's available in POS
-    isAvailable: Number(product.pos_hidden) === 0 || Number(product.is_active) === 1 || product.is_active === true,
+    isAvailable:
+      Number(product.pos_hidden) === 0 ||
+      Number(product.is_active) === 1 ||
+      product.is_active === true,
     isBestSeller: false,
     isRecommended: false,
-    type: 'both',
+    type: "both",
     categoryId: String(groupId || 0),
     categoryName: groupName,
     categorySlug: groupSlug,
@@ -133,11 +155,12 @@ function mapOlseraProduct(product: OlseraProduct, groups: OlseraProductGroup[]):
     sizes,
     olseraProductId: product.id || product.product_id,
     olseraVariants: variants.map((v) => {
-      const vPrice = v.sell_price_pos != null ? v.sell_price_pos : (v.sell_price || 0);
+      const vPrice =
+        v.sell_price_pos != null ? v.sell_price_pos : v.sell_price || 0;
       return {
         id: v.id || v.variant_id || 0,
         name: v.name,
-        price: typeof vPrice === 'string' ? parseFloat(vPrice) : Number(vPrice),
+        price: typeof vPrice === "string" ? parseFloat(vPrice) : Number(vPrice),
       };
     }),
   };
@@ -169,14 +192,16 @@ export async function getMenuItems(filters?: {
 }): Promise<NormalizedMenuItem[]> {
   if (USE_OLSERA) {
     const isCacheExpired = Date.now() - olseraCache.timestamp > CACHE_TTL_MS;
-    
+
     if (isCacheExpired || !olseraCache.products) {
       const [products, groups] = await Promise.all([
         olsera.getProducts(),
         olsera.getProductGroups(),
       ]);
       // Reverse the order so newest/added-later items appear first as per user request
-      olseraCache.products = products.map((p) => mapOlseraProduct(p, groups)).reverse();
+      olseraCache.products = products
+        .map((p) => mapOlseraProduct(p, groups))
+        .reverse();
       olseraCache.timestamp = Date.now();
     }
 
@@ -192,14 +217,18 @@ export async function getMenuItems(filters?: {
     if (filters?.search) {
       const q = filters.search.toLowerCase();
       items = items.filter(
-        (i) => i.name.toLowerCase().includes(q) || i.description.toLowerCase().includes(q)
+        (i) =>
+          i.name.toLowerCase().includes(q) ||
+          i.description.toLowerCase().includes(q),
       );
     }
 
     return items;
   }
   // Fallback removed
-  throw new Error('Local database (Prisma) is no longer supported. Please ensure Olsera configuration is active in Vercel.');
+  throw new Error(
+    "Local database (Prisma) is no longer supported. Please ensure Olsera configuration is active in Vercel.",
+  );
 }
 
 /**
@@ -208,80 +237,121 @@ export async function getMenuItems(filters?: {
 export async function getCategories(): Promise<NormalizedCategory[]> {
   // Custom display order: lower number = higher priority (shown first)
   const CATEGORY_ORDER: Record<string, number> = {
-    'rakken-signature': 1,
-    'rakken-style': 2,
-    'non-coffee': 3,
-    'refreshment': 4,
-    'dessert': 5,
-    'bites': 6,
-    'main-course': 7,
+    "rakken-signature": 1,
+    "rakken-style": 2,
+    "non-coffee": 3,
+    refreshment: 4,
+    dessert: 5,
+    bites: 6,
+    "main-course": 7,
   };
 
   if (USE_OLSERA) {
     const isCacheExpired = Date.now() - olseraCache.timestamp > CACHE_TTL_MS;
-    
+
     if (isCacheExpired || !olseraCache.categories) {
       const groups = await olsera.getProductGroups();
-      olseraCache.categories = groups.map(mapOlseraGroup).sort((a, b) => (CATEGORY_ORDER[a.slug] ?? 99) - (CATEGORY_ORDER[b.slug] ?? 99));
+      olseraCache.categories = groups
+        .map(mapOlseraGroup)
+        .sort(
+          (a, b) =>
+            (CATEGORY_ORDER[a.slug] ?? 99) - (CATEGORY_ORDER[b.slug] ?? 99),
+        );
     }
-    
+
     return olseraCache.categories || [];
   }
   // Fallback removed
-  throw new Error('Local database (Prisma) is no longer supported.');
+  throw new Error("Local database (Prisma) is no longer supported.");
 }
 
 /**
  * Create order in POS system
  */
 export async function createOrder(
-  items: { productId: string; variantId?: string; quantity: number; price?: number; note?: string }[],
-  customerName?: string
+  items: {
+    productId: string;
+    variantId?: string;
+    quantity: number;
+    price?: number;
+    note?: string;
+    name?: string;
+    options?: any;
+  }[],
+  customerName?: string,
 ): Promise<{ orderId: string; olseraOrderId?: number }> {
   if (USE_OLSERA) {
-    // 1. Create open order
-    const order = await olsera.createOrder([], { customer_name: customerName }); // create empty order first with customer name if possible
+    // 1. Create open order (Header only)
+    const order = await olsera.createOrder([], { customer_name: customerName });
     const orderId = (order.id || order.order_id) as number;
 
-    // 2. Add each item separately as required by Olsera API
+    // 2. Add each item separately (required by Olsera Open API for Open Orders)
     for (const item of items) {
       if (!item.productId) continue;
       try {
+        // Concatenate note and options for Olsera
+        let fullNote = item.note || "";
+        if (item.options) {
+          const optStr = Object.entries(item.options)
+            .filter(([_, v]) => v && v !== "-" && !Array.isArray(v))
+            .map(([k, v]) => `${k}: ${v}`)
+            .join(", ");
+          if (optStr) fullNote = fullNote ? `${fullNote} (${optStr})` : optStr;
+        }
+
         await olsera.addItemToOrder(
           orderId,
           parseInt(item.productId),
           item.variantId ? parseInt(item.variantId) : null,
           item.quantity,
-          item.note || ''
+          fullNote
         );
       } catch (err) {
         console.error(`Failed to add item ${item.productId} to order ${orderId}:`, err);
       }
     }
 
-    // 3. Save to local Prisma for Dashboard/Reporting (Sprint 4)
+    // 3. Mirror to local Prisma for Dashboard/Reporting (Sprint 4)
     try {
-      const { prisma } = await import('@/lib/db');
+      const { prisma } = await import("@/lib/db");
       await prisma.order.create({
         data: {
           id: `OLSERA-${orderId}`,
-          stationId: 'KIOSK', // Kiosk self-service
-          cashierId: 'cmo83g6140000vq5g10u03858', // Valid system user for Kiosk sync
-          total: items.reduce((acc, item) => acc + ((item.price || 0) * item.quantity), 0),
-          status: 'PENDING',
+          stationId: "KIOSK", // Kiosk self-service
+          cashierId: "cmo83g6140000vq5g10u03858", // Valid system user for Kiosk sync
+          total: items.reduce(
+            (acc, item) => acc + (item.price || 0) * item.quantity,
+            0,
+          ),
+          status: "PENDING",
           items: {
-            create: items.map((item) => ({
-              olseraId: item.productId,
-              name: 'Item', // Will be enriched or kept as Item
-              quantity: item.quantity,
-              price: item.price || 0,
-              subtotal: (item.price || 0) * item.quantity,
-              notes: item.note || '',
-            })),
+            create: items.map((item) => {
+              // Format customization details for local receipt fallback
+              let displayNotes = item.note || "";
+              if (item.options) {
+                const optParts = [];
+                if (item.options.size && item.options.size !== "-") optParts.push(`Size: ${item.options.size}`);
+                if (item.options.sugarLevel && item.options.sugarLevel !== "-") optParts.push(`${item.options.sugarLevel} Sugar`);
+                if (item.options.iceLevel && item.options.iceLevel !== "-") optParts.push(`${item.options.iceLevel} Ice`);
+                if (item.options.extraShot) optParts.push("Extra Shot");
+                
+                const optStr = optParts.join(", ");
+                if (optStr) displayNotes = displayNotes ? `${displayNotes} (${optStr})` : optStr;
+              }
+
+              return {
+                olseraId: item.productId,
+                name: item.name || "Item",
+                quantity: item.quantity,
+                price: item.price || 0,
+                subtotal: (item.price || 0) * item.quantity,
+                notes: displayNotes,
+              };
+            }),
           },
         },
       });
-      console.log(`[Sync] Order OLSERA-${orderId} mirrored to local database.`);
+      console.log(`[Sync] Order OLSERA-${orderId} mirrored with formatted notes.`);
     } catch (dbErr) {
       console.warn(`[Sync] Failed to mirror order to local database:`, dbErr);
     }
@@ -292,7 +362,9 @@ export async function createOrder(
     };
   }
   // Fallback removed
-  throw new Error('Local database (Prisma) is no longer supported for creating orders.');
+  throw new Error(
+    "Local database (Prisma) is no longer supported for creating orders.",
+  );
 }
 
 /**
@@ -301,22 +373,29 @@ export async function createOrder(
  */
 export async function updateOrderPaymentStatus(
   orderId: string,
-  status: 'paid' | 'failed' | 'expired',
-  paymentAmount?: number
+  status: "paid" | "failed" | "expired",
+  paymentAmount?: number,
 ): Promise<void> {
-  if (USE_OLSERA && orderId.startsWith('OLSERA-')) {
-    const olseraOrderId = parseInt(orderId.replace('OLSERA-', ''));
+  if (USE_OLSERA && orderId.startsWith("OLSERA-")) {
+    const olseraOrderId = parseInt(orderId.replace("OLSERA-", ""));
 
-    if (status === 'paid') {
+    if (status === "paid") {
       let paymentModeId: number | undefined = undefined;
 
       try {
         // Step 1: Get payment methods to find QRIS/Midtrans mode ID
         // (This API randomly returns 500 on Sandbox, so we wrap it)
         const paymentMethods = await olsera.getPaymentMethods();
-        const targetNames = ['qris', 'midtrans', 'e-wallet', 'ewallet', 'online', 'transfer'];
+        const targetNames = [
+          "qris",
+          "midtrans",
+          "e-wallet",
+          "ewallet",
+          "online",
+          "transfer",
+        ];
         paymentModeId = paymentMethods[0]?.id;
-        
+
         for (const method of paymentMethods) {
           const name = String(method.name).toLowerCase();
           if (targetNames.some((t) => name.includes(t))) {
@@ -325,7 +404,9 @@ export async function updateOrderPaymentStatus(
           }
         }
       } catch (paymentDetailsError) {
-        console.warn(`[Auto-Settlement] Non-fatal: Could not fetch payment methods from Olsera. Falling back to default ID 1.`);
+        console.warn(
+          `[Auto-Settlement] Non-fatal: Could not fetch payment methods from Olsera. Falling back to default ID 1.`,
+        );
         paymentModeId = 1; // Fallback to 1 (usually Cash/Default)
       }
 
@@ -333,90 +414,130 @@ export async function updateOrderPaymentStatus(
         // Step 2: Record payment details on the order
         // Fetch the absolute source of truth for the total from Olsera to avoid 406 "Incorrect payment amount"
         const orderDetail = await olsera.getOrderDetail(orderId);
-        const actualOlseraTotal = orderDetail.total ? parseFloat(String(orderDetail.total)) : (paymentAmount || 0);
-        
+        const actualOlseraTotal = orderDetail.total
+          ? parseFloat(String(orderDetail.total))
+          : paymentAmount || 0;
+
         // Skip if already paid in Olsera to avoid duplicate settlement errors
-        if (orderDetail.is_paid === true || orderDetail.is_paid === 1 || orderDetail.is_paid === '1') {
-          console.log(`[Auto-Settlement] Order ${orderId} already marked as PAID in Olsera. Skipping settlement.`);
+        if (
+          orderDetail.is_paid === true ||
+          orderDetail.is_paid === 1 ||
+          orderDetail.is_paid === "1"
+        ) {
+          console.log(
+            `[Auto-Settlement] Order ${orderId} already marked as PAID in Olsera. Skipping settlement.`,
+          );
           return;
         }
 
         if (actualOlseraTotal > 0 && paymentModeId) {
           try {
-            console.log(`[Auto-Settlement] Initializing settlement for Olsera order ${orderId} with amount: ${actualOlseraTotal}`);
-            await olsera.updateOrderPayment(olseraOrderId, actualOlseraTotal, paymentModeId);
-            
+            console.log(
+              `[Auto-Settlement] Initializing settlement for Olsera order ${orderId} with amount: ${actualOlseraTotal}`,
+            );
+            await olsera.updateOrderPayment(
+              olseraOrderId,
+              actualOlseraTotal,
+              paymentModeId,
+            );
+
             // CRITICAL: Also mark as Paid (status=1) so Olsera allows status updates to A/Z later
             await olsera.markOrderAsPaid(olseraOrderId, true);
-            console.log(`[Auto-Settlement] Successfully recorded payment info for order ${orderId}`);
-            
+            console.log(
+              `[Auto-Settlement] Successfully recorded payment info for order ${orderId}`,
+            );
+
             // FORCE status back to PENDING (P)
             // Olsera sometimes auto-accepts orders and moves them to 'A' (Preparing).
             // We force it back to 'P' so it appears in the first column of the KDS.
-            await olsera.updateOrderStatus(olseraOrderId, 'P');
-            console.log(`[Auto-Settlement] Forced status to PENDING for order ${orderId}`);
+            await olsera.updateOrderStatus(olseraOrderId, "P");
+            console.log(
+              `[Auto-Settlement] Forced status to PENDING for order ${orderId}`,
+            );
           } catch (paymentAppendError: any) {
-            console.warn(`[Auto-Settlement] Non-fatal: Could not append payment details to Olsera order ${orderId}:`, paymentAppendError.message);
+            console.warn(
+              `[Auto-Settlement] Non-fatal: Could not append payment details to Olsera order ${orderId}:`,
+              paymentAppendError.message,
+            );
           }
         }
 
         // Step 3: Broadcast to KDS via Pusher
         // The Barista will manually move it to PREPARING (A) by clicking "Start Making"
-        console.log(`[Auto-Settlement] ✅ Order ${orderId} marked as PAID. Broadcasting to KDS...`);
-        
+        console.log(
+          `[Auto-Settlement] ✅ Order ${orderId} marked as PAID. Broadcasting to KDS...`,
+        );
+
         try {
-          const { pusherServer } = await import('@/lib/pusher');
-          await pusherServer.trigger('kitchen', 'ORDER_CREATED', {
+          const { pusherServer } = await import("@/lib/pusher");
+          await pusherServer.trigger("kitchen", "ORDER_CREATED", {
             order: {
               id: orderId,
               queueNumber: olseraOrderId % 1000,
-              status: 'PENDING',
+              status: "PENDING",
               totalAmount: orderDetail.total || paymentAmount || 0,
-              paymentMethod: 'MIDTRANS',
+              paymentMethod: "MIDTRANS",
               createdAt: orderDetail.order_date || new Date().toISOString(),
-              items: Array.isArray(orderDetail.items) ? orderDetail.items.map((item: any, idx: number) => ({
-                id: idx,
-                menuItem: { name: item.product_name || item.name || 'Item' },
-                quantity: item.qty || item.quantity || 1,
-                size: item.variant_name || '-',
-              })) : [],
+              items: Array.isArray(orderDetail.items)
+                ? orderDetail.items.map((item: any, idx: number) => ({
+                    id: idx,
+                    menuItem: {
+                      name: item.product_name || item.name || "Item",
+                    },
+                    quantity: item.qty || item.quantity || 1,
+                    size: item.variant_name || "-",
+                  }))
+                : [],
             },
           });
           console.log(`[Pusher] ORDER_CREATED broadcast for ${orderId}`);
         } catch (pusherErr) {
-          console.warn('[Pusher] Failed to broadcast ORDER_CREATED:', pusherErr);
+          console.warn(
+            "[Pusher] Failed to broadcast ORDER_CREATED:",
+            pusherErr,
+          );
         }
 
         // Step 4: Broadcast to Admin Reports (Sprint 4)
         try {
-          const { pusherServer } = await import('@/lib/pusher');
-          await pusherServer.trigger('admin-reports', 'SALES_UPDATED', {
+          const { pusherServer } = await import("@/lib/pusher");
+          await pusherServer.trigger("admin-reports", "SALES_UPDATED", {
             orderId,
             amount: actualOlseraTotal,
           });
           console.log(`[Pusher] SALES_UPDATED broadcast for ${orderId}`);
         } catch (adminPusherErr) {
-          console.warn('[Pusher] Failed to broadcast SALES_UPDATED:', adminPusherErr);
+          console.warn(
+            "[Pusher] Failed to broadcast SALES_UPDATED:",
+            adminPusherErr,
+          );
         }
 
         // Step 5: Update local Prisma status (Sprint 4)
         try {
-          const { prisma } = await import('@/lib/db');
+          const { prisma } = await import("@/lib/db");
           await prisma.order.update({
             where: { id: orderId },
-            data: { status: 'PAID' },
+            data: { status: "PAID" },
           });
           console.log(`[Sync] Local order ${orderId} updated to PAID.`);
         } catch (dbUpdateErr) {
-          console.warn(`[Sync] Failed to update local order status:`, dbUpdateErr);
+          console.warn(
+            `[Sync] Failed to update local order status:`,
+            dbUpdateErr,
+          );
         }
-
       } catch (error: any) {
         // Log but don't throw — webhook must still return 200 to Midtrans
-        console.error(`[Auto-Settlement] ❌ Failed to settle order ${orderId} in Olsera:`, error.message);
+        console.error(
+          `[Auto-Settlement] ❌ Failed to settle order ${orderId} in Olsera:`,
+          error.message,
+        );
       }
     } else {
-      console.log(`[Olsera POS] Order ${orderId} status: ${status}. No Olsera action needed.`);
+      console.log(
+        `[Olsera POS] Order ${orderId} status: ${status}. No Olsera action needed.`,
+      );
     }
     return;
   }
@@ -426,9 +547,11 @@ export async function updateOrderPaymentStatus(
   // Skenario: Saat checkout, Olsera API gagal → ID jadi SF-xxxx.
   // Pelanggan tetap bayar via Midtrans → webhook masuk dengan SF-xxxx.
   // Kita HARUS recover order ini ke Olsera agar tidak hilang.
-  if (USE_OLSERA && orderId.startsWith('SF-') && status === 'paid') {
+  if (USE_OLSERA && orderId.startsWith("SF-") && status === "paid") {
     console.log(`[Recovery] ⚠️ Order fallback terdeteksi: ${orderId}`);
-    console.log(`[Recovery] Attempting to create order in Olsera for reconciliation...`);
+    console.log(
+      `[Recovery] Attempting to create order in Olsera for reconciliation...`,
+    );
 
     let recoveredOlseraId: string | null = null;
 
@@ -436,71 +559,103 @@ export async function updateOrderPaymentStatus(
       // Step 1: Buat order baru di Olsera (tanpa item — hanya header)
       // Item tidak bisa di-recovery karena data cart sudah hilang dari konteks webhook.
       // Tapi order tetap tercatat di Olsera untuk keperluan audit/reconciliation.
-      const newOrder = await olsera.createOrder([], { 
-        customer_name: `Recovery ${orderId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 20)}` 
+      const newOrder = await olsera.createOrder([], {
+        customer_name: `Recovery ${orderId.replace(/[^a-zA-Z0-9]/g, "").slice(0, 20)}`,
       });
       const newOlseraId = (newOrder.id || newOrder.order_id) as number;
       recoveredOlseraId = `OLSERA-${newOlseraId}`;
-      console.log(`[Recovery] ✅ Order created in Olsera: ${recoveredOlseraId}`);
+      console.log(
+        `[Recovery] ✅ Order created in Olsera: ${recoveredOlseraId}`,
+      );
 
       // Step 2: Settlement di Olsera (mark as paid)
       try {
         let paymentModeId = 1;
         try {
           const paymentMethods = await olsera.getPaymentMethods();
-          const targetNames = ['qris', 'midtrans', 'e-wallet', 'ewallet', 'online', 'transfer'];
+          const targetNames = [
+            "qris",
+            "midtrans",
+            "e-wallet",
+            "ewallet",
+            "online",
+            "transfer",
+          ];
           for (const method of paymentMethods) {
-            if (targetNames.some(t => String(method.name).toLowerCase().includes(t))) {
+            if (
+              targetNames.some((t) =>
+                String(method.name).toLowerCase().includes(t),
+              )
+            ) {
               paymentModeId = method.id;
               break;
             }
           }
-        } catch { /* use default */ }
+        } catch {
+          /* use default */
+        }
 
         if (paymentAmount && paymentAmount > 0) {
-          await olsera.updateOrderPayment(newOlseraId, paymentAmount, paymentModeId);
+          await olsera.updateOrderPayment(
+            newOlseraId,
+            paymentAmount,
+            paymentModeId,
+          );
           await olsera.markOrderAsPaid(newOlseraId, true);
-          await olsera.updateOrderStatus(newOlseraId, 'P');
-          console.log(`[Recovery] ✅ Settlement completed for ${recoveredOlseraId}`);
+          await olsera.updateOrderStatus(newOlseraId, "P");
+          console.log(
+            `[Recovery] ✅ Settlement completed for ${recoveredOlseraId}`,
+          );
         }
       } catch (settlementErr: any) {
-        console.warn(`[Recovery] Settlement partially failed (non-blocking): ${settlementErr.message}`);
+        console.warn(
+          `[Recovery] Settlement partially failed (non-blocking): ${settlementErr.message}`,
+        );
       }
     } catch (recoveryErr: any) {
-      console.warn(`[Recovery] ⚠️ Could not create Olsera order (non-blocking): ${recoveryErr.message}`);
+      console.warn(
+        `[Recovery] ⚠️ Could not create Olsera order (non-blocking): ${recoveryErr.message}`,
+      );
       // Even if Olsera fails again, we still broadcast to KDS and update local DB
     }
 
     // Step 3: Broadcast ke KDS via Pusher — pelanggan sudah bayar, barista HARUS tahu
     try {
-      const { pusherServer } = await import('@/lib/pusher');
-      await pusherServer.trigger('kitchen', 'ORDER_CREATED', {
+      const { pusherServer } = await import("@/lib/pusher");
+      await pusherServer.trigger("kitchen", "ORDER_CREATED", {
         order: {
           id: recoveredOlseraId || orderId,
           queueNumber: Math.floor(Math.random() * 900) + 100,
-          status: 'PENDING',
+          status: "PENDING",
           totalAmount: paymentAmount || 0,
-          paymentMethod: 'MIDTRANS',
+          paymentMethod: "MIDTRANS",
           createdAt: new Date().toISOString(),
           items: [], // Items tidak tersedia dari webhook context
           isRecovered: true, // Flag agar KDS tahu ini order recovery
         },
       });
-      console.log(`[Recovery] ✅ KDS broadcast sent for ${recoveredOlseraId || orderId}`);
+      console.log(
+        `[Recovery] ✅ KDS broadcast sent for ${recoveredOlseraId || orderId}`,
+      );
     } catch (pusherErr) {
-      console.warn('[Recovery] Pusher broadcast failed (non-blocking):', pusherErr);
+      console.warn(
+        "[Recovery] Pusher broadcast failed (non-blocking):",
+        pusherErr,
+      );
     }
 
     // Step 4: Update database lokal
     try {
-      const { prisma } = await import('@/lib/db');
+      const { prisma } = await import("@/lib/db");
       // Coba update jika sudah ada
-      const existing = await prisma.order.findUnique({ where: { id: orderId } });
+      const existing = await prisma.order.findUnique({
+        where: { id: orderId },
+      });
       if (existing) {
         await prisma.order.update({
           where: { id: orderId },
-          data: { 
-            status: 'PAID',
+          data: {
+            status: "PAID",
             olseraSynced: recoveredOlseraId !== null,
             olseraTransactionId: recoveredOlseraId || undefined,
           },
@@ -511,28 +666,36 @@ export async function updateOrderPaymentStatus(
         await prisma.order.create({
           data: {
             id: recoveredOlseraId || orderId,
-            stationId: 'KIOSK',
-            cashierId: 'cmo83g6140000vq5g10u03858',
+            stationId: "KIOSK",
+            cashierId: "cmo83g6140000vq5g10u03858",
             total: paymentAmount || 0,
-            status: 'PAID',
-            paymentMethod: 'MIDTRANS',
+            status: "PAID",
+            paymentMethod: "MIDTRANS",
             olseraSynced: recoveredOlseraId !== null,
             olseraTransactionId: recoveredOlseraId || undefined,
             items: { create: [] },
           },
         });
-        console.log(`[Recovery] ✅ New local DB record created for ${recoveredOlseraId || orderId}`);
+        console.log(
+          `[Recovery] ✅ New local DB record created for ${recoveredOlseraId || orderId}`,
+        );
       }
     } catch (dbErr: any) {
-      console.warn(`[Recovery] DB update failed (non-blocking): ${dbErr.message}`);
+      console.warn(
+        `[Recovery] DB update failed (non-blocking): ${dbErr.message}`,
+      );
     }
 
-    console.log(`[Recovery] 🏁 Reconciliation complete for ${orderId} → ${recoveredOlseraId || '(local only)'}`);
+    console.log(
+      `[Recovery] 🏁 Reconciliation complete for ${orderId} → ${recoveredOlseraId || "(local only)"}`,
+    );
     return;
   }
 
   // Non-SF, Non-OLSERA orders — truly unsupported
-  console.warn(`[Auto-Settlement] Order ${orderId} is not recognized. No action taken.`);
+  console.warn(
+    `[Auto-Settlement] Order ${orderId} is not recognized. No action taken.`,
+  );
   return;
 }
 
@@ -541,11 +704,16 @@ export async function updateOrderPaymentStatus(
  * Note: Olsera Open API may not support native discount injection.
  * We log it here so it's tracked, and the actual discount is reflected in Midtrans payment amount.
  */
-export async function applyOrderDiscount(orderId: string, discountAmount: number): Promise<void> {
+export async function applyOrderDiscount(
+  orderId: string,
+  discountAmount: number,
+): Promise<void> {
   if (!USE_OLSERA) return;
   // Olsera Open API doesn't have a dedicated discount endpoint.
   // The discount is already reflected in the Midtrans payment amount.
-  console.log(`[POS Adapter] Discount of Rp ${discountAmount.toLocaleString('id-ID')} applied to order ${orderId} (tracked in Midtrans, not synced to Olsera).`);
+  console.log(
+    `[POS Adapter] Discount of Rp ${discountAmount.toLocaleString("id-ID")} applied to order ${orderId} (tracked in Midtrans, not synced to Olsera).`,
+  );
 }
 
 /**
