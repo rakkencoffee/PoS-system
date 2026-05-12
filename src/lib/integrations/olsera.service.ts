@@ -519,47 +519,35 @@ export async function createOrder(
   options: { currencyId?: string | number; customer_name?: string; notes?: string } = {}
 ): Promise<{ id: number; order_id?: number; [key: string]: unknown }> {
   const { currencyId = 'IDR', customer_name, notes } = options;
-  const formData = new URLSearchParams();
-  formData.append('order_date', new Date().toISOString().split('T')[0]);
-  formData.append('currency_id', String(currencyId));
-  formData.append('is_funding', '0'); // Required by Olsera Open API (boolean: 1/0)
+  const uniqueId = Date.now().toString().slice(-6);
   
-  if (customer_name) {
-    formData.append('customer_name', customer_name);
-    // Guest profile requires email, phone, and customer_type_id to avoid 406 errors
-    const uniqueId = Date.now().toString().slice(-6);
-    formData.append('customer_email', `${customer_name.replace(/\s+/g, '').toLowerCase()}${uniqueId}@rakkencoffee.com`);
-    formData.append('customer_phone', `08123${uniqueId}`);
-    formData.append('customer_type_id', '0'); // Guest type ID found from API
-  } else {
-    const uniqueId = Date.now().toString().slice(-6);
-    formData.append('customer_name', 'Guest');
-    formData.append('customer_email', `guest${uniqueId}@rakkencoffee.com`);
-    formData.append('customer_phone', `08100${uniqueId}`);
-    formData.append('customer_type_id', '0');
-  }
+  // Format dates and customer info
+  const payload: any = {
+    order_date: new Date().toISOString().split('T')[0],
+    currency_id: String(currencyId),
+    is_funding: 0,
+    customer_name: customer_name || 'Guest',
+    customer_email: customer_name 
+      ? `${customer_name.replace(/\s+/g, '').toLowerCase()}${uniqueId}@rakkencoffee.com`
+      : `guest${uniqueId}@rakkencoffee.com`,
+    customer_phone: customer_name ? `08123${uniqueId}` : `08100${uniqueId}`,
+    customer_type_id: 0,
+    notes: notes || '',
+    items: (items || []).map(item => ({
+      product_id: Number(item.productId),
+      variant_id: item.variantId ? Number(item.variantId) : 0,
+      qty: Number(item.quantity),
+      price: Number(item.price || 0),
+      notes: item.note || ''
+    }))
+  };
 
-  if (notes) formData.append('notes', notes);
-  // Items are better added via addItemToOrder after getting order_id
-  // but we keep the logic here if items were passed
-  if (items && items.length > 0) {
-    items.forEach((item, index) => {
-      formData.append(`items[${index}][product_id]`, item.productId);
-      formData.append(`items[${index}][qty]`, String(item.quantity));
-      if (item.price) formData.append(`items[${index}][price]`, String(item.price));
-      if (item.variantId) {
-        formData.append(`items[${index}][variant_id]`, item.variantId);
-      }
-      if (item.note) {
-        formData.append(`items[${index}][notes]`, item.note);
-      }
-    });
-  }
+  console.log(`[Olsera API] createOrder JSON payload:`, JSON.stringify(payload));
 
   const res = await olseraFetch('/order/openorder', {
     method: 'POST',
-    body: formData,
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
   });
 
   if (!res.ok) {
@@ -601,20 +589,20 @@ export async function addItemToOrder(
 
   console.log(`[Olsera API] addItemToOrder payload:`, Object.fromEntries(formData));
 
-  const res = await olseraFetch('/order/openorder/additem', {
+  const response = await olseraFetch('/order/openorder/additem', {
     method: 'POST',
     body: formData,
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
   });
 
-  if (!res.ok) {
-    const text = await res.text();
-    console.error('Olsera addItemToOrder error:', text);
-    throw new Error(`Failed to add item to order: ${res.status}`);
+  const resData = await response.json();
+  console.log(`[Olsera API] addItemToOrder response for ${productId}:`, JSON.stringify(resData));
+
+  if (!response.ok || (resData.status !== 'success' && resData.error)) {
+    throw new Error(`Olsera Add Item Error: ${resData.error || response.statusText}`);
   }
 
-  const data = await res.json();
-  return data.data || data;
+  return resData;
 }
 
 /**

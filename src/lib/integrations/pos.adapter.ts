@@ -281,36 +281,30 @@ export async function createOrder(
   customerName?: string,
 ): Promise<{ orderId: string; olseraOrderId?: number }> {
   if (USE_OLSERA) {
-    // 1. Create open order (Header only)
-    const order = await olsera.createOrder([], { customer_name: customerName });
-    const orderId = (order.id || order.order_id) as number;
-
-    // 2. Add each item separately (required by Olsera Open API for Open Orders)
-    for (const item of items) {
-      if (!item.productId) continue;
-      try {
-        // Concatenate note and options for Olsera
-        let fullNote = item.note || "";
-        if (item.options) {
-          const optStr = Object.entries(item.options)
-            .filter(([_, v]) => v && v !== "-" && !Array.isArray(v))
-            .map(([k, v]) => `${k}: ${v}`)
-            .join(", ");
-          if (optStr) fullNote = fullNote ? `${fullNote} (${optStr})` : optStr;
-        }
-
-        await olsera.addItemToOrder(
-          orderId,
-          parseInt(item.productId),
-          item.variantId ? parseInt(item.variantId) : null,
-          item.quantity,
-          fullNote,
-          item.price
-        );
-      } catch (err) {
-        console.error(`Failed to add item ${item.productId} to order ${orderId}:`, err);
+    // 1. Create order in POS (Olsera) with all items in one go
+    // This is more efficient (1 API call) and more reliable for pricing/variants
+    const posItems = items.map((item) => {
+      // Concatenate note and options for Olsera
+      let fullNote = item.note || "";
+      if (item.options) {
+        const optStr = Object.entries(item.options)
+          .filter(([_, v]) => v && v !== "-" && !Array.isArray(v))
+          .map(([k, v]) => `${k}: ${v}`)
+          .join(", ");
+        if (optStr) fullNote = fullNote ? `${fullNote} (${optStr})` : optStr;
       }
-    }
+
+      return {
+        productId: item.productId,
+        variantId: item.variantId,
+        quantity: item.quantity,
+        price: item.price,
+        note: fullNote
+      };
+    });
+
+    const order = await olsera.createOrder(posItems, { customer_name: customerName });
+    const orderId = (order.id || order.order_id) as number;
 
     // 3. Mirror to local Prisma for Dashboard/Reporting (Sprint 4)
     try {
