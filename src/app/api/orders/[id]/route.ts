@@ -55,7 +55,7 @@ export async function GET(
 
         // FALLBACK: If Olsera has no items or 0 total, fetch from local Prisma mirror
         // This is the most robust way to handle Olsera's sync delays.
-        if (totalAmount === 0 || finalItems.length === 0 || finalItems.every(i => i.price === 0)) {
+        if (totalAmount === 0 || finalItems.length === 0 || finalItems.every((i: any) => i.price === 0)) {
           console.log(`[Sync] Olsera data incomplete for ${id}, fetching from local Prisma fallback...`);
           try {
             const { prisma } = await import('@/lib/db');

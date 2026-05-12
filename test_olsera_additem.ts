@@ -2,6 +2,7 @@ import { createOrder, addItemToOrder, getOrderDetail } from './src/lib/integrati
 async function run() {
   const o = await createOrder([], { customer_name: 'Debug Note' });
   const id = o.id || o.order_id;
+  if (!id) throw new Error('Failed to get order ID');
   console.log('Created order', id);
   // add a kyoto blend
   await addItemToOrder(id, 114800750, 63357628, 1, 'Sugar: Less; Ice: Less;');
