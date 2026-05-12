@@ -586,7 +586,8 @@ export async function addItemToOrder(
   productId: number,
   variantId: number | null,
   quantity: number = 1,
-  note: string = ''
+  note: string = '',
+  price?: number
 ): Promise<unknown> {
   const formData = new URLSearchParams();
   formData.append('order_id', String(orderId));
@@ -595,6 +596,7 @@ export async function addItemToOrder(
   const itemValue = variantId ? `${productId}|${variantId}` : String(productId);
   formData.append('item_products', itemValue);
   formData.append('item_qty', String(quantity));
+  if (price !== undefined) formData.append('item_price', String(price));
   if (note) formData.append('notes', note);
 
   console.log(`[Olsera API] addItemToOrder payload:`, Object.fromEntries(formData));
