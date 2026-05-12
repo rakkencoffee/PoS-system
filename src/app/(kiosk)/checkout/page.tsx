@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useCartStore } from '@/stores/useCartStore';
 import { useCreateOrder, useValidateVoucher, usePaymentConfig } from '@/hooks/useOrders';
 import { db } from '@/lib/dexie';
+import { payWithEDC } from '@/lib/print-bridge';
 import * as Sentry from "@sentry/nextjs";
 
 declare global {
@@ -38,6 +39,7 @@ export default function CheckoutPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<string>('');
   const [snapLoaded, setSnapLoaded] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'online' | 'edc'>('online');
   const checkoutInProgress = useRef(false);
 
   // Voucher states
@@ -142,55 +144,111 @@ export default function CheckoutPage() {
         throw new Error('No payment token received');
       }
     } catch (error: any) {
-      console.error('Checkout error:', error);
-      
-      // Check if it's a network error (offline)
-      const isNetworkError = error.name === 'TypeError' && 
-                             (error.message.includes('fetch') || error.message.includes('NetworkError'));
-      
-      if (isNetworkError || !navigator.onLine) {
-        try {
-          const orderPayload = {
-            orderId: `OFFLINE-${Date.now()}`,
-            items: items.map((item) => ({
-              productId: String(item.menuItemId),
-              name: item.name,
-              price: item.subtotal / item.quantity,
-              quantity: item.quantity,
-              variantId: item.olseraVariantId ? String(item.olseraVariantId) : undefined,
-              notes: item.notes,
-              options: {
-                size: item.size,
-                sugarLevel: item.sugarLevel,
-                iceLevel: item.iceLevel,
-                extraShot: item.extraShot,
-                toppings: item.toppings.map(t => t.id)
-              }
-            })),
-            customerName: customerName,
-            totalAmount: total,
-            createdAt: new Date().toISOString(),
-            status: 'pending' as const
-          };
+      handleCheckoutError(error);
+    }
+  };
 
-          await db.pendingOrders.add(orderPayload);
-          
-          setPaymentStatus('Order saved offline!');
-          clearCart();
-          
-          // Redirect to success with offline flag
-          router.push(`/success?orderId=${orderPayload.orderId}&offline=true`);
-          return;
-        } catch (dexieError) {
-          console.error('Failed to save to Dexie:', dexieError);
-          Sentry.captureException(dexieError);
-        }
+  const handleCheckoutEDC = async () => {
+    checkoutInProgress.current = true;
+    setIsProcessing(true);
+    setPaymentStatus('Connecting to EDC...');
+
+    try {
+      // 1. Create order first (mark as pending_edc)
+      const data = await createOrderMutation.mutateAsync({
+        items: items.map((item) => ({
+          productId: String(item.menuItemId),
+          name: item.name,
+          price: item.subtotal / item.quantity,
+          quantity: item.quantity,
+          variantId: item.olseraVariantId ? String(item.olseraVariantId) : undefined,
+          notes: item.notes,
+          options: {
+            size: item.size,
+            sugarLevel: item.sugarLevel,
+            iceLevel: item.iceLevel,
+            extraShot: item.extraShot,
+            toppings: item.toppings.map(t => t.id)
+          }
+        })),
+        totalAmount: subtotal,
+        discountAmount: appliedDiscount,
+        customerName: customerName,
+        voucherCode: appliedDiscount > 0 ? voucherCode : undefined,
+        paymentMethod: 'EDC' // Signal to backend this is EDC
+      });
+
+      setPaymentStatus('Please tap/swipe card on EDC terminal...');
+
+      // 2. Trigger EDC via local bridge
+      const edcResult = await payWithEDC(total, data.orderId);
+
+      if (edcResult.success) {
+        setPaymentStatus('Payment Approved!');
+        clearCart();
+        const numericId = data.orderId.replace('OLSERA-', '');
+        const queueNum = numericId.slice(-3);
+        
+        // Pass EDC metadata to success page
+        const edcParams = `&edc=true&approval=${edcResult.data.approvalCode}&card=${edcResult.data.cardNo}`;
+        router.push(`/success?orderId=${data.orderId}&queue=${queueNum}${edcParams}`);
+      } else {
+        throw new Error(edcResult.error || 'Payment declined by EDC');
       }
 
-      alert('Failed to process checkout: ' + error.message);
-      setIsProcessing(false);
-      checkoutInProgress.current = false;
+    } catch (error: any) {
+      handleCheckoutError(error);
     }
+  };
+
+  const handleCheckoutError = async (error: any) => {
+    console.error('Checkout error:', error);
+    
+    // Check if it's a network error (offline)
+    const isNetworkError = error.name === 'TypeError' && 
+                           (error.message.includes('fetch') || error.message.includes('NetworkError'));
+    
+    if (isNetworkError || !navigator.onLine) {
+      try {
+        const orderPayload = {
+          orderId: `OFFLINE-${Date.now()}`,
+          items: items.map((item) => ({
+            productId: String(item.menuItemId),
+            name: item.name,
+            price: item.subtotal / item.quantity,
+            quantity: item.quantity,
+            variantId: item.olseraVariantId ? String(item.olseraVariantId) : undefined,
+            notes: item.notes,
+            options: {
+              size: item.size,
+              sugarLevel: item.sugarLevel,
+              iceLevel: item.iceLevel,
+              extraShot: item.extraShot,
+              toppings: item.toppings.map(t => t.id)
+            }
+          })),
+          customerName: customerName,
+          totalAmount: total,
+          createdAt: new Date().toISOString(),
+          status: 'pending' as const
+        };
+
+        await db.pendingOrders.add(orderPayload);
+        
+        setPaymentStatus('Order saved offline!');
+        clearCart();
+        
+        router.push(`/success?orderId=${orderPayload.orderId}&offline=true`);
+        return;
+      } catch (dexieError) {
+        console.error('Failed to save to Dexie:', dexieError);
+        Sentry.captureException(dexieError);
+      }
+    }
+
+    alert('Checkout failed: ' + error.message);
+    setIsProcessing(false);
+    checkoutInProgress.current = false;
   };
 
   const handleApplyVoucher = async () => {

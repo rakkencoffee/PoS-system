@@ -385,20 +385,35 @@ export async function getProductGroups(): Promise<OlseraProductGroup[]> {
   return data.data || data;
 }
 
+// Order Detail Cache: prevents re-fetching same details within a short window
+const orderDetailCache = new Map<string | number, { data: any, expiresAt: number }>();
+const CACHE_TTL_ORDER_DETAIL = 300_000; // 5 minutes
+
 /**
  * Fetch open order detail from Olsera
  * GET /order/openorder/detail?id=xxx
  * Note: Use the numeric internal ID.
  */
 export async function getOrderDetail(orderId: number | string): Promise<any> {
-  // Extract numeric ID if string (e.g. OLSERA-12345 -> 12345)
   const numericId = typeof orderId === 'string' 
     ? orderId.replace('OLSERA-', '') 
     : orderId;
 
+  // Check Cache First
+  const cached = orderDetailCache.get(numericId);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.data;
+  }
+
   console.log(`[Olsera API] Fetching detail for order: ${numericId}`);
 
-  const res = await olseraFetch(`/order/openorder/detail?id=${numericId}`);
+  let res = await olseraFetch(`/order/openorder/detail?id=${numericId}`);
+  if (res.status === 429) {
+    console.warn(`[Olsera API] Rate limited (429) on order ${numericId}. Waiting 2s...`);
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    res = await olseraFetch(`/order/openorder/detail?id=${numericId}`);
+  }
+
   if (!res.ok) {
     const text = await res.text();
     console.error(`Olsera getOrderDetail error for ${numericId}:`, text);
@@ -406,7 +421,6 @@ export async function getOrderDetail(orderId: number | string): Promise<any> {
   }
 
   const data = await res.json();
-  // Detail API returns order inside .data
   const order = data.data || data;
   
   if (!order || (!order.id && !order.order_id)) {
@@ -422,6 +436,12 @@ export async function getOrderDetail(orderId: number | string): Promise<any> {
   if (Array.isArray(order.orderitems) && !order.items) {
     order.items = order.orderitems;
   }
+
+  // Store in cache
+  orderDetailCache.set(numericId, {
+    data: order,
+    expiresAt: Date.now() + CACHE_TTL_ORDER_DETAIL
+  });
 
   return order;
 }
@@ -483,6 +503,11 @@ export async function updateOrderStatus(orderId: number, status: 'P' | 'A' | 'S'
 
   const result = await res.json();
   console.log(`[Olsera API] Successfully updated order ${orderId} to status ${status}`);
+  
+  // Invalidate Cache so next fetch gets new status
+  orderDetailCache.delete(orderId);
+  orderDetailCache.delete(String(orderId));
+
   return result;
 }
 
@@ -491,9 +516,9 @@ export async function updateOrderStatus(orderId: number, status: 'P' | 'A' | 'S'
  */
 export async function createOrder(
   items: { productId: string; variantId?: string; quantity: number; price?: number; note?: string }[] = [],
-  options: { currencyId?: string | number; customer_name?: string } = {}
+  options: { currencyId?: string | number; customer_name?: string; notes?: string } = {}
 ): Promise<{ id: number; order_id?: number; [key: string]: unknown }> {
-  const { currencyId = 'IDR', customer_name } = options;
+  const { currencyId = 'IDR', customer_name, notes } = options;
   const formData = new URLSearchParams();
   formData.append('order_date', new Date().toISOString().split('T')[0]);
   formData.append('currency_id', String(currencyId));
@@ -514,6 +539,7 @@ export async function createOrder(
     formData.append('customer_type_id', '0');
   }
 
+  if (notes) formData.append('notes', notes);
   // Items are better added via addItemToOrder after getting order_id
   // but we keep the logic here if items were passed
   if (items && items.length > 0) {
@@ -715,7 +741,7 @@ export async function getAllOrders(options: { today?: boolean } = {}): Promise<a
 
   try {
     // 1. Fetch Open Orders
-    const openRes = await olseraFetch(`/order/openorder?per_page=50${today ? `&date_from=${dateFilter}` : ''}`);
+    const openRes = await olseraFetch(`/order/openorder?per_page=50`);
     if (openRes.ok) {
       const data = await openRes.json();
       const orders = data.data || data || [];
@@ -725,7 +751,7 @@ export async function getAllOrders(options: { today?: boolean } = {}): Promise<a
     }
 
     // 2. Fetch Closed Orders
-    const closedRes = await olseraFetch(`/order/closeorder?per_page=50${today ? `&date_from=${dateFilter}` : ''}`);
+    const closedRes = await olseraFetch(`/order/closeorder?per_page=50${today ? `&start_date=${dateFilter}` : ''}`);
     if (closedRes.ok) {
       const data = await closedRes.json();
       const orders = data.data || data || [];

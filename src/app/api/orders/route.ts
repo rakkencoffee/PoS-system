@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { orderEvents } from '@/lib/events';
 
 const USE_OLSERA = process.env.USE_OLSERA === 'true';
 
@@ -12,132 +11,93 @@ export async function GET(request: NextRequest) {
     if (USE_OLSERA) {
       const olsera = await import('@/lib/integrations/olsera.service');
       let orders: any[] = [];
+      
       try {
-        // Use consolidated fetching if 'today' is requested, otherwise fallback to open orders
-        let rawOrders = today === 'true' 
+        // 1. Fetch List of Orders from Olsera
+        const rawList = today === 'true' 
           ? await olsera.getAllOrders({ today: true })
-          : await olsera.olseraFetch('/order/openorder?per_page=50').then(res => res.json().then(d => d.data || d || []));
-
-        if (!Array.isArray(rawOrders)) rawOrders = [];
-
-        // HANYA ambil order yang belum selesai untuk di-fetch detailnya 
-        // (KDS butuh items, list API Olsera tidak mengembalikan items)
-        const activeOrders = rawOrders.filter((o: any) => {
-          const s = (o.status || '').toUpperCase();
-          return s !== 'Z' && s !== 'T' && s !== 'COMPLETED'; // Filter out completed
-        });
-
-        // Fetch detail secara paralel (maks 10-20 order biasanya di KDS)
-        const detailedOrders = await Promise.all(
-          activeOrders.map(async (o: any) => {
-            try {
-              return await olsera.getOrderDetail(o.id || o.order_id);
-            } catch (err) {
-              console.warn(`Failed to fetch detail for order ${o.id}:`, err);
-              return o; // Fallback to raw if detail fails
-            }
+          : await olsera.olseraFetch('/order/openorder?per_page=100').then(res => res.json().then(d => d.data || d || []));
+        
+        // 2. Identify "Active" orders that need details (Pending/Preparing)
+        // Increased limit to 50 to cover all orders seen in backoffice
+        const allPotentialOrders = (Array.isArray(rawList) ? rawList : []);
+        const activeOrdersToEnrich = allPotentialOrders
+          .filter(o => {
+            const status = (o.status || '').toUpperCase();
+            return status !== 'Z' && status !== 'T'; // Not Completed / Not Cancelled
           })
-        );
+          .slice(0, 50);
 
-        const rawData = detailedOrders;
+        console.log(`[API] Total list items: ${allPotentialOrders.length}, Active to enrich: ${activeOrdersToEnrich.length}`);
 
-        // Normalize orders to match frontend format
-        orders = (Array.isArray(rawData) ? rawData : []).map((order: any) => {
+        // 3. Fetch details for each active order sequentially with rate limit protection
+        const enrichedOrders = [];
+        for (const o of activeOrdersToEnrich) {
+          try {
+            const numericId = o.id || o.order_id;
+            const detail = await olsera.getOrderDetail(numericId);
+            enrichedOrders.push({ ...o, ...detail });
+            
+            // Add a small delay to respect Olsera's rate limits
+            await new Promise(resolve => setTimeout(resolve, 300));
+          } catch (err) {
+            console.error(`[API] Failed to fetch detail for order ${o.id}:`, err);
+            enrichedOrders.push({
+              ...o,
+              items: [{ product_name: 'Menu (Detail Loading...)', qty: 1, group_name: 'Other' }]
+            });
+          }
+        }
+
+        // 5. Normalize enriched orders
+        orders = enrichedOrders.map((order: any) => {
           let kdsStatus = 'PENDING';
           const oStatus = (order.status || '').toUpperCase();
           const numericId = order.id || order.order_id;
-          const isPaid = Number(order.is_paid) === 1 || order.payment_status === '1' || oStatus === 'Z';
           
           if (oStatus === 'A') kdsStatus = 'PREPARING';
           else if (oStatus === 'Z' || oStatus === 'T') kdsStatus = 'COMPLETED';
-          else if (isPaid) {
-            kdsStatus = 'PENDING'; // Paid but no progress yet
-          }
+          else kdsStatus = 'PENDING';
 
-          // Payment method normalization
           let pMethod = order.payment_mode_name || order.payment_method || 'MIDTRANS';
           if (pMethod === '1' || pMethod === 'Cash') pMethod = 'CASH';
 
-          let createdAtStr = '';
-          // Priority: add_datetime > add_date+add_time > order_date+order_time > created_at
-          if (order.add_datetime) {
-            createdAtStr = order.add_datetime;
-          } else if (order.add_date && order.add_time) {
-            createdAtStr = `${order.add_date} ${order.add_time}`;
-          } else if (order.order_date && order.order_time) {
-            createdAtStr = `${order.order_date} ${order.order_time}`;
-          } else if (order.order_date) {
-            // order_date may contain '00:00:00' time — strip it and use current time
-            const datePart = order.order_date.split(' ')[0]; // "2026-04-01 00:00:00" → "2026-04-01"
-            const now = new Date();
-            const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
-            createdAtStr = `${datePart} ${timeStr}`;
-          } else {
-            createdAtStr = order.created_at || new Date().toISOString();
-          }
-
-          const orderItems = (order.items || order.orderitems || order.order_items || []).map((item: any, idx: number) => {
-              const rawNote = item.note || item.notes || '';
-              let sugarLevel = 'normal';
-              let iceLevel = 'normal';
-              let isExtraShot = false;
-
-              if (typeof rawNote === 'string') {
-                const parts = rawNote.split(';').map((p: string) => p.trim());
-                parts.forEach((p: string) => {
-                  const lower = p.toLowerCase();
-                  if (lower.startsWith('sugar:')) sugarLevel = p.substring(6).trim();
-                  else if (lower.startsWith('ice:')) iceLevel = p.substring(4).trim();
-                  else if (lower === 'extra shot') isExtraShot = true;
-                });
-              }
-
-              let size = item.variant_name
-                || item.product_variant_name
-                || item.variant?.name
-                || item.size
-                || '-';
-
-              const categoryName = item.product_group_name 
-                || item.klasifikasi 
-                || item.category_name 
-                || item.group_name 
-                || '';
-
-              return {
-                id: idx,
-                menuItem: { name: item.product_name || item.name || 'Item' },
-                quantity: Number(item.qty || item.quantity || 1),
-                size,
-                sugarLevel,
-                iceLevel,
-                extraShot: isExtraShot,
-                notes: rawNote,
-                subtotal: Number(item.price || 0),
-                categoryName,
-              };
-            });
-
-          // Deteksi HANYA berdasarkan kategori, jangan nama menu
-          const coffeeCategories = ['coffee-based', 'coffee based', 'milk-based', 'milk based', 'coffee', 'kopi'];
+          const rawItems = order.items || order.orderitems || order.order_items || [];
           
-          const isCoffeeOrder = orderItems.some((item: any) => {
-            const catName = (item.categoryName || '').toLowerCase();
-            return coffeeCategories.some(c => catName.includes(c));
-          });
-
           return {
             id: `OLSERA-${numericId}`,
             queueNumber: numericId % 1000,
             status: kdsStatus,
             totalAmount: Number(order.total || order.total_amount || order.grand_total || 0),
             paymentMethod: pMethod,
-            createdAt: createdAtStr,
-            isCoffeeOrder,
-            items: orderItems,
+            createdAt: order.order_date || order.created_at || new Date().toISOString(),
+            items: rawItems.map((item: any, idx: number) => {
+              const name = item.product_name || item.name || 'Item';
+              
+              // Normalize category from Olsera group name or category name
+              const groupName = (item.product_group_name || item.group_name || item.category_name || '').toLowerCase();
+              
+              let cat = 'other';
+              // Check for Rakken Signature or Rakken Style specifically
+              if (groupName.includes('signature')) cat = 'rakken-signature';
+              else if (groupName.includes('style')) cat = 'rakken-style';
+
+              return {
+                id: idx,
+                menuItem: { name },
+                quantity: Number(item.qty || item.quantity || 1),
+                size: item.variant_name || '-',
+                subtotal: Number(item.price || 0),
+                categorySlug: cat,
+                notes: item.notes || item.note || '',
+              };
+            }),
           };
         });
 
+        console.log(`[API] Returning ${orders.length} normalized orders to KDS`);
+
+        // 6. If filtering for KDS (status provided), restrict to active only
         if (status) {
           orders = orders.filter(o => o.status !== 'COMPLETED' || status === 'COMPLETED');
         }

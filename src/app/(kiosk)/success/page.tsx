@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Receipt } from '@/components/pos/Receipt';
+import { printReceipt, type PrintReceiptData } from '@/lib/print-bridge';
 
 function SuccessContent() {
   const router = useRouter();
@@ -26,52 +27,127 @@ function SuccessContent() {
   
   const [countdown, setCountdown] = useState(isOffline ? 30 : 15);
   const [orderData, setOrderData] = useState<any>(null);
+  const [edcData, setEdcData] = useState<any>(null);
   const hasPrinted = useRef(false);
+  const [printStatus, setPrintStatus] = useState<'idle' | 'printing' | 'success' | 'fallback' | 'error'>('idle');
 
   // Auto-verify payment & Fetch order detail for receipt
   useEffect(() => {
     if (orderId && !isOffline) {
-      // 1. Fetch order details for the receipt
-      fetch(`/api/orders/${orderId}`)
-        .then(res => res.json())
-        .then(data => {
-          if (!data.error) setOrderData(data);
-        })
-        .catch(e => console.error('Failed to fetch order for receipt:', e));
+      console.log(`[Success] Starting order sync/fetch for ${orderId}...`);
+      
+      let retryCount = 0;
+      const maxRetries = 8; // Increased retries
+      
+      const fetchOrder = async () => {
+        try {
+          const res = await fetch(`/api/orders/${orderId}?refresh=true`); // Added refresh hint
+          const data = await res.json();
+          
+          if (data.id && data.items && data.items.length > 0) {
+            console.log('[Success] Order data found with items:', data.id);
+            setOrderData(data);
+          } else if (retryCount < maxRetries) {
+            retryCount++;
+            const delay = retryCount * 1000; // Exponential-ish backoff
+            console.log(`[Success] Order items not ready yet, retrying in ${delay}ms... (${retryCount}/${maxRetries})`);
+            setTimeout(fetchOrder, delay);
+          } else {
+            console.warn('[Success] Order data still incomplete after retries.');
+            if (data.id) setOrderData(data);
+          }
+        } catch (e) {
+          console.error('[Success] Fetch failed:', e);
+        }
+      };
 
-      // 2. Settlement logic
-      if (process.env.NEXT_PUBLIC_TEST_MODE === 'true') {
-        // [TEST MODE EXCLUSIVE] Auto settle the Olsera order since Webhooks can't reach us locally
+      // Initial fetch
+      fetchOrder();
+
+      // Settlement logic
+      if (process.env.NEXT_PUBLIC_TEST_MODE === 'true' || !transactionStatus) {
+        // Force settlement in test mode or if direct visit
         fetch('/api/test-settle', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ orderId }),
-        })
-          .then(() => console.log('Test-Mode Auto Settlement triggered!'))
-          .catch((e) => console.error('Failed to auto-settle test order:', e));
-      } else if (transactionStatus && (transactionStatus === 'capture' || transactionStatus === 'settlement')) {
-        // Standard Midtrans redirect verify
-        fetch(`/api/payment/verify?orderId=${orderId}`, { method: 'POST' })
-          .then(() => console.log('Payment verified after Midtrans redirect'))
-          .catch((e) => console.error('Failed to verify payment after redirect:', e));
+        }).catch(() => {});
       }
     }
-  }, [orderId, transactionStatus]);
 
-  // Auto-print when order data is ready
+    const isEdc = searchParams.get('edc') === 'true';
+    if (isEdc) {
+      setEdcData({
+        approvalCode: searchParams.get('approval'),
+        cardNo: searchParams.get('card'),
+      });
+    }
+  }, [orderId, isOffline, searchParams, transactionStatus]);
+
+  // Auto-print logic
   useEffect(() => {
-    if (orderData && !hasPrinted.current) {
-      hasPrinted.current = true;
-      // Small delay to ensure Receipt renders before print dialog opens
-      const timer = setTimeout(() => {
-        window.print();
-      }, 800);
+    if (orderData && orderData.items?.length > 0 && !hasPrinted.current) {
+      console.log('[Success] Order items detected, initiating print...');
+      
+      const triggerPrint = async () => {
+        if (hasPrinted.current) return;
+        hasPrinted.current = true;
+        setPrintStatus('printing');
+
+        try {
+          const receiptData: PrintReceiptData = {
+            orderId: orderId || '',
+            queueNumber: queue,
+            customerName: orderData.customerName || '',
+            items: orderData.items || [],
+            total: orderData.totalAmount || 0,
+            discount: orderData.discount || 0,
+            paymentMethod: edcData ? 'Debit/Credit' : (orderData.paymentMethod || 'E-Wallet'),
+            edcData: edcData ? {
+              approvalCode: edcData.approvalCode || '',
+              cardNo: edcData.cardNo || '',
+              refNo: orderId || ''
+            } : undefined
+          };
+
+          const result = await printReceipt(receiptData);
+          console.log('[Success] Print result:', result);
+          setPrintStatus(result.method === 'bridge' ? 'success' : result.method === 'browser' ? 'fallback' : 'error');
+        } catch (err) {
+          console.error('[Success] Print error:', err);
+          setPrintStatus('error');
+          hasPrinted.current = false;
+        }
+      };
+
+      const timer = setTimeout(triggerPrint, 300);
       return () => clearTimeout(timer);
     }
-  }, [orderData]);
+  }, [orderData, orderId, queue, edcData]);
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    setPrintStatus('printing');
+    try {
+      const receiptData: PrintReceiptData = {
+        orderId: orderId || '',
+        queueNumber: queue,
+        customerName: orderData?.customerName || '',
+        items: orderData?.items || [],
+        total: orderData?.totalAmount || 0,
+        discount: orderData?.discount || 0,
+        paymentMethod: edcData ? 'Debit/Credit' : (orderData?.paymentMethod || 'E-Wallet'),
+        edcData: edcData ? {
+          approvalCode: edcData.approvalCode || '',
+          cardNo: edcData.cardNo || '',
+          refNo: orderId || ''
+        } : undefined
+      };
+      const result = await printReceipt(receiptData);
+      setPrintStatus(result.method === 'bridge' ? 'success' : result.method === 'browser' ? 'fallback' : 'error');
+    } catch {
+      window.print();
+      setPrintStatus('fallback');
+    }
   };
 
   useEffect(() => {
@@ -158,15 +234,38 @@ function SuccessContent() {
         {/* Buttons */}
         <div className="space-y-3 animate-fade-in delay-4" style={{ opacity: 0 }}>
           {!isOffline && (
-            <button
-              onClick={handlePrint}
-              className="w-full py-4 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold flex items-center justify-center gap-3 transition-all active:scale-95 border border-white/10"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-              </svg>
-              🧾 Cetak Struk
-            </button>
+            <>
+              <button
+                onClick={handlePrint}
+                disabled={printStatus === 'printing'}
+                className="w-full py-4 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold flex items-center justify-center gap-3 transition-all active:scale-95 border border-white/10 disabled:opacity-50"
+              >
+                {printStatus === 'printing' ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Printing...
+                  </>
+                ) : printStatus === 'success' ? (
+                  <>
+                    <svg className="w-5 h-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Struk Tercetak ✓
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                    </svg>
+                    🧾 Cetak Struk
+                  </>
+                )}
+              </button>
+              
+              {printStatus === 'fallback' && (
+                <p className="text-xs text-amber-400 text-center">Print Bridge offline — menggunakan browser print</p>
+              )}
+            </>
           )}
           
           <button
@@ -176,6 +275,7 @@ function SuccessContent() {
           >
             {isOffline ? 'Tracking Unavailable (Offline)' : 'Track My Order'}
           </button>
+          
           <button
             onClick={() => router.push('/')}
             className="btn-ghost w-full"
