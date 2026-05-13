@@ -156,19 +156,79 @@ export async function PATCH(
       }
 
       let detail: any = null;
+      let localOrder: any = null;
 
       // 1. Handle mock orders (TEST01, etc) by skipping Olsera sync
       if (id.includes('TEST')) {
         console.log(`[Mock Order] Skipping Olsera sync for test order ${id}`);
       } else {
-        // Map KDS status to Olsera status
-        let olseraStatus: 'P' | 'A' | 'S' | 'Z' | 'X' = 'P';
-        if (body.status === 'PREPARING') olseraStatus = 'A'; // Confirmed/Preparing
-        else if (body.status === 'COMPLETED') olseraStatus = 'Z'; // Completed
+        // Station-specific logic
+        const stationType = body.stationType; // 'barista' or 'kitchen'
+        const newKdsStatus = body.status; // 'PREPARING' or 'COMPLETED'
         
+        console.log(`[Update] Station ${stationType} updating order ${id} to ${newKdsStatus}`);
+
+        // 1. Get or Create local order record in Prisma
+        const { prisma } = await import('@/lib/db');
+        localOrder = await prisma.order.findUnique({ where: { id } });
+        
+        if (!localOrder) {
+          console.log(`[Sync] Creating local record for Olsera order ${id}`);
+          detail = await olsera.getOrderDetail(olseraOrderId);
+          const rawItems = detail.items || detail.orderitems || [];
+          
+          // Basic category detection for initial status
+          const hasCoffee = rawItems.some((i: any) => {
+            const name = (i.product_name || '').toLowerCase();
+            return name.includes('coffee') || name.includes('signature') || name.includes('style');
+          });
+          const hasFood = rawItems.some((i: any) => {
+            const name = (i.product_name || '').toLowerCase();
+            return !name.includes('coffee') && !name.includes('signature') && !name.includes('style');
+          });
+
+          localOrder = await prisma.order.create({
+            data: {
+              id: id,
+              stationId: 'OLSERA',
+              cashierId: 'SYSTEM',
+              total: Math.round(Number(detail.total || 0)),
+              status: 'PENDING',
+              baristaStatus: hasCoffee ? 'PENDING' : 'COMPLETED',
+              kitchenStatus: hasFood ? 'PENDING' : 'COMPLETED',
+              olseraTransactionId: String(olseraOrderId),
+              olseraSynced: true
+            }
+          });
+        }
+
+        // 2. Update the specific station's status
+        const updateData: any = {};
+        if (stationType === 'barista') updateData.baristaStatus = newKdsStatus;
+        else if (stationType === 'kitchen') updateData.kitchenStatus = newKdsStatus;
+        else updateData.status = newKdsStatus; // Fallback
+
+        localOrder = await prisma.order.update({
+          where: { id },
+          data: updateData
+        });
+
+        // 3. Determine overall Olsera status
+        let olseraStatus: 'P' | 'A' | 'S' | 'Z' | 'X' = 'P';
+        
+        // If either station is preparing, overall is preparing
+        if (localOrder.baristaStatus === 'PREPARING' || localOrder.kitchenStatus === 'PREPARING') {
+          olseraStatus = 'A';
+        }
+        // If BOTH are completed, overall is completed
+        if (localOrder.baristaStatus === 'COMPLETED' && localOrder.kitchenStatus === 'COMPLETED') {
+          olseraStatus = 'Z';
+        }
+
         try {
+          // Only sync if Olsera status needs to change
           await olsera.updateOrderStatus(olseraOrderId, olseraStatus);
-          console.log(`Successfully synced Olsera order ${olseraOrderId} to status ${olseraStatus}`);
+          console.log(`Successfully synced Olsera order ${olseraOrderId} to combined status ${olseraStatus}`);
         } catch (err: any) {
           console.error('Initial sync failed, attempting self-healing for order:', olseraOrderId, err.message);
           
@@ -234,7 +294,9 @@ export async function PATCH(
       const updatedOrder = {
         id: id,
         queueNumber: olseraOrderId % 1000,
-        status: body.status,
+        status: localOrder ? localOrder.status : body.status,
+        baristaStatus: localOrder?.baristaStatus,
+        kitchenStatus: localOrder?.kitchenStatus,
         totalAmount: detail ? (detail.total || detail.grand_total || 0) : 0,
         paymentMethod: 'MIDTRANS',
         createdAt: detail ? (detail.order_date || detail.created_at || new Date().toISOString()) : new Date().toISOString(),

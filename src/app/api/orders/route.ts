@@ -30,7 +30,16 @@ export async function GET(request: NextRequest) {
 
         console.log(`[API] Total list items: ${allPotentialOrders.length}, Active to enrich: ${activeOrdersToEnrich.length}`);
 
-        // 3. Fetch details for each active order sequentially with rate limit protection
+        // 3. Fetch local order statuses from Prisma to merge with Olsera data
+        const { prisma } = await import('@/lib/db');
+        const localOrders = await prisma.order.findMany({
+          where: {
+            id: { in: activeOrdersToEnrich.map(o => `OLSERA-${o.id || o.order_id}`) }
+          }
+        });
+        const localMap = new Map(localOrders.map(lo => [lo.id, lo]));
+
+        // 4. Fetch details for each active order sequentially with rate limit protection
         const enrichedOrders = [];
         for (const o of activeOrdersToEnrich) {
           try {
@@ -62,6 +71,8 @@ export async function GET(request: NextRequest) {
           const oStatus = (order.status || '').toUpperCase();
           const numericId = order.id || order.order_id;
           
+          const localData = localMap.get(`OLSERA-${numericId}`);
+          
           if (oStatus === 'A') kdsStatus = 'PREPARING';
           else if (oStatus === 'Z' || oStatus === 'T') kdsStatus = 'COMPLETED';
           else kdsStatus = 'PENDING';
@@ -70,37 +81,47 @@ export async function GET(request: NextRequest) {
           if (pMethod === '1' || pMethod === 'Cash') pMethod = 'CASH';
 
           const rawItems = order.items || order.orderitems || order.order_items || [];
-          
+          const normalizedItems = rawItems.map((item: any, idx: number) => {
+            const name = item.product_name || item.name || 'Item';
+            let cat = masterCategoryMap.get(name.toLowerCase()) || 'other';
+            if (cat === 'other') {
+              const groupName = (item.product_group_name || item.group_name || item.category_name || item.klasifikasi || '').toLowerCase();
+              if (groupName.includes('signature')) cat = 'rakken-signature';
+              else if (groupName.includes('style')) cat = 'rakken-style';
+            }
+            return {
+              id: idx,
+              menuItem: { name },
+              quantity: Number(item.qty || item.quantity || 1),
+              size: item.variant_name || '-',
+              subtotal: Number(item.price || 0),
+              categorySlug: cat,
+              notes: item.notes || item.note || '',
+            };
+          });
+
+          // Determine station-specific statuses
+          // If no local data exists, use Olsera's global status as default
+          let baristaStatus = localData?.baristaStatus || kdsStatus;
+          let kitchenStatus = localData?.kitchenStatus || kdsStatus;
+
+          // AUTO-COMPLETE station if it has no relevant items
+          const hasCoffee = normalizedItems.some((i: any) => ['rakken-signature', 'rakken-style'].includes(i.categorySlug));
+          const hasKitchen = normalizedItems.some((i: any) => !['rakken-signature', 'rakken-style'].includes(i.categorySlug));
+
+          if (!hasCoffee) baristaStatus = 'COMPLETED';
+          if (!hasKitchen) kitchenStatus = 'COMPLETED';
+
           return {
             id: `OLSERA-${numericId}`,
             queueNumber: numericId % 1000,
             status: kdsStatus,
+            baristaStatus,
+            kitchenStatus,
             totalAmount: Number(order.total || order.total_amount || order.grand_total || 0),
             paymentMethod: pMethod,
             createdAt: order.order_date || order.created_at || new Date().toISOString(),
-            items: rawItems.map((item: any, idx: number) => {
-              const name = item.product_name || item.name || 'Item';
-              
-              // 1. Try to get category from master menu mapping (most accurate)
-              let cat = masterCategoryMap.get(name.toLowerCase()) || 'other';
-              
-              // 2. Fallback to Olsera's group/category fields if not found in master menu
-              if (cat === 'other') {
-                const groupName = (item.product_group_name || item.group_name || item.category_name || item.klasifikasi || '').toLowerCase();
-                if (groupName.includes('signature')) cat = 'rakken-signature';
-                else if (groupName.includes('style')) cat = 'rakken-style';
-              }
-
-              return {
-                id: idx,
-                menuItem: { name },
-                quantity: Number(item.qty || item.quantity || 1),
-                size: item.variant_name || '-',
-                subtotal: Number(item.price || 0),
-                categorySlug: cat,
-                notes: item.notes || item.note || '',
-              };
-            }),
+            items: normalizedItems,
           };
         });
 

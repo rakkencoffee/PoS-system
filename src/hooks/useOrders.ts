@@ -17,11 +17,11 @@ export function useUpdateOrderStatus() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ orderId, status }: { orderId: string | number; status: string }) => {
+    mutationFn: async ({ orderId, status, stationType }: { orderId: string | number; status: string; stationType?: string }) => {
       const res = await fetch(`/api/orders/${orderId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, stationType }),
       });
       if (!res.ok) throw new Error('Failed to update order status');
       return res.json();
