@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
             id: { in: activeOrdersToEnrich.map(o => `OLSERA-${o.id || o.order_id}`) }
           }
         });
-        const localMap = new Map(localOrders.map(lo => [lo.id, lo]));
+        const localMap = new Map(localOrders.map((lo: any) => [lo.id, lo]));
 
         // 4. Fetch details for each active order sequentially with rate limit protection
         const enrichedOrders = [];
@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
           const oStatus = (order.status || '').toUpperCase();
           const numericId = order.id || order.order_id;
           
-          const localData = localMap.get(`OLSERA-${numericId}`);
+          const localData = localMap.get(`OLSERA-${numericId}`) as any;
           
           if (oStatus === 'A') kdsStatus = 'PREPARING';
           else if (oStatus === 'Z' || oStatus === 'T') kdsStatus = 'COMPLETED';
