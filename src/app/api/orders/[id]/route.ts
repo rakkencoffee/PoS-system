@@ -187,7 +187,7 @@ export async function PATCH(
             return !name.includes('coffee') && !name.includes('signature') && !name.includes('style');
           });
 
-          localOrder = await prisma.order.create({
+          localOrder = await (prisma.order as any).create({
             data: {
               id: id,
               stationId: 'OLSERA',
@@ -208,7 +208,7 @@ export async function PATCH(
         else if (stationType === 'kitchen') updateData.kitchenStatus = newKdsStatus;
         else updateData.status = newKdsStatus; // Fallback
 
-        localOrder = await prisma.order.update({
+        localOrder = await (prisma.order as any).update({
           where: { id },
           data: updateData
         });

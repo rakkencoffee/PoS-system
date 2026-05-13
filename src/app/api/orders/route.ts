@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 
         // 3. Fetch local order statuses from Prisma to merge with Olsera data
         const { prisma } = await import('@/lib/db');
-        const localOrders = await prisma.order.findMany({
+        const localOrders = await (prisma.order as any).findMany({
           where: {
             id: { in: activeOrdersToEnrich.map(o => `OLSERA-${o.id || o.order_id}`) }
           }
