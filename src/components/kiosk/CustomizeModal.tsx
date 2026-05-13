@@ -298,7 +298,7 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
                     className={`py-2.5 rounded-xl text-center transition-all ${
                       selectedSize === size.size
                         ? 'bg-[var(--brand-500)] text-white shadow-lg'
-                        : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle) hover:border-(--border-default)'
+                        : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle) hover:border-[var(--brand-400)] hover:scale-[1.02] hover:shadow-sm'
                     }`}
                   >
                     <span className="block text-sm font-bold">{sizeLabel(size.size)}</span>
@@ -327,7 +327,7 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
                     className={`py-2 px-1 rounded-xl text-center transition-all flex flex-col items-center justify-center min-h-[60px] ${
                       sugarLevel === level.key
                         ? 'bg-[var(--brand-500)] text-white shadow-md'
-                        : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle)'
+                        : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle) hover:border-[var(--brand-400)] hover:scale-[1.02]'
                     }`}
                   >
                     <span className="text-sm font-bold block leading-tight">{level.label}</span>
@@ -350,7 +350,7 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
                     className={`py-2 px-1 rounded-xl text-center transition-all flex flex-col items-center justify-center min-h-[60px] ${
                       iceLevel === ice.key
                         ? 'bg-[var(--brand-500)] text-white shadow-md'
-                        : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle)'
+                        : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle) hover:border-[var(--brand-400)] hover:scale-[1.02]'
                     }`}
                   >
                     <span className="text-sm font-bold block flex items-center justify-center gap-1 leading-tight">
