@@ -34,7 +34,7 @@ async function testCreateOrder() {
     console.log('Order Items:', JSON.stringify(detail.orderitems, null, 2));
     console.log('\nTotal Amount from API:', detail.total_amount || detail.total);
     
-  } catch (error) {
+  } catch (error: any) {
     console.error('Test Failed:', error.message);
   }
 }

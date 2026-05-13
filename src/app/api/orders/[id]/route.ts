@@ -187,6 +187,10 @@ export async function PATCH(
               // 2. Explicitly mark as Paid flag
               await olsera.markOrderAsPaid(olseraOrderId, true);
               
+              // Add a small delay to allow Olsera's database to process the payment
+              // Prevents 406: "There are still other processes that have not been completed"
+              await new Promise(resolve => setTimeout(resolve, 1500));
+              
               // 3. Retry the status update
               await olsera.updateOrderStatus(olseraOrderId, olseraStatus);
               console.log(`[Self-Healing] Successfully recovered and synced order ${olseraOrderId}`);
@@ -194,7 +198,7 @@ export async function PATCH(
               console.error('[Self-Healing] Failed to recover order:', recoveryError.message);
               return NextResponse.json({ 
                 error: 'Order must be fully paid in Olsera before it can be prepared or completed.',
-                details: 'Sistem mencoba melunasi otomatis namun gagal. Harap selesaikan pembayaran di dashboard Olsera.'
+                details: 'Sistem mencoba melunasi otomatis namun proses Olsera belum selesai (timeout). Harap coba lagi dalam beberapa detik.'
               }, { status: 400 });
             }
           } else {
