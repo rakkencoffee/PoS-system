@@ -45,7 +45,6 @@ export async function POST(request: NextRequest) {
           options: item.options // Pass options for receipt formatting
         })),
         customerName,
-        discountAmount,
       );
       dbOrderId = adapterOrder.orderId;
       console.log("Successfully created POS order:", dbOrderId);
