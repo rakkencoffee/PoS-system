@@ -26,6 +26,8 @@ model Order {
   cashierId           String
   tableNumber         String?
   status              OrderStatus @default(PENDING)
+  baristaStatus       OrderStatus @default(PENDING)
+  kitchenStatus       OrderStatus @default(PENDING)
   total               Int
   paymentMethod       String?
   cashReceived        Int?

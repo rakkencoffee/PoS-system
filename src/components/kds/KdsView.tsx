@@ -83,12 +83,23 @@ export function KdsView({ type, title }: KdsViewProps) {
     }).filter(Boolean);
   }, [orders, type, searchQuery]);
 
-  const ordersPending = filteredOrders.filter((o: any) => o.status === 'PENDING');
-  const ordersPreparing = filteredOrders.filter((o: any) => o.status === 'PREPARING');
+  const ordersPending = filteredOrders.filter((o: any) => {
+    const currentStatus = type === 'barista' ? o.baristaStatus : o.kitchenStatus;
+    return (currentStatus || o.status) === 'PENDING';
+  });
+  
+  const ordersPreparing = filteredOrders.filter((o: any) => {
+    const currentStatus = type === 'barista' ? o.baristaStatus : o.kitchenStatus;
+    return (currentStatus || o.status) === 'PREPARING';
+  });
 
   const updateOrderStatus = async (orderId: number | string, newStatus: string) => {
     try {
-      await updateStatusMutation.mutateAsync({ orderId, status: newStatus });
+      await updateStatusMutation.mutateAsync({ 
+        orderId, 
+        status: newStatus,
+        stationType: type // Add this line
+      });
     } catch (error: any) {
       alert(`Gagal: ${error.message}`);
     }
@@ -105,57 +116,62 @@ export function KdsView({ type, title }: KdsViewProps) {
     );
   }
 
-  const renderOrderCard = (order: any) => (
-    <div key={order.id} className={`rounded-2xl border-2 p-5 transition-all bg-zinc-900/50 ${order.status === 'PENDING' ? 'border-yellow-500/20' : 'border-blue-500/20'}`}>
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <span className={`text-3xl font-black ${order.status === 'PENDING' ? 'text-yellow-500' : 'text-blue-500'}`}>
-            #{order.queueNumber}
-          </span>
-          <div>
-            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${order.status === 'PENDING' ? 'bg-yellow-500/20 text-yellow-500' : 'bg-blue-500/20 text-blue-500'}`}>
-              {order.status}
+  const renderOrderCard = (order: any) => {
+    const currentStatus = type === 'barista' ? order.baristaStatus : order.kitchenStatus;
+    const displayStatus = currentStatus || order.status;
+
+    return (
+      <div key={order.id} className={`rounded-2xl border-2 p-5 transition-all bg-zinc-900/50 ${displayStatus === 'PENDING' ? 'border-yellow-500/20' : 'border-blue-500/20'}`}>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <span className={`text-3xl font-black ${displayStatus === 'PENDING' ? 'text-yellow-500' : 'text-blue-500'}`}>
+              #{order.queueNumber}
             </span>
-            <p className="text-[10px] text-zinc-500 mt-0.5">{new Date(order.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</p>
+            <div>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${displayStatus === 'PENDING' ? 'bg-yellow-500/20 text-yellow-500' : 'bg-blue-500/20 text-blue-500'}`}>
+                {displayStatus}
+              </span>
+              <p className="text-[10px] text-zinc-500 mt-0.5">{new Date(order.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</p>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="space-y-2 mb-4">
-        {order.items.map((item: any) => (
-          <div key={item.id} className="bg-black/20 rounded-xl p-3 border border-white/5">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-white text-sm">
-                {item.quantity}x {item.menuItem?.name}
-              </span>
-              <span className="text-[10px] text-zinc-500 bg-white/5 px-2 py-0.5 rounded-full">
-                {item.size}
-              </span>
+        <div className="space-y-2 mb-4">
+          {order.items.map((item: any) => (
+            <div key={item.id} className="bg-black/20 rounded-xl p-3 border border-white/5">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-white text-sm">
+                  {item.quantity}x {item.menuItem?.name}
+                </span>
+                <span className="text-[10px] text-zinc-500 bg-white/5 px-2 py-0.5 rounded-full">
+                  {item.size}
+                </span>
+              </div>
+              {item.notes && <p className="text-[10px] text-amber-400 mt-1 italic">📝 {item.notes}</p>}
             </div>
-            {item.notes && <p className="text-[10px] text-amber-400 mt-1 italic">📝 {item.notes}</p>}
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
 
-      <div className="flex gap-2">
-        {order.status === 'PENDING' ? (
-          <button
-            onClick={() => updateOrderStatus(order.id, 'PREPARING')}
-            className="flex-1 py-3 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-500 active:scale-95 transition-all"
-          >
-            👨‍🍳 Start Making
-          </button>
-        ) : (
-          <button
-            onClick={() => updateOrderStatus(order.id, 'COMPLETED')}
-            className="flex-1 py-3 rounded-xl bg-green-600 text-white font-bold text-sm hover:bg-green-500 active:scale-95 transition-all"
-          >
-            🎉 Complete
-          </button>
-        )}
+        <div className="flex gap-2">
+          {displayStatus === 'PENDING' ? (
+            <button
+              onClick={() => updateOrderStatus(order.id, 'PREPARING')}
+              className="flex-1 py-3 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-500 active:scale-95 transition-all"
+            >
+              👨‍🍳 Start Making
+            </button>
+          ) : (
+            <button
+              onClick={() => updateOrderStatus(order.id, 'COMPLETED')}
+              className="flex-1 py-3 rounded-xl bg-green-600 text-white font-bold text-sm hover:bg-green-500 active:scale-95 transition-all"
+            >
+              🎉 Complete
+            </button>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <KdsAuth title={title}>
