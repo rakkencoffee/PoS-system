@@ -149,7 +149,7 @@ export default function MenuPage() {
         <div className="px-6 max-w-7xl mx-auto w-full mb-4">
           {/* Search bar */}
           <div className="relative">
-            <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-(--text-muted)" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
@@ -198,8 +198,8 @@ export default function MenuPage() {
             {filteredItems.length === 0 ? (
               <div className="text-center py-20">
                 <span className="text-6xl mb-4 block">🔍</span>
-                <p className="text-white/60 text-lg">No items found</p>
-                <p className="text-white/40 text-sm mt-1">Try adjusting your search</p>
+                <p className="text-(--text-primary) text-lg font-semibold">No items found</p>
+                <p className="text-(--text-muted) text-sm mt-1">Try adjusting your search</p>
               </div>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -220,11 +220,11 @@ export default function MenuPage() {
                 <div key={cat.slug} id={`category-${cat.slug}`} className="scroll-mt-40">
                   {/* Category Separator/Header */}
                   <div className="flex items-center gap-3 mb-6">
-                    <div className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-2xl shadow-sm">
+                    <div className="w-12 h-12 rounded-xl bg-(--bg-secondary) border border-(--border-subtle) flex items-center justify-center text-2xl shadow-sm">
                       {cat.icon || '📦'}
                     </div>
                     <h2 className="text-2xl font-bold text-(--text-primary)">{cat.name}</h2>
-                    <div className="h-px bg-linear-to-r from-white/20 to-transparent flex-1 ml-4" />
+                    <div className="h-px bg-linear-to-r from-(--border-default) to-transparent flex-1 ml-4" />
                   </div>
                   
                   {/* Item Grid */}

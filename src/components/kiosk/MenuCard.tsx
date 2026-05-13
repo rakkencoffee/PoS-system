@@ -86,7 +86,7 @@ export default function MenuCard({ item, index, onSelect }: MenuCardProps) {
           {item.description}
         </p>
         <div className="flex items-center justify-between">
-          <span className="text-white font-bold text-sm">
+          <span className="text-(--brand-500) font-bold text-sm">
             {formatCurrency(item.price)}
           </span>
           <span className="w-8 h-8 rounded-full bg-[var(--brand-500)] flex items-center justify-center text-white text-lg leading-none group-hover:scale-110 transition-transform">

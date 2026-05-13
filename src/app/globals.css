@@ -202,13 +202,27 @@ body {
   border-radius: 1.5rem;
   box-shadow: var(--shadow-sm);
   transition: all var(--transition-normal);
+  cursor: pointer; /* Ensure pointer on cards */
 }
 
 .glass-card:hover {
   background: var(--bg-card-hover);
-  border-color: var(--border-default);
-  box-shadow: var(--shadow-glow);
-  transform: translateY(-2px);
+  border-color: var(--brand-300); /* Subtle brand tint on border */
+  box-shadow: var(--shadow-md), 0 0 15px rgba(168, 19, 30, 0.1);
+  transform: translateY(-4px) scale(1.01); /* More noticeable hover */
+}
+
+/* Global button fix */
+button, 
+a, 
+input[type="button"], 
+input[type="submit"] {
+  cursor: pointer !important;
+  transition: all var(--transition-fast);
+}
+
+button:active {
+  transform: scale(0.96); /* Feedback on click/touch */
 }
 
 /* ===== BUTTON STYLES ===== */

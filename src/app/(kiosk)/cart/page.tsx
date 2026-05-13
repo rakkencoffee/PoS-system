@@ -93,26 +93,26 @@ export default function CartPage() {
 
                 {/* Customizations */}
                 <div className="flex flex-wrap gap-1.5 mt-1.5">
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-white/70">
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-(--bg-secondary) text-(--text-secondary) font-medium">
                     Size {item.size}
                   </span>
                   {item.sugarLevel !== 'normal' && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-white/70">
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-(--bg-secondary) text-(--text-secondary) font-medium">
                       Sugar {item.sugarLevel}
                     </span>
                   )}
                   {item.iceLevel !== 'none' && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-white/70">
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-(--bg-secondary) text-(--text-secondary) font-medium">
                       Ice: {item.iceLevel}
                     </span>
                   )}
                   {item.extraShot && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-[#A8131E]/30 text-red-200">
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--brand-100)] text-[var(--brand-700)] font-bold">
                       +Shot
                     </span>
                   )}
                   {item.toppings.map((t) => (
-                    <span key={t.id} className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-white/70">
+                    <span key={t.id} className="text-xs px-2 py-0.5 rounded-full bg-(--bg-secondary) text-(--text-secondary) font-medium">
                       {t.name}
                     </span>
                   ))}
@@ -120,7 +120,7 @@ export default function CartPage() {
 
                 {/* Price & Quantity */}
                 <div className="flex items-center justify-between mt-3">
-                  <span className="font-bold text-white">{formatCurrency(item.subtotal)}</span>
+                  <span className="font-bold text-(--brand-500)">{formatCurrency(item.subtotal)}</span>
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => updateQuantity(item.id, item.quantity - 1)}
