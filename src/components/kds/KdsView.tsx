@@ -4,7 +4,6 @@ import { useEffect, useState, useMemo } from 'react';
 import { useKitchenOrders, useUpdateOrderStatus } from '@/hooks/useOrders';
 import { useQueryClient } from '@tanstack/react-query';
 import { OrderData } from '@/lib/types';
-import { KdsAuth } from './KdsAuth';
 
 interface KdsViewProps {
   type: 'kitchen' | 'barista';
@@ -174,8 +173,7 @@ export function KdsView({ type, title }: KdsViewProps) {
   };
 
   return (
-    <KdsAuth title={title}>
-      <div className="min-h-screen bg-[#0F0F0F] text-white p-6">
+    <div className="min-h-screen bg-[#0F0F0F] text-white p-6">
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
           <div>
@@ -266,6 +264,5 @@ export function KdsView({ type, title }: KdsViewProps) {
           </div>
         )}
       </div>
-    </KdsAuth>
   );
 }
