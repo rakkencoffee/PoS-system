@@ -40,39 +40,39 @@ function LoginForm() {
   };
 
   return (
-    <div className="glass-card p-8 shadow-2xl relative overflow-hidden">
+    <div className="bg-white p-10 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border border-gray-100 relative overflow-hidden">
       {/* Decorative Glow */}
       <div className="absolute -top-24 -right-24 w-48 h-48 bg-brand-500/20 blur-3xl rounded-full" />
       
       <form onSubmit={handleSubmit} className="space-y-6 relative z-10">
         {error && (
-          <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm animate-shake">
+          <div className="p-4 bg-red-50 border border-red-100 rounded-xl text-red-600 text-sm animate-shake">
             {error}
           </div>
         )}
 
         <div>
-          <label className="block text-sm font-medium text-white/60 mb-2 ml-1">Username</label>
+          <label className="block text-sm font-bold text-gray-700 mb-2 ml-1">Username</label>
           <input
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             required
             disabled={isLoading}
-            className="w-full px-4 py-3.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all"
+            className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--brand-500)]/20 focus:border-[var(--brand-500)] transition-all"
             placeholder="Masukkan username"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-white/60 mb-2 ml-1">Password</label>
+          <label className="block text-sm font-bold text-gray-700 mb-2 ml-1">Password</label>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             disabled={isLoading}
-            className="w-full px-4 py-3.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all"
+            className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--brand-500)]/20 focus:border-[var(--brand-500)] transition-all"
             placeholder="••••••••"
           />
         </div>
@@ -105,9 +105,9 @@ export default function LoginPage() {
           <div className="inline-block mb-4 animate-float">
             <span className="text-6xl drop-shadow-2xl" role="img" aria-label="coffee">☕</span>
           </div>
-          <h1 className="text-4xl font-bold tracking-tight">
-            <span className="text-gradient">StartFriday</span>
-            <span className="text-white/60 font-light block text-2xl mt-1">Staff Portal</span>
+          <h1 className="text-4xl font-black tracking-tight">
+            <span className="text-[var(--brand-500)]">StartFriday</span>
+            <span className="text-gray-500 font-medium block text-xl mt-1 uppercase tracking-widest">Staff Portal</span>
           </h1>
         </div>
 
@@ -122,8 +122,8 @@ export default function LoginPage() {
         </Suspense>
 
         {/* Footer Info */}
-        <p className="mt-8 text-center text-white/30 text-sm italic">
-          StartFriday POS System v2.0
+        <p className="mt-8 text-center text-gray-400 text-xs font-medium uppercase tracking-widest">
+          Rakken Coffee POS v2.0
         </p>
       </div>
     </div>
