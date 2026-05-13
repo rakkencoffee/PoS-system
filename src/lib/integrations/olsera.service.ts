@@ -516,51 +516,37 @@ export async function updateOrderStatus(orderId: number, status: 'P' | 'A' | 'S'
  */
 export async function createOrder(
   items: { productId: string; variantId?: string; quantity: number; price?: number; note?: string }[] = [],
-  options: { currencyId?: string | number; customer_name?: string; notes?: string; discount_amount?: number } = {}
+  options: { currencyId?: string | number; customer_name?: string; notes?: string } = {}
 ): Promise<{ id: number; order_id?: number; [key: string]: unknown }> {
   const { currencyId = 'IDR', customer_name, notes } = options;
-  const uniqueId = Date.now().toString().slice(-6);
+  const formData = new URLSearchParams();
+  formData.append('order_date', new Date().toISOString().split('T')[0]);
+  formData.append('currency_id', String(currencyId));
+  formData.append('is_funding', '0'); // Required by Olsera Open API (boolean: 1/0)
   
-  // Format dates and customer info
-  const payload: any = {
-    order_date: new Date().toISOString().split('T')[0],
-    currency_id: String(currencyId),
-    is_funding: 0,
-    customer_name: customer_name || 'Guest',
-    customer_email: customer_name 
-      ? `${customer_name.replace(/\s+/g, '').toLowerCase()}${uniqueId}@rakkencoffee.com`
-      : `guest${uniqueId}@rakkencoffee.com`,
-    customer_phone: customer_name ? `08123${uniqueId}` : `08100${uniqueId}`,
-    customer_type_id: 0,
-    notes: notes || '',
-    items: (items || []).map(item => ({
-      product_id: Number(item.productId),
-      variant_id: item.variantId ? Number(item.variantId) : 0,
-      qty: Number(item.quantity),
-      price: Number(item.price || 0),
-      notes: item.note || ''
-    }))
-  };
-
-  // Calculate totals to ensure Dashboard displays correct values
-  const subtotal = payload.items.reduce((sum: number, item: any) => sum + (item.qty * item.price), 0);
-  payload.subtotal = subtotal;
-  payload.total_amount = subtotal;
-  payload.amount = subtotal; 
-  payload.order_items = payload.items; // Alias for different API versions
-
-  // Handle discount if provided in options
-  if (options.discount_amount) {
-    payload.total_amount = Math.max(0, subtotal - options.discount_amount);
-    payload.amount = payload.total_amount;
+  if (customer_name) {
+    formData.append('customer_name', customer_name);
+    // Guest profile requires email, phone, and customer_type_id to avoid 406 errors
+    const uniqueId = Date.now().toString().slice(-6);
+    formData.append('customer_email', `${customer_name.replace(/\s+/g, '').toLowerCase()}${uniqueId}@rakkencoffee.com`);
+    formData.append('customer_phone', `08123${uniqueId}`);
+    formData.append('customer_type_id', '0'); // Guest type ID found from API
+  } else {
+    const uniqueId = Date.now().toString().slice(-6);
+    formData.append('customer_name', 'Guest');
+    formData.append('customer_email', `guest${uniqueId}@rakkencoffee.com`);
+    formData.append('customer_phone', `08100${uniqueId}`);
+    formData.append('customer_type_id', '0');
   }
 
-  console.log(`[Olsera API] createOrder JSON payload:`, JSON.stringify(payload));
+  if (notes) formData.append('notes', notes);
+
+  console.log(`[Olsera API] createOrder payload:`, Object.fromEntries(formData));
 
   const res = await olseraFetch('/order/openorder', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: formData,
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
   });
 
   if (!res.ok) {
@@ -587,8 +573,7 @@ export async function addItemToOrder(
   productId: number,
   variantId: number | null,
   quantity: number = 1,
-  note: string = '',
-  price?: number
+  note: string = ''
 ): Promise<unknown> {
   const formData = new URLSearchParams();
   formData.append('order_id', String(orderId));
@@ -597,7 +582,6 @@ export async function addItemToOrder(
   const itemValue = variantId ? `${productId}|${variantId}` : String(productId);
   formData.append('item_products', itemValue);
   formData.append('item_qty', String(quantity));
-  if (price !== undefined) formData.append('item_price', String(price));
   if (note) formData.append('notes', note);
 
   console.log(`[Olsera API] addItemToOrder payload:`, Object.fromEntries(formData));
