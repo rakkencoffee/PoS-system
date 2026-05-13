@@ -57,9 +57,10 @@ export const authConfig = {
         return false; // Redirects to login
       }
 
-      // Role check for dashboard
-      if (pathname.startsWith('/dashboard') && (auth?.user as any)?.role === 'cashier') {
-        return Response.redirect(new URL('/pos', nextUrl));
+      // Role check for KDS
+      if ((pathname.startsWith('/barista') || pathname.startsWith('/kitchen')) && 
+          !['KITCHEN', 'ADMIN'].includes((auth?.user as any)?.role)) {
+        return Response.redirect(new URL('/login', nextUrl));
       }
 
       return true;
