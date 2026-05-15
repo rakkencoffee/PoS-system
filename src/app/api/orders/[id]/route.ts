@@ -15,6 +15,15 @@ export async function GET(
       const olseraOrderId = parseInt(id.replace('OLSERA-', ''));
       const olsera = await import('@/lib/integrations/olsera.service');
 
+      // Fetch menu items for category mapping globally for this request
+      let menuItems: any[] = [];
+      try {
+        const { getMenuItems } = await import('@/lib/integrations/pos.adapter');
+        menuItems = await getMenuItems();
+      } catch (mErr) {}
+      const catMap = new Map();
+      menuItems.forEach(m => catMap.set(m.name, m.categorySlug));
+
       try {
         const orderDetail = await olsera.getOrderDetail(olseraOrderId);
         
@@ -28,15 +37,6 @@ export async function GET(
         else if (orderDetail.payment_status === '1' || orderDetail.payment_status === 'paid') {
           kdsStatus = 'PENDING'; // Paid but not yet prepared
         }
-
-        // Fetch menu items for category mapping
-        let menuItems: any[] = [];
-        try {
-          const { getMenuItems } = await import('@/lib/integrations/pos.adapter');
-          menuItems = await getMenuItems();
-        } catch (mErr) {}
-        const catMap = new Map();
-        menuItems.forEach(m => catMap.set(m.name, m.categorySlug));
 
         // Determine base data from Olsera
         const olseraItems = Array.isArray(orderDetail.items) ? orderDetail.items : [];

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMenuItems } from '@/lib/integrations/pos.adapter';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/menu
  *
