@@ -128,7 +128,10 @@ async function fetchNewToken(): Promise<string> {
 
       const res = await fetch(`${env.API_BASE}/api/open-api/v1/id/token`, {
         method: 'POST',
-        body: formData,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: formData.toString(), // Explicitly stringify to avoid Next.js fetch polyfill quirks
         signal: controller.signal,
       });
 
