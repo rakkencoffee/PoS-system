@@ -234,17 +234,28 @@ function formatReceipt(data) {
       newline();
 
       // Size
-      if (item.size && item.size !== '-') {
+      // Skip printing standalone Size if it's already in notes
+      const hasSizeInNotes = item.notes && item.notes.toLowerCase().includes('size:');
+      if (item.size && item.size !== '-' && !hasSizeInNotes) {
         add(textBuf(`  Size: ${item.size}`));
         newline();
       }
 
       // Notes / customization
       if (item.notes) {
-        const noteLines = wrapText(`  ${item.notes}`, 0);
-        for (const nl of noteLines) {
-          add(textBuf(nl));
-          newline();
+        // Split by comma+space to keep "Hot,Small" together, but separate "normal Sugar"
+        const notesArray = item.notes.split(/,\s+/).filter(Boolean);
+        for (const note of notesArray) {
+          // Add a space after comma for readability, e.g. "Hot,Small" -> "Hot, Small"
+          const cleanNote = note.replace(/,/g, ', ').replace(/\s+/g, ' ');
+          // Capitalize first letter
+          const capitalized = cleanNote.charAt(0).toUpperCase() + cleanNote.slice(1);
+          
+          const noteLines = wrapText(`  * ${capitalized}`, 0);
+          for (const nl of noteLines) {
+            add(textBuf(nl));
+            newline();
+          }
         }
       }
 
@@ -310,4 +321,108 @@ function formatReceipt(data) {
   return Buffer.concat(parts);
 }
 
-module.exports = { formatReceipt };
+/**
+ * Format Drink Labels into ESC/POS binary buffer
+ * Prints individual labels for each drink cup.
+ */
+function formatDrinkLabels(data) {
+  const parts = [];
+  const add = (...buffers) => buffers.forEach(b => parts.push(b));
+  const newline = () => add(CMD.FEED_LINE);
+
+  if (!data.items || data.items.length === 0) return Buffer.concat(parts);
+
+  // Filter out food items
+  const excludedCategories = ['bites', 'dessert', 'main-course'];
+  const drinkItems = data.items.filter(item => {
+    if (item.categorySlug) {
+      return !excludedCategories.includes(item.categorySlug.toLowerCase());
+    }
+    // Fallback if categorySlug is missing
+    const name = (item.menuItem?.name || item.name || '').toLowerCase();
+    if (name.includes('bites') || name.includes('dessert')) return false;
+    return true; // Default to drink
+  });
+
+  if (drinkItems.length === 0) return Buffer.concat(parts);
+
+  const totalCups = drinkItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
+  let currentCup = 1;
+
+  const queueNum = data.queueNumber || (() => {
+    if (!data.orderId) return '000';
+    const nums = data.orderId.replace(/[^0-9]/g, '');
+    return nums.length > 3 ? nums.slice(-3) : nums.padStart(3, '0');
+  })();
+
+  const now = new Date().toLocaleString('id-ID', {
+    dateStyle: 'medium',
+    timeStyle: 'medium',
+    timeZone: 'Asia/Jakarta',
+  });
+
+  for (const item of drinkItems) {
+    const qty = item.quantity || 1;
+    for (let i = 0; i < qty; i++) {
+      add(CMD.INIT);
+      add(CMD.LINE_SPACING_DEFAULT);
+      
+      // Header: No: 178         1/3
+      add(CMD.ALIGN_LEFT);
+      add(CMD.SIZE_NORMAL);
+      add(CMD.BOLD_ON);
+      add(leftRight(`No: ${queueNum}`, `${currentCup}/${totalCups}`));
+      newline();
+      
+      // Name and Size
+      const name = item.menuItem?.name || item.name || 'Drink';
+      const hasSizeInNotes = item.notes && item.notes.toLowerCase().includes('size:');
+      const sizeStr = (item.size && item.size !== '-' && !hasSizeInNotes) ? ` (${item.size})` : '';
+      const nameLines = wrapText(`${name}${sizeStr}`, 0);
+      for (const nl of nameLines) {
+        add(textBuf(nl));
+        newline();
+      }
+      add(CMD.BOLD_OFF);
+      
+      // Notes / Customizations
+      if (item.notes) {
+        // For stickers, we split by ALL commas to put every variant on a new line for max readability
+        const notesArray = item.notes.split(',').map(n => n.trim()).filter(Boolean);
+        for (let note of notesArray) {
+          // Remove "Size: " from the string for a cleaner sticker
+          note = note.replace(/^Size:\s*/i, '');
+          const noteLines = wrapText(`  * ${note.toUpperCase()}`, 0);
+          for (const nl of noteLines) {
+            add(textBuf(nl));
+            newline();
+          }
+        }
+      } else {
+        // Empty notes but add space for alignment if needed
+        newline();
+      }
+      
+      // Footer Date/Time
+      newline();
+      add(CMD.ALIGN_LEFT);
+      add(CMD.SIZE_NORMAL);
+      add(textBuf(now));
+      newline();
+      
+      // Cut line separator for manual tearing
+      newline();
+      add(line('-'));
+      newline();
+      
+      // Feed paper to ensure it's outside the printer lip
+      add(CMD.FEED_5);
+      
+      currentCup++;
+    }
+  }
+
+  return Buffer.concat(parts);
+}
+
+module.exports = { formatReceipt, formatDrinkLabels };
