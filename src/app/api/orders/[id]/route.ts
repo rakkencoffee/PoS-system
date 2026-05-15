@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { pusherServer } from '@/lib/pusher';
+import { prisma } from '@/lib/db';
+import { getMenuItems } from '@/lib/integrations/pos.adapter';
 
 const USE_OLSERA = process.env.USE_OLSERA === 'true';
 
@@ -59,7 +61,6 @@ export async function GET(
         if (totalAmount === 0 || finalItems.length === 0 || finalItems.every((i: any) => i.price === 0)) {
           console.log(`[Sync] Olsera data incomplete for ${id}, fetching from local Prisma fallback...`);
           try {
-            const { prisma } = await import('@/lib/db');
             const localOrder = await prisma.order.findUnique({
               where: { id: id },
               include: { items: true }
@@ -92,7 +93,6 @@ export async function GET(
           // ENRICH NOTES: Olsera's OpenOrder API frequently drops the notes payload.
           // We MUST retrieve the notes from our local Prisma mirror where we saved them at checkout.
           try {
-            const { prisma } = await import('@/lib/db');
             const localOrder = await prisma.order.findUnique({
               where: { id: id },
               include: { items: true }
@@ -159,7 +159,6 @@ export async function GET(
             
             // Enrich notes from local DB for closed orders too
             try {
-              const { prisma } = await import('@/lib/db');
               const localOrder = await prisma.order.findUnique({
                 where: { id: id },
                 include: { items: true }
@@ -249,7 +248,6 @@ export async function PATCH(
         console.log(`[Update] Station ${stationType} updating order ${id} to ${newKdsStatus}`);
 
         // 1. Get or Create local order record in Prisma
-        const { prisma } = await import('@/lib/db');
         localOrder = await prisma.order.findUnique({ where: { id } });
         
         if (!localOrder) {
@@ -268,8 +266,20 @@ export async function PATCH(
           });
 
           // Fetch a valid user for cashierId to prevent Prisma foreign key constraints
-          const firstUser = await prisma.user.findFirst();
-          const validCashierId = firstUser ? firstUser.id : 'SYSTEM'; // Will fail if completely empty DB, but DB should be seeded
+          let firstUser = await prisma.user.findFirst();
+          if (!firstUser) {
+            // Auto-create a fallback SYSTEM user if DB is completely empty
+            firstUser = await prisma.user.create({
+              data: {
+                id: 'SYSTEM',
+                name: 'System Auto',
+                username: 'system_auto',
+                passwordHash: 'none',
+                role: 'ADMIN'
+              }
+            });
+          }
+          const validCashierId = firstUser.id;
 
           localOrder = await (prisma.order as any).create({
             data: {
@@ -347,7 +357,6 @@ export async function PATCH(
       // Build category lookup for final response
       let menuItems: any[] = [];
       try {
-        const { getMenuItems } = await import('@/lib/integrations/pos.adapter');
         menuItems = await getMenuItems();
       } catch (mErr) {}
       const catMap = new Map();
@@ -387,8 +396,12 @@ export async function PATCH(
     } else {
       throw new Error("Local database (Prisma) is no longer supported for updating orders.");
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating order:', error);
-    return NextResponse.json({ error: 'Failed to update order' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Failed to update order',
+      details: error?.message || String(error),
+      stack: error?.stack 
+    }, { status: 500 });
   }
 }
