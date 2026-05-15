@@ -582,7 +582,11 @@ export async function addItemToOrder(
   const itemValue = variantId ? `${productId}|${variantId}` : String(productId);
   formData.append('item_products', itemValue);
   formData.append('item_qty', String(quantity));
-  if (note) formData.append('notes', note);
+  if (note) {
+    formData.append('notes', note);
+    formData.append('note', note);
+    formData.append('item_note', note);
+  }
 
   console.log(`[Olsera API] addItemToOrder payload:`, Object.fromEntries(formData));
 

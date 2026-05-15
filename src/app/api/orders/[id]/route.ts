@@ -49,6 +49,7 @@ export async function GET(
             quantity: item.qty || item.quantity || 1,
             price: parseFloat(item.price || item.product_price || '0'),
             size: item.variant_name || '-',
+            notes: item.notes || item.note || item.item_notes || '',
             categorySlug: catMap.get(name) || 'other',
           };
         });
@@ -79,12 +80,54 @@ export async function GET(
                   price: item.price,
                   notes: item.notes,
                   size: displaySize,
+                  categorySlug: catMap.get(item.name) || 'other',
                 };
               });
               console.log(`[Sync] Successfully used local fallback for ${id}. Total: ${totalAmount}`);
             }
           } catch (prismaError) {
             console.error('[Sync] Local fallback failed:', prismaError);
+          }
+        } else {
+          // ENRICH NOTES: Olsera's OpenOrder API frequently drops the notes payload.
+          // We MUST retrieve the notes from our local Prisma mirror where we saved them at checkout.
+          try {
+            const { prisma } = await import('@/lib/db');
+            const localOrder = await prisma.order.findUnique({
+              where: { id: id },
+              include: { items: true }
+            });
+
+            if (localOrder && localOrder.items && localOrder.items.length > 0) {
+              // We copy the items array so we can remove matched items and avoid duplicate assignments
+              const availableLocalItems = [...localOrder.items];
+              
+              finalItems = finalItems.map((fItem: any) => {
+                // Find a matching item by name and quantity (or just name if quantity differs slightly)
+                const matchIdx = availableLocalItems.findIndex((li: any) => 
+                  li.name.toLowerCase() === fItem.menuItem.name.toLowerCase()
+                );
+                
+                if (matchIdx !== -1) {
+                  const lItem = availableLocalItems[matchIdx];
+                  // Remove it from available so we don't match the same local item twice if they ordered 2 of the same drink separately
+                  availableLocalItems.splice(matchIdx, 1);
+                  
+                  if (lItem.notes) {
+                    fItem.notes = fItem.notes ? `${fItem.notes}, ${lItem.notes}` : lItem.notes;
+                    // Also try to extract Size if Olsera didn't return it
+                    const sizeMatch = lItem.notes.match(/Size:\s*([^,)]+)/i);
+                    if (sizeMatch && (!fItem.size || fItem.size === '-')) {
+                      fItem.size = sizeMatch[1];
+                    }
+                  }
+                }
+                return fItem;
+              });
+              console.log(`[Sync] Successfully enriched notes from local fallback for ${id}`);
+            }
+          } catch (e) {
+            console.error('[Sync] Local notes enrichment failed:', e);
           }
         }
 
@@ -102,19 +145,56 @@ export async function GET(
           const closedOrder = await olsera.getClosedOrderDetail(olseraOrderId);
           const items = Array.isArray(closedOrder.items) ? closedOrder.items : [];
           
-          return NextResponse.json({
-            id: id,
-            queueNumber: olseraOrderId % 1000,
-            status: 'COMPLETED', // Found in closed orders, must be completed
-            totalAmount: parseFloat(closedOrder.total || closedOrder.grand_total || '0'),
-            createdAt: closedOrder.order_date || new Date().toISOString(),
-            items: items.map((item: any, idx: number) => ({
-              id: idx,
-              menuItem: { name: item.product_name || item.name || 'Item' },
-              quantity: item.qty || item.quantity || 1,
-              size: item.variant_name || '-',
-            })),
-          });
+            let finalClosedItems = items.map((item: any, idx: number) => {
+              const name = item.product_name || item.name || 'Item';
+              return {
+                id: idx,
+                menuItem: { name },
+                quantity: item.qty || item.quantity || 1,
+                size: item.variant_name || '-',
+                notes: item.notes || item.note || item.item_notes || '',
+                categorySlug: catMap?.get(name) || 'other',
+              };
+            });
+            
+            // Enrich notes from local DB for closed orders too
+            try {
+              const { prisma } = await import('@/lib/db');
+              const localOrder = await prisma.order.findUnique({
+                where: { id: id },
+                include: { items: true }
+              });
+
+              if (localOrder && localOrder.items && localOrder.items.length > 0) {
+                const availableLocalItems = [...localOrder.items];
+                finalClosedItems = finalClosedItems.map((fItem: any) => {
+                  const matchIdx = availableLocalItems.findIndex((li: any) => 
+                    li.name.toLowerCase() === fItem.menuItem.name.toLowerCase()
+                  );
+                  if (matchIdx !== -1) {
+                    const lItem = availableLocalItems[matchIdx];
+                    availableLocalItems.splice(matchIdx, 1);
+                    if (lItem.notes) {
+                      fItem.notes = fItem.notes ? `${fItem.notes}, ${lItem.notes}` : lItem.notes;
+                      const sizeMatch = lItem.notes.match(/Size:\s*([^,)]+)/i);
+                      if (sizeMatch && (!fItem.size || fItem.size === '-')) {
+                        fItem.size = sizeMatch[1];
+                      }
+                    }
+                  }
+                  return fItem;
+                });
+              }
+            } catch (e) {}
+
+            return NextResponse.json({
+              id: id,
+              queueNumber: olseraOrderId % 1000,
+              status: 'COMPLETED', // Found in closed orders, must be completed
+              totalAmount: parseFloat(closedOrder.total || closedOrder.grand_total || '0'),
+              createdAt: closedOrder.order_date || new Date().toISOString(),
+              items: finalClosedItems,
+            });
         } catch (closedError) {
           console.error('Order not found even in closed orders:', closedError);
           // Return a minimal order object as last resort
@@ -187,11 +267,15 @@ export async function PATCH(
             return !name.includes('coffee') && !name.includes('signature') && !name.includes('style');
           });
 
+          // Fetch a valid user for cashierId to prevent Prisma foreign key constraints
+          const firstUser = await prisma.user.findFirst();
+          const validCashierId = firstUser ? firstUser.id : 'SYSTEM'; // Will fail if completely empty DB, but DB should be seeded
+
           localOrder = await (prisma.order as any).create({
             data: {
               id: id,
               stationId: 'OLSERA',
-              cashierId: 'SYSTEM',
+              cashierId: validCashierId,
               total: Math.round(Number(detail.total || 0)),
               status: 'PENDING',
               baristaStatus: hasCoffee ? 'PENDING' : 'COMPLETED',
@@ -230,37 +314,15 @@ export async function PATCH(
           await olsera.updateOrderStatus(olseraOrderId, olseraStatus);
           console.log(`Successfully synced Olsera order ${olseraOrderId} to combined status ${olseraStatus}`);
         } catch (err: any) {
-          console.error('Initial sync failed, attempting self-healing for order:', olseraOrderId, err.message);
+          console.error('Initial sync failed for order:', olseraOrderId, err.message);
           
           if (err.message.includes('406') || err.message.includes('payment info')) {
-            try {
-              // 1. Fetch current order total to ensure full payment record
-              detail = await olsera.getOrderDetail(olseraOrderId);
-              const total = detail.total || detail.grand_total || 0;
-              
-              if (total > 0) {
-                console.log(`[Self-Healing] Recording full payment of ${total} for order ${olseraOrderId}`);
-                // Use default payment mode 1 (Cash/General) for force sync
-                await olsera.updateOrderPayment(olseraOrderId, total, 1);
-              }
-              
-              // 2. Explicitly mark as Paid flag
-              await olsera.markOrderAsPaid(olseraOrderId, true);
-              
-              // Add a small delay to allow Olsera's database to process the payment
-              // Prevents 406: "There are still other processes that have not been completed"
-              await new Promise(resolve => setTimeout(resolve, 1500));
-              
-              // 3. Retry the status update
-              await olsera.updateOrderStatus(olseraOrderId, olseraStatus);
-              console.log(`[Self-Healing] Successfully recovered and synced order ${olseraOrderId}`);
-            } catch (recoveryError: any) {
-              console.error('[Self-Healing] Failed to recover order:', recoveryError.message);
-              return NextResponse.json({ 
-                error: 'Order must be fully paid in Olsera before it can be prepared or completed.',
-                details: 'Sistem mencoba melunasi otomatis namun proses Olsera belum selesai (timeout). Harap coba lagi dalam beberapa detik.'
-              }, { status: 400 });
-            }
+            // Unpaid orders cannot be processed by the kitchen
+            // Do NOT auto-pay them, as it will falsify financial records
+            return NextResponse.json({ 
+              error: 'Pesanan Belum Dibayar',
+              details: 'Pesanan ini belum lunas di Olsera. Harap selesaikan pembayaran sebelum memproses pesanan di dapur.'
+            }, { status: 400 });
           } else {
             return NextResponse.json({ error: 'Failed to sync status to Olsera' }, { status: 500 });
           }
@@ -307,6 +369,7 @@ export async function PATCH(
             menuItem: { name },
             quantity: item.qty || item.quantity || 1,
             size: item.variant_name || '-',
+            notes: item.notes || item.note || item.item_notes || '',
             categorySlug: catMap.get(name) || 'other',
           };
         }) : [],

@@ -117,6 +117,11 @@ RULE 4: Laporan pendapatan & analitik bisnis → buka di Olsera Backoffice.
         kasir (misal: total penjualan shift hari ini Station A).
 
 RULE 5: Jika ada konflik data antara Olsera dan PostgreSQL kita → Olsera yang menang.
+
+RULE 6: Catatan Pesanan (Notes/Ice/Sugar) WAJIB diambil dari database lokal (Prisma).
+        API Olsera endpoint `/order/openorder/additem` secara desain membuang parameter notes.
+        Oleh karena itu, sistem kita menggunakan Prisma lokal sebagai *fallback* (Source of Truth)
+        untuk merender struk dan stiker cup. Jangan pernah bergantung pada *response* Olsera untuk notes.
 ```
 
 ### Visualisasi Aliran Data

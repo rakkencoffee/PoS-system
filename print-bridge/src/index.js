@@ -12,7 +12,7 @@
 const express = require('express');
 const cors = require('cors');
 const net = require('net'); // Added for EDC socket communication
-const { formatReceipt } = require('./format-receipt');
+const { formatReceipt, formatDrinkLabels } = require('./format-receipt');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -158,13 +158,15 @@ app.post('/print', async (req, res) => {
       });
     }
 
-    console.log(`🖨️  Printing receipt for order ${data.orderId}...`);
+    console.log(`🖨️  Printing receipt & labels for order ${data.orderId}...`);
 
     // Format receipt ke ESC/POS binary commands
-    const buffer = formatReceipt(data);
+    const receiptBuffer = formatReceipt(data);
+    const labelsBuffer = formatDrinkLabels(data);
+    const finalBuffer = Buffer.concat([receiptBuffer, labelsBuffer]);
 
     // Kirim ke printer
-    await writeToPrinter(buffer);
+    await writeToPrinter(finalBuffer);
 
     console.log(`✅ Receipt printed: ${data.orderId}`);
     res.json({ success: true, orderId: data.orderId });

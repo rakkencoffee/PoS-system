@@ -26,6 +26,7 @@ export interface PrintReceiptData {
     subtotal?: number;
     size?: string;
     notes?: string;
+    categorySlug?: string;
   }[];
   total: number;
   discount?: number;
