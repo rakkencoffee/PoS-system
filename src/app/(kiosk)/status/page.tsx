@@ -23,19 +23,19 @@ function PublicBoard() {
       <div className="glass-card p-6">
         <h2 className="text-xl font-bold text-yellow-400 mb-4">Pending ({pending.length})</h2>
         <div className="space-y-2">
-          {pending.map(o => <div key={o.id} className="text-2xl font-mono">#{o.queueNumber}</div>)}
+          {pending.map(o => <div key={o.id} className="text-lg font-mono">{(o as any).orderNo || `#${o.queueNumber}`}</div>)}
         </div>
       </div>
       <div className="glass-card p-6 border-blue-500/30">
         <h2 className="text-xl font-bold text-blue-400 mb-4">Preparing ({preparing.length})</h2>
         <div className="space-y-2">
-          {preparing.map(o => <div key={o.id} className="text-2xl font-mono">#{o.queueNumber}</div>)}
+          {preparing.map(o => <div key={o.id} className="text-lg font-mono">{(o as any).orderNo || `#${o.queueNumber}`}</div>)}
         </div>
       </div>
       <div className="glass-card p-6 border-green-500/30">
         <h2 className="text-xl font-bold text-green-400 mb-4">Ready ({ready.length})</h2>
         <div className="space-y-2">
-          {ready.map(o => <div key={o.id} className="text-2xl font-mono text-green-400">#{o.queueNumber}</div>)}
+          {ready.map(o => <div key={o.id} className="text-lg font-mono text-green-400">{(o as any).orderNo || `#${o.queueNumber}`}</div>)}
         </div>
       </div>
     </div>
@@ -174,8 +174,8 @@ function StatusContent() {
 
         {/* Queue Number */}
         <div className="glass-card p-6 mb-6 animate-fade-in">
-          <p className="text-xs text-(--text-muted) uppercase tracking-wider mb-1">Queue</p>
-          <p className="text-5xl font-black text-gradient">#{order.queueNumber}</p>
+          <p className="text-xs text-(--text-muted) uppercase tracking-wider mb-1">No. Pesanan</p>
+          <p className="text-3xl font-black text-gradient">{(order as any).orderNo || `#${order.queueNumber}`}</p>
         </div>
 
         {/* Status */}

@@ -133,9 +133,11 @@ export async function GET(
 
         return NextResponse.json({
           id: id,
+          orderNo: orderDetail.order_no || '',
           queueNumber: olseraOrderId % 1000,
           status: kdsStatus,
           totalAmount: totalAmount,
+          customerName: orderDetail.customer_name || '',
           createdAt: orderDetail.order_date || new Date().toISOString(),
           items: finalItems,
         });
@@ -188,9 +190,11 @@ export async function GET(
 
             return NextResponse.json({
               id: id,
+              orderNo: closedOrder.order_no || '',
               queueNumber: olseraOrderId % 1000,
               status: 'COMPLETED', // Found in closed orders, must be completed
               totalAmount: parseFloat(closedOrder.total || closedOrder.grand_total || '0'),
+              customerName: closedOrder.customer_name || '',
               createdAt: closedOrder.order_date || new Date().toISOString(),
               items: finalClosedItems,
             });
@@ -199,6 +203,7 @@ export async function GET(
           // Return a minimal order object as last resort
           return NextResponse.json({
             id: id,
+            orderNo: '',
             queueNumber: olseraOrderId % 1000,
             status: 'PENDING',
             totalAmount: 0,
@@ -364,6 +369,7 @@ export async function PATCH(
 
       const updatedOrder = {
         id: id,
+        orderNo: detail?.order_no || '',
         queueNumber: olseraOrderId % 1000,
         status: localOrder ? localOrder.status : body.status,
         baristaStatus: localOrder?.baristaStatus,
@@ -371,6 +377,7 @@ export async function PATCH(
         totalAmount: detail ? (detail.total || detail.grand_total || 0) : 0,
         paymentMethod: 'MIDTRANS',
         createdAt: detail ? (detail.order_date || detail.created_at || new Date().toISOString()) : new Date().toISOString(),
+        customerName: detail?.customer_name || '',
         items: detail && Array.isArray(detail.items) ? detail.items.map((item: any, idx: number) => {
           const name = item.product_name || item.name || 'Item';
           return {
