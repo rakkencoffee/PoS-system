@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
     // 1. Create order in POS (Olsera) — NON-BLOCKING
     // Best Practice POS: Jangan pernah gagalkan pembayaran pelanggan karena API backend error.
     let dbOrderId: string | null = null;
+    let dbOrderNo: string | null = null;
     try {
       const posAdapter = await import("@/lib/integrations/pos.adapter");
       const adapterOrder = await posAdapter.createOrder(
@@ -47,7 +48,8 @@ export async function POST(request: NextRequest) {
         customerName,
       );
       dbOrderId = adapterOrder.orderId;
-      console.log("Successfully created POS order:", dbOrderId);
+      dbOrderNo = adapterOrder.orderNo || null;
+      console.log("Successfully created POS order:", dbOrderId, "orderNo:", dbOrderNo);
 
       // Inject discount natively to Olsera if a voucher was applied
       if (discountAmount && discountAmount > 0) {
@@ -129,6 +131,7 @@ export async function POST(request: NextRequest) {
           queueNumber: dbOrderId?.startsWith("OLSERA-")
             ? parseInt(dbOrderId.replace("OLSERA-", "")) % 1000
             : Math.floor(Math.random() * 900) + 100,
+          orderNo: dbOrderNo || '',
           status: "PENDING",
           totalAmount: finalGrossAmount,
           paymentMethod: "MIDTRANS",
@@ -161,6 +164,7 @@ export async function POST(request: NextRequest) {
       snapToken: snapResult.token,
       redirectUrl: snapResult.redirect_url,
       orderId: dbOrderId ? String(dbOrderId) : orderId,
+      orderNo: dbOrderNo || '',
     });
   } catch (error) {
     console.error("Error creating payment:", error);

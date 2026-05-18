@@ -35,7 +35,8 @@ export async function GET(request: NextRequest) {
         const localOrders = await (prisma.order as any).findMany({
           where: {
             id: { in: activeOrdersToEnrich.map(o => `OLSERA-${o.id || o.order_id}`) }
-          }
+          },
+          include: { items: true }
         });
         const localMap = new Map(localOrders.map((lo: any) => [lo.id, lo]));
 
@@ -81,6 +82,11 @@ export async function GET(request: NextRequest) {
           if (pMethod === '1' || pMethod === 'Cash') pMethod = 'CASH';
 
           const rawItems = order.items || order.orderitems || order.order_items || [];
+          
+          // Get local items for notes enrichment (RULE 6: Olsera drops notes)
+          const localItems = localData?.items || [];
+          const availableLocalItems = [...localItems];
+          
           const normalizedItems = rawItems.map((item: any, idx: number) => {
             const name = item.product_name || item.name || 'Item';
             let cat = masterCategoryMap.get(name.toLowerCase()) || 'other';
@@ -89,6 +95,20 @@ export async function GET(request: NextRequest) {
               if (groupName.includes('signature')) cat = 'rakken-signature';
               else if (groupName.includes('style')) cat = 'rakken-style';
             }
+            
+            // Enrich notes from local Prisma (customization details)
+            let enrichedNotes = item.notes || item.note || '';
+            const localMatchIdx = availableLocalItems.findIndex((li: any) => 
+              li.name.toLowerCase() === name.toLowerCase()
+            );
+            if (localMatchIdx !== -1) {
+              const localItem = availableLocalItems[localMatchIdx];
+              availableLocalItems.splice(localMatchIdx, 1);
+              if (localItem.notes && localItem.notes.length > enrichedNotes.length) {
+                enrichedNotes = localItem.notes;
+              }
+            }
+            
             return {
               id: idx,
               menuItem: { name },
@@ -96,7 +116,7 @@ export async function GET(request: NextRequest) {
               size: item.variant_name || '-',
               subtotal: Number(item.price || 0),
               categorySlug: cat,
-              notes: item.notes || item.note || '',
+              notes: enrichedNotes,
             };
           });
 
@@ -112,8 +132,15 @@ export async function GET(request: NextRequest) {
           if (!hasCoffee) baristaStatus = 'COMPLETED';
           if (!hasKitchen) kitchenStatus = 'COMPLETED';
 
+          // Extract customer name from Olsera order detail
+          const customerName = order.customer_name || order.customer?.name || '';
+          
+          // Extract the backoffice order number (format: OL26051500000205)
+          const orderNo = order.order_no || '';
+          
           return {
             id: `OLSERA-${numericId}`,
+            orderNo: orderNo,
             queueNumber: numericId % 1000,
             status: kdsStatus,
             baristaStatus,
@@ -121,6 +148,7 @@ export async function GET(request: NextRequest) {
             totalAmount: Number(order.total || order.total_amount || order.grand_total || 0),
             paymentMethod: pMethod,
             createdAt: order.order_date || order.created_at || new Date().toISOString(),
+            customerName: customerName,
             items: normalizedItems,
           };
         });

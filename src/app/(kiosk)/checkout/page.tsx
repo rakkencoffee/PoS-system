@@ -86,7 +86,9 @@ export default function CheckoutPage() {
           clearCart();
           const numericId = id.replace('OLSERA-', '');
           const queueNum = numericId.slice(-3);
-          router.push(`/success?orderId=${id}&queue=${queueNum}`);
+          // Get orderNo from the createOrder response data
+          const orderNoParam = (window as any).__lastOrderNo ? `&orderNo=${(window as any).__lastOrderNo}` : '';
+          router.push(`/success?orderId=${id}&queue=${queueNum}${orderNoParam}`);
         },
         onPending: () => {
           setPaymentStatus('Waiting for payment...');
@@ -139,6 +141,8 @@ export default function CheckoutPage() {
       });
 
       if (data.snapToken) {
+        // Store orderNo for success redirect
+        if (data.orderNo) (window as any).__lastOrderNo = data.orderNo;
         triggerSnapPopup(data.snapToken, data.orderId, data.redirectUrl);
       } else {
         throw new Error('No payment token received');
@@ -190,8 +194,9 @@ export default function CheckoutPage() {
         const queueNum = numericId.slice(-3);
         
         // Pass EDC metadata to success page
+        const orderNoParam = data.orderNo ? `&orderNo=${data.orderNo}` : '';
         const edcParams = `&edc=true&approval=${edcResult.data.approvalCode}&card=${edcResult.data.cardNo}`;
-        router.push(`/success?orderId=${data.orderId}&queue=${queueNum}${edcParams}`);
+        router.push(`/success?orderId=${data.orderId}&queue=${queueNum}${orderNoParam}${edcParams}`);
       } else {
         throw new Error(edcResult.error || 'Payment declined by EDC');
       }

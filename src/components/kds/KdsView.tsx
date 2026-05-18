@@ -71,9 +71,11 @@ export function KdsView({ type, title }: KdsViewProps) {
 
       if (items.length === 0) return null;
 
-      // Further filter by search query (Queue number or Item name)
+      // Further filter by search query (Queue number, Order No, or Item name)
       const matchesSearch = 
         order.queueNumber.toString().includes(searchQuery) ||
+        (order.orderNo || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (order.customerName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         items.some((item: any) => item.menuItem?.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
       if (searchQuery && !matchesSearch) return null;
@@ -121,11 +123,13 @@ export function KdsView({ type, title }: KdsViewProps) {
 
     return (
       <div key={order.id} className={`rounded-2xl border-2 p-5 transition-all bg-zinc-900/50 ${displayStatus === 'PENDING' ? 'border-yellow-500/20' : 'border-blue-500/20'}`}>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
-            <span className={`text-3xl font-black ${displayStatus === 'PENDING' ? 'text-yellow-500' : 'text-blue-500'}`}>
-              #{order.queueNumber}
-            </span>
+            <div>
+              <span className={`text-2xl font-black ${displayStatus === 'PENDING' ? 'text-yellow-500' : 'text-blue-500'}`}>
+                {order.orderNo || `#${order.queueNumber}`}
+              </span>
+            </div>
             <div>
               <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${displayStatus === 'PENDING' ? 'bg-yellow-500/20 text-yellow-500' : 'bg-blue-500/20 text-blue-500'}`}>
                 {displayStatus}
@@ -134,21 +138,57 @@ export function KdsView({ type, title }: KdsViewProps) {
             </div>
           </div>
         </div>
+        {/* Customer Name */}
+        {order.customerName && (
+          <div className="mb-3 px-3 py-2 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+            <p className="text-xs text-amber-400 font-bold flex items-center gap-1.5">
+              <span>👤</span> {order.customerName}
+            </p>
+          </div>
+        )}
 
         <div className="space-y-2 mb-4">
-          {order.items.map((item: any) => (
-            <div key={item.id} className="bg-black/20 rounded-xl p-3 border border-white/5">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-white text-sm">
-                  {item.quantity}x {item.menuItem?.name}
-                </span>
-                <span className="text-[10px] text-zinc-500 bg-white/5 px-2 py-0.5 rounded-full">
-                  {item.size}
-                </span>
+          {order.items.map((item: any) => {
+            // Parse notes into structured display
+            const notesParts = (item.notes || '').split(',').map((n: string) => n.trim()).filter(Boolean);
+            const hasNotes = notesParts.length > 0;
+            
+            return (
+              <div key={item.id} className="bg-black/20 rounded-xl p-3 border border-white/5">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-white text-sm">
+                    {item.quantity}x {item.menuItem?.name}
+                  </span>
+                  {item.size && item.size !== '-' && (
+                    <span className="text-[10px] text-zinc-400 bg-white/5 px-2 py-0.5 rounded-full font-medium">
+                      {item.size}
+                    </span>
+                  )}
+                </div>
+                {hasNotes && (
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {notesParts.map((note: string, i: number) => {
+                      // Determine badge color based on note type
+                      let badgeColor = 'bg-zinc-700/50 text-zinc-300';
+                      const lower = note.toLowerCase();
+                      if (lower.includes('size') || lower.includes('hot') || lower.includes('ice') || lower.includes('cold')) {
+                        badgeColor = 'bg-cyan-500/15 text-cyan-400';
+                      } else if (lower.includes('sugar')) {
+                        badgeColor = 'bg-amber-500/15 text-amber-400';
+                      } else if (lower.includes('icelevel') || lower.includes('ice level')) {
+                        badgeColor = 'bg-blue-500/15 text-blue-400';
+                      }
+                      return (
+                        <span key={i} className={`text-[10px] px-2 py-0.5 rounded-md font-medium ${badgeColor}`}>
+                          {note.replace(/^(size|sugarLevel|iceLevel|sugar|ice):\s*/i, (_, key) => `${key}: `)}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-              {item.notes && <p className="text-[10px] text-amber-400 mt-1 italic">📝 {item.notes}</p>}
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="flex gap-2">

@@ -30,11 +30,13 @@ export type PaymentMethod = 'QRIS' | 'E-Wallet' | 'Debit/Credit' | 'Cash';
 
 export interface OrderData {
   id: number | string;
+  orderNo?: string;
   queueNumber: number;
   status: string;
   totalAmount: number;
   paymentMethod?: string;
   createdAt: string;
+  customerName?: string;
   isCoffeeOrder?: boolean;
   items: {
     id: number | string;

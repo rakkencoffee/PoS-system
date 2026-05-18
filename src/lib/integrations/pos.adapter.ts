@@ -279,11 +279,12 @@ export async function createOrder(
     options?: any;
   }[],
   customerName?: string,
-): Promise<{ orderId: string; olseraOrderId?: number }> {
+): Promise<{ orderId: string; olseraOrderId?: number; orderNo?: string }> {
   if (USE_OLSERA) {
     // 1. Create open order (Header only)
     const order = await olsera.createOrder([], { customer_name: customerName });
     const orderId = (order.id || order.order_id) as number;
+    const orderNo = (order.order_no as string) || '';
 
     // 2. Add each item separately (required by Olsera Open API for Open Orders)
     for (const item of items) {
@@ -351,7 +352,7 @@ export async function createOrder(
           },
         },
       });
-      console.log(`[Sync] Order OLSERA-${orderId} mirrored with formatted notes.`);
+      console.log(`[Sync] Order OLSERA-${orderId} (${orderNo}) mirrored with formatted notes.`);
     } catch (dbErr) {
       console.warn(`[Sync] Failed to mirror order to local database:`, dbErr);
     }
@@ -359,6 +360,7 @@ export async function createOrder(
     return {
       orderId: `OLSERA-${orderId}`,
       olseraOrderId: orderId,
+      orderNo: orderNo,
     };
   }
   // Fallback removed

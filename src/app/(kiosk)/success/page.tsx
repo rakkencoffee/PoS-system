@@ -16,6 +16,7 @@ function SuccessContent() {
   // Extract queue: either from explicit param or from order ID (last 3 digits)
   const isOffline = searchParams.get('offline') === 'true';
   const rawQueue = searchParams.get('queue');
+  const orderNo = searchParams.get('orderNo') || '';
   const queue = rawQueue || (() => {
     if (!orderId) return '123';
     
@@ -45,7 +46,7 @@ function SuccessContent() {
           const data = await res.json();
           
           if (data.id && data.items && data.items.length > 0) {
-            console.log('[Success] Order data found with items:', data.id);
+            console.log('[Success] Order data found with items:', data.id, 'orderNo:', data.orderNo);
             setOrderData(data);
           } else if (retryCount < maxRetries) {
             retryCount++;
@@ -95,8 +96,9 @@ function SuccessContent() {
         setPrintStatus('printing');
 
         try {
+          const displayOrderNo = (orderNo || orderData?.orderNo) || orderId || '';
           const receiptData: PrintReceiptData = {
-            orderId: orderId || '',
+            orderId: displayOrderNo,
             queueNumber: queue,
             customerName: orderData.customerName || '',
             items: orderData.items || [],
@@ -128,8 +130,9 @@ function SuccessContent() {
   const handlePrint = async () => {
     setPrintStatus('printing');
     try {
+      const displayOrderNo = (orderNo || orderData?.orderNo) || orderId || '';
       const receiptData: PrintReceiptData = {
-        orderId: orderId || '',
+        orderId: displayOrderNo,
         queueNumber: queue,
         customerName: orderData?.customerName || '',
         items: orderData?.items || [],
@@ -198,11 +201,11 @@ function SuccessContent() {
             : 'Your order has been placed and sent to the kitchen.'}
         </p>
 
-        {/* Queue Number */}
+        {/* Order Number */}
         <div className="glass-card p-8 mb-8 animate-fade-in-up delay-2" style={{ opacity: 0 }}>
-          <p className="text-sm text-(--text-muted) uppercase tracking-wider mb-2">Your Queue Number</p>
-          <div className="text-7xl font-black text-gradient mb-4">
-            #{queue || '—'}
+          <p className="text-sm text-(--text-muted) uppercase tracking-wider mb-2">No. Pesanan</p>
+          <div className="text-4xl font-black text-gradient mb-4">
+            {(orderNo || orderData?.orderNo) || `#${queue}`}
           </div>
           <div className="flex items-center justify-center gap-2 text-(--text-secondary)">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -287,7 +290,7 @@ function SuccessContent() {
         {/* Hidden Receipt — only visible during print */}
         {orderData && (
           <Receipt 
-            orderId={orderId || ''}
+            orderId={(orderNo || orderData?.orderNo) || orderId || ''}
             queueNumber={queue}
             items={orderData.items || []}
             total={orderData.totalAmount || 0}
