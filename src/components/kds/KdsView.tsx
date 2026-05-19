@@ -73,7 +73,7 @@ export function KdsView({ type, title }: KdsViewProps) {
 
       // Further filter by search query (Queue number, Order No, or Item name)
       const matchesSearch = 
-        order.queueNumber.toString().includes(searchQuery) ||
+        String(order.queueNumber).padStart(3, '0').includes(searchQuery) ||
         (order.orderNo || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         (order.customerName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         items.some((item: any) => item.menuItem?.name.toLowerCase().includes(searchQuery.toLowerCase()));
