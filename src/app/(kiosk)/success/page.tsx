@@ -201,11 +201,14 @@ function SuccessContent() {
             : 'Your order has been placed and sent to the kitchen.'}
         </p>
 
-        {/* Order Number */}
+        {/* Queue & Order Number */}
         <div className="glass-card p-8 mb-8 animate-fade-in-up delay-2" style={{ opacity: 0 }}>
-          <p className="text-sm text-(--text-muted) uppercase tracking-wider mb-2">No. Pesanan</p>
-          <div className="text-4xl font-black text-gradient mb-4">
-            {(orderNo || orderData?.orderNo) || `#${queue}`}
+          <p className="text-sm text-(--text-muted) uppercase tracking-wider mb-2">Nomor Antrean</p>
+          <div className="text-7xl font-black text-gradient mb-2">
+            #{String(queue).padStart(3, '0')}
+          </div>
+          <div className="text-sm text-(--text-muted) mb-4 font-mono">
+            ID: {(orderNo || orderData?.orderNo) || orderId}
           </div>
           <div className="flex items-center justify-center gap-2 text-(--text-secondary)">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
