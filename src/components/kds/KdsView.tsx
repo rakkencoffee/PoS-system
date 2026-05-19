@@ -126,9 +126,12 @@ export function KdsView({ type, title }: KdsViewProps) {
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
             <div>
-              <span className={`text-2xl font-black ${displayStatus === 'PENDING' ? 'text-yellow-500' : 'text-blue-500'}`}>
-                {order.orderNo || `#${order.queueNumber}`}
+              <span className={`text-3xl font-black ${displayStatus === 'PENDING' ? 'text-yellow-500' : 'text-blue-500'}`}>
+                #{String(order.queueNumber).padStart(3, '0')}
               </span>
+              <div className="text-xs font-mono text-zinc-500 mt-1">
+                {order.orderNo || order.id}
+              </div>
             </div>
             <div>
               <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${displayStatus === 'PENDING' ? 'bg-yellow-500/20 text-yellow-500' : 'bg-blue-500/20 text-blue-500'}`}>
