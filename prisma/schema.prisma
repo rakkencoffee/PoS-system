@@ -25,6 +25,7 @@ model Order {
   stationId           String
   cashierId           String
   tableNumber         String?
+  queueNumber         Int?        // Daily queue number (001, 002, ...) resets at 00:00 WIB
   status              OrderStatus @default(PENDING)
   baristaStatus       OrderStatus @default(PENDING)
   kitchenStatus       OrderStatus @default(PENDING)
@@ -121,4 +122,10 @@ enum OrderStatus {
   READY
   COMPLETED
   CANCELLED
+}
+
+// Daily queue counter — resets at 00:00 WIB each day
+model QueueCounter {
+  date     String @id  // Format: "2026-05-19" (WIB date)
+  counter  Int    @default(0)
 }

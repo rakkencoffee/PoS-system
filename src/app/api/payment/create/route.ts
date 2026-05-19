@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
     // Best Practice POS: Jangan pernah gagalkan pembayaran pelanggan karena API backend error.
     let dbOrderId: string | null = null;
     let dbOrderNo: string | null = null;
+    let dbQueueNumber: number | null = null;
     try {
       const posAdapter = await import("@/lib/integrations/pos.adapter");
       const adapterOrder = await posAdapter.createOrder(
@@ -49,7 +50,8 @@ export async function POST(request: NextRequest) {
       );
       dbOrderId = adapterOrder.orderId;
       dbOrderNo = adapterOrder.orderNo || null;
-      console.log("Successfully created POS order:", dbOrderId, "orderNo:", dbOrderNo);
+      dbQueueNumber = adapterOrder.queueNumber || null;
+      console.log("Successfully created POS order:", dbOrderId, "orderNo:", dbOrderNo, "queue:", dbQueueNumber);
 
       // Inject discount natively to Olsera if a voucher was applied
       if (discountAmount && discountAmount > 0) {
@@ -128,9 +130,7 @@ export async function POST(request: NextRequest) {
       await pusherServer.trigger("kitchen", "ORDER_CREATED", {
         order: {
           id: dbOrderId || orderId,
-          queueNumber: dbOrderId?.startsWith("OLSERA-")
-            ? parseInt(dbOrderId.replace("OLSERA-", "")) % 1000
-            : Math.floor(Math.random() * 900) + 100,
+          queueNumber: dbQueueNumber || 0,
           orderNo: dbOrderNo || '',
           status: "PENDING",
           totalAmount: finalGrossAmount,
@@ -165,6 +165,7 @@ export async function POST(request: NextRequest) {
       redirectUrl: snapResult.redirect_url,
       orderId: dbOrderId ? String(dbOrderId) : orderId,
       orderNo: dbOrderNo || '',
+      queueNumber: dbQueueNumber || 0,
     });
   } catch (error) {
     console.error("Error creating payment:", error);

@@ -279,7 +279,7 @@ export async function createOrder(
     options?: any;
   }[],
   customerName?: string,
-): Promise<{ orderId: string; olseraOrderId?: number; orderNo?: string }> {
+): Promise<{ orderId: string; olseraOrderId?: number; orderNo?: string; queueNumber?: number }> {
   if (USE_OLSERA) {
     // 1. Create open order (Header only)
     const order = await olsera.createOrder([], { customer_name: customerName });
@@ -312,7 +312,16 @@ export async function createOrder(
       }
     }
 
-    // 3. Mirror to local Prisma for Dashboard/Reporting (Sprint 4)
+    // 3. Generate daily queue number (resets at 00:00 WIB)
+    let queueNum: number | undefined;
+    try {
+      const { getNextQueueNumber } = await import("@/lib/queue-number");
+      queueNum = await getNextQueueNumber();
+    } catch (qErr) {
+      console.warn(`[Queue] Failed to generate queue number:`, qErr);
+    }
+
+    // 4. Mirror to local Prisma for Dashboard/Reporting (Sprint 4)
     try {
       const { prisma } = await import("@/lib/db");
       await prisma.order.create({
@@ -320,6 +329,7 @@ export async function createOrder(
           id: `OLSERA-${orderId}`,
           stationId: "KIOSK", // Kiosk self-service
           cashierId: "cmo83g6140000vq5g10u03858", // Valid system user for Kiosk sync
+          queueNumber: queueNum || null,
           total: items.reduce(
             (acc, item) => acc + (item.price || 0) * item.quantity,
             0,
@@ -352,7 +362,7 @@ export async function createOrder(
           },
         },
       });
-      console.log(`[Sync] Order OLSERA-${orderId} (${orderNo}) mirrored with formatted notes.`);
+      console.log(`[Sync] Order OLSERA-${orderId} (${orderNo}) Queue=#${String(queueNum).padStart(3, '0')} mirrored.`);
     } catch (dbErr) {
       console.warn(`[Sync] Failed to mirror order to local database:`, dbErr);
     }
@@ -361,6 +371,7 @@ export async function createOrder(
       orderId: `OLSERA-${orderId}`,
       olseraOrderId: orderId,
       orderNo: orderNo,
+      queueNumber: queueNum,
     };
   }
   // Fallback removed
