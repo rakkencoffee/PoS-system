@@ -28,12 +28,14 @@ export async function GET(
 
       // Fetch stored daily queue number from local Prisma
       let storedQueueNumber: number | null = null;
+      let localCreatedAt: string | null = null;
       try {
         const localOrderForQueue = await prisma.order.findUnique({
           where: { id: id },
-          select: { queueNumber: true }
+          select: { queueNumber: true, createdAt: true }
         });
         storedQueueNumber = localOrderForQueue?.queueNumber || null;
+        localCreatedAt = localOrderForQueue?.createdAt ? localOrderForQueue.createdAt.toISOString() : null;
       } catch (_) {}
       const displayQueue = storedQueueNumber || (olseraOrderId % 1000);
 
@@ -149,7 +151,7 @@ export async function GET(
           status: kdsStatus,
           totalAmount: totalAmount,
           customerName: orderDetail.customer_name || '',
-          createdAt: orderDetail.order_date || new Date().toISOString(),
+          createdAt: localCreatedAt || orderDetail.order_date || new Date().toISOString(),
           items: finalItems,
         });
       } catch (olseraError) {
@@ -206,7 +208,7 @@ export async function GET(
               status: 'COMPLETED', // Found in closed orders, must be completed
               totalAmount: parseFloat(closedOrder.total || closedOrder.grand_total || '0'),
               customerName: closedOrder.customer_name || '',
-              createdAt: closedOrder.order_date || new Date().toISOString(),
+              createdAt: localCreatedAt || closedOrder.order_date || new Date().toISOString(),
               items: finalClosedItems,
             });
         } catch (closedError) {

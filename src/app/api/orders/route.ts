@@ -147,7 +147,7 @@ export async function GET(request: NextRequest) {
             kitchenStatus,
             totalAmount: Number(order.total || order.total_amount || order.grand_total || 0),
             paymentMethod: pMethod,
-            createdAt: order.order_date || order.created_at || new Date().toISOString(),
+            createdAt: localData?.createdAt || order.order_date || order.created_at || new Date().toISOString(),
             customerName: customerName,
             items: normalizedItems,
           };
