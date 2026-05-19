@@ -23,19 +23,19 @@ function PublicBoard() {
       <div className="glass-card p-6">
         <h2 className="text-xl font-bold text-yellow-400 mb-4">Pending ({pending.length})</h2>
         <div className="space-y-2">
-          {pending.map(o => <div key={o.id} className="text-lg font-mono">{(o as any).orderNo || `#${o.queueNumber}`}</div>)}
+          {pending.map(o => <div key={o.id} className="text-2xl font-mono text-center">#{String(o.queueNumber).padStart(3, '0')}</div>)}
         </div>
       </div>
       <div className="glass-card p-6 border-blue-500/30">
         <h2 className="text-xl font-bold text-blue-400 mb-4">Preparing ({preparing.length})</h2>
         <div className="space-y-2">
-          {preparing.map(o => <div key={o.id} className="text-lg font-mono">{(o as any).orderNo || `#${o.queueNumber}`}</div>)}
+          {preparing.map(o => <div key={o.id} className="text-2xl font-mono text-center">#{String(o.queueNumber).padStart(3, '0')}</div>)}
         </div>
       </div>
       <div className="glass-card p-6 border-green-500/30">
         <h2 className="text-xl font-bold text-green-400 mb-4">Ready ({ready.length})</h2>
         <div className="space-y-2">
-          {ready.map(o => <div key={o.id} className="text-lg font-mono text-green-400">{(o as any).orderNo || `#${o.queueNumber}`}</div>)}
+          {ready.map(o => <div key={o.id} className="text-2xl font-mono text-center text-green-400">#{String(o.queueNumber).padStart(3, '0')}</div>)}
         </div>
       </div>
     </div>
@@ -174,8 +174,9 @@ function StatusContent() {
 
         {/* Queue Number */}
         <div className="glass-card p-6 mb-6 animate-fade-in">
-          <p className="text-xs text-(--text-muted) uppercase tracking-wider mb-1">No. Pesanan</p>
-          <p className="text-3xl font-black text-gradient">{(order as any).orderNo || `#${order.queueNumber}`}</p>
+          <p className="text-xs text-(--text-muted) uppercase tracking-wider mb-1">Nomor Antrean</p>
+          <p className="text-6xl font-black text-gradient mb-2">#{String(order.queueNumber).padStart(3, '0')}</p>
+          <p className="text-xs text-(--text-muted) font-mono">ID: {(order as any).orderNo || order.id}</p>
         </div>
 
         {/* Status */}

@@ -50,7 +50,7 @@ export const Receipt: React.FC<ReceiptProps> = ({
       {/* Queue Number */}
       <div className="receipt-queue-section">
         <div className="receipt-label">NOMOR ANTREAN</div>
-        <div className="receipt-queue-big">#{queueNumber}</div>
+        <div className="receipt-queue-big">#{String(queueNumber).padStart(3, '0')}</div>
       </div>
 
       <div className="receipt-divider-thick">===============================</div>

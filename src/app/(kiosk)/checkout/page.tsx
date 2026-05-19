@@ -77,15 +77,14 @@ export default function CheckoutPage() {
     loadSnapScript();
   }, [loadSnapScript]);
 
-  const triggerSnapPopup = (token: string, id: string, redirectPath?: string) => {
+  const triggerSnapPopup = (token: string, id: string, queueNumber: number, redirectPath?: string) => {
     setPaymentStatus('Opening payment...');
     if (window.snap) {
       window.snap.pay(token, {
         onSuccess: async () => {
           setPaymentStatus('Payment successful!');
           clearCart();
-          const numericId = id.replace('OLSERA-', '');
-          const queueNum = numericId.slice(-3);
+          const queueNum = queueNumber.toString();
           // Get orderNo from the createOrder response data
           const orderNoParam = (window as any).__lastOrderNo ? `&orderNo=${(window as any).__lastOrderNo}` : '';
           router.push(`/success?orderId=${id}&queue=${queueNum}${orderNoParam}`);
@@ -143,7 +142,7 @@ export default function CheckoutPage() {
       if (data.snapToken) {
         // Store orderNo for success redirect
         if (data.orderNo) (window as any).__lastOrderNo = data.orderNo;
-        triggerSnapPopup(data.snapToken, data.orderId, data.redirectUrl);
+        triggerSnapPopup(data.snapToken, data.orderId, data.queueNumber || 0, data.redirectUrl);
       } else {
         throw new Error('No payment token received');
       }
@@ -190,8 +189,7 @@ export default function CheckoutPage() {
       if (edcResult.success) {
         setPaymentStatus('Payment Approved!');
         clearCart();
-        const numericId = data.orderId.replace('OLSERA-', '');
-        const queueNum = numericId.slice(-3);
+        const queueNum = (data.queueNumber || 0).toString();
         
         // Pass EDC metadata to success page
         const orderNoParam = data.orderNo ? `&orderNo=${data.orderNo}` : '';
