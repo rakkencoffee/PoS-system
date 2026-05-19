@@ -26,6 +26,17 @@ export async function GET(
       const catMap = new Map();
       menuItems.forEach(m => catMap.set(m.name, m.categorySlug));
 
+      // Fetch stored daily queue number from local Prisma
+      let storedQueueNumber: number | null = null;
+      try {
+        const localOrderForQueue = await prisma.order.findUnique({
+          where: { id: id },
+          select: { queueNumber: true }
+        });
+        storedQueueNumber = localOrderForQueue?.queueNumber || null;
+      } catch (_) {}
+      const displayQueue = storedQueueNumber || (olseraOrderId % 1000);
+
       try {
         const orderDetail = await olsera.getOrderDetail(olseraOrderId);
         
@@ -134,7 +145,7 @@ export async function GET(
         return NextResponse.json({
           id: id,
           orderNo: orderDetail.order_no || '',
-          queueNumber: olseraOrderId % 1000,
+          queueNumber: displayQueue,
           status: kdsStatus,
           totalAmount: totalAmount,
           customerName: orderDetail.customer_name || '',
@@ -191,7 +202,7 @@ export async function GET(
             return NextResponse.json({
               id: id,
               orderNo: closedOrder.order_no || '',
-              queueNumber: olseraOrderId % 1000,
+              queueNumber: displayQueue,
               status: 'COMPLETED', // Found in closed orders, must be completed
               totalAmount: parseFloat(closedOrder.total || closedOrder.grand_total || '0'),
               customerName: closedOrder.customer_name || '',
@@ -204,7 +215,7 @@ export async function GET(
           return NextResponse.json({
             id: id,
             orderNo: '',
-            queueNumber: olseraOrderId % 1000,
+            queueNumber: displayQueue,
             status: 'PENDING',
             totalAmount: 0,
             createdAt: new Date().toISOString(),
@@ -370,7 +381,7 @@ export async function PATCH(
       const updatedOrder = {
         id: id,
         orderNo: detail?.order_no || '',
-        queueNumber: olseraOrderId % 1000,
+        queueNumber: localOrder?.queueNumber || (olseraOrderId ? (olseraOrderId % 1000) : parseInt(id.replace(/[^0-9]/g, '').slice(-3) || '123')),
         status: localOrder ? localOrder.status : body.status,
         baristaStatus: localOrder?.baristaStatus,
         kitchenStatus: localOrder?.kitchenStatus,

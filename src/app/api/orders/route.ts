@@ -141,7 +141,7 @@ export async function GET(request: NextRequest) {
           return {
             id: `OLSERA-${numericId}`,
             orderNo: orderNo,
-            queueNumber: numericId % 1000,
+            queueNumber: localData?.queueNumber || (numericId % 1000),
             status: kdsStatus,
             baristaStatus,
             kitchenStatus,
