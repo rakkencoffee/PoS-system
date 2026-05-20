@@ -874,7 +874,7 @@ export async function validateVoucherRemote(code: string, totalAmount: number): 
     return { 
       valid: false, 
       discountAmount: 0, 
-      message: `Minimal pembelian ${voucher.fmin_order_amount || `Rp ${minOrder.toLocaleString('id-ID')}`}` 
+      message: `Minimal pembelian Rp ${minOrder.toLocaleString('id-ID')}` 
     };
   }
 
