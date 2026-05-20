@@ -52,15 +52,15 @@ export function useCreateOrder() {
 
 export function useValidateVoucher() {
   return useMutation({
-    mutationFn: async (code: string) => {
+    mutationFn: async ({ code, totalAmount }: { code: string; totalAmount: number }) => {
       const res = await fetch('/api/payment/validate-voucher', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ code, totalAmount }),
       });
       if (!res.ok) {
         const error = await res.json();
-        throw new Error(error.message || 'Invalid voucher');
+        throw new Error(error.error || error.message || 'Invalid voucher');
       }
       return res.json();
     },

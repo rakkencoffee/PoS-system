@@ -259,7 +259,7 @@ export default function CheckoutPage() {
     
     setVoucherMessage(null);
     try {
-      const data = await validateVoucherMutation.mutateAsync(voucherCode);
+      const data = await validateVoucherMutation.mutateAsync({ code: voucherCode, totalAmount });
       setAppliedDiscount(data.discountAmount);
       setVoucherMessage({type: 'success', text: `Voucher applied! Discount: ${formatCurrency(data.discountAmount)}`});
     } catch (error: any) {
