@@ -773,63 +773,127 @@ export async function getAllOrders(options: { today?: boolean } = {}): Promise<a
  * Fetch all active discount vouchers from Olsera
  */
 export async function getVouchers(): Promise<any[]> {
-  const res = await olseraFetch('/discountvoucher');
+  const res = await olseraFetch('/discountvoucher?per_page=50');
   if (!res.ok) {
     const text = await res.text();
     console.error('Olsera getVouchers error:', text);
     return [];
   }
   const data = await res.json();
-  return data.data || data || [];
+  return data.data || [];
 }
 
 /**
- * Validate a voucher code remotely via Olsera
+ * Search for a specific voucher by code (more efficient than fetching all)
+ * Uses Olsera's ?search= parameter to filter server-side
+ */
+export async function getVoucherByCode(code: string): Promise<any | null> {
+  const uppercaseCode = code.toUpperCase().trim();
+  const res = await olseraFetch(`/discountvoucher?search=${encodeURIComponent(uppercaseCode)}`);
+  if (!res.ok) {
+    console.error('Olsera getVoucherByCode error:', await res.text());
+    return null;
+  }
+  const data = await res.json();
+  const vouchers = data.data || [];
+  
+  // Find exact match (search might return partial matches)
+  return vouchers.find((v: any) => 
+    (v.code || '').toUpperCase() === uppercaseCode
+  ) || null;
+}
+
+/**
+ * Get voucher detail by Olsera ID
+ * Uses /discountvoucher/detail?id=<numeric_id>
+ */
+export async function getVoucherDetail(voucherId: number): Promise<any | null> {
+  const res = await olseraFetch(`/discountvoucher/detail?id=${voucherId}`);
+  if (!res.ok) {
+    console.error('Olsera getVoucherDetail error:', await res.text());
+    return null;
+  }
+  const data = await res.json();
+  return data.data || null;
+}
+
+/**
+ * Validate a voucher code against Olsera backoffice
+ * 
+ * Olsera voucher fields:
+ * - discount_with: 1 = nominal, 2 = percentage
+ * - discount_amount: nominal discount value (when discount_with=1)
+ * - discount_rate: percentage as decimal e.g. 0.1500 = 15% (when discount_with=2)
+ * - discount_percent: percentage display e.g. "15.00"
+ * - min_order_amount: minimum order amount e.g. "50000.00"
+ * - no_expiry: 1 = never expires
+ * - expiry_date: null or "YYYY-MM-DD"
+ * - active_date: "YYYY-MM-DD"
+ * - no_usage_limit: 1 = unlimited usage
+ * - usage_limit: max uses (when no_usage_limit=0)
+ * - usage: current usage count
  */
 export async function validateVoucherRemote(code: string, totalAmount: number): Promise<{
   valid: boolean;
   discountAmount: number;
   message: string;
+  voucherTitle?: string;
+  voucherType?: string;
+  voucherValue?: string;
 }> {
   const uppercaseCode = code.toUpperCase().trim();
   
-  // 1. Fetch available vouchers
-  const vouchers = await getVouchers();
-  
-  // 2. Find matching voucher by code
-  const voucher = vouchers.find((v: any) => 
-    (v.code?.toUpperCase() === uppercaseCode) || 
-    (v.voucher_code?.toUpperCase() === uppercaseCode)
-  );
+  // 1. Search for voucher by code (efficient — server-side filter)
+  const voucher = await getVoucherByCode(uppercaseCode);
 
   if (!voucher) {
-    return { valid: false, discountAmount: 0, message: 'Kode voucher tidak valid.' };
+    return { valid: false, discountAmount: 0, message: 'Kode voucher tidak ditemukan.' };
   }
 
-  // 3. Check status
-  if (voucher.status !== '1' && voucher.status !== 1 && voucher.status !== 'active') {
-    return { valid: false, discountAmount: 0, message: 'Voucher sudah tidak aktif.' };
+  // 2. Check active date
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0]; // "YYYY-MM-DD"
+  
+  if (voucher.active_date && todayStr < voucher.active_date) {
+    return { valid: false, discountAmount: 0, message: `Voucher belum aktif. Berlaku mulai ${voucher.factive_date || voucher.active_date}.` };
   }
 
-  // 4. Check min purchase
-  const minPurchase = Number(voucher.min_purchase || 0);
-  if (totalAmount < minPurchase) {
+  // 3. Check expiry
+  if (!voucher.no_expiry && voucher.expiry_date && todayStr > voucher.expiry_date) {
+    return { valid: false, discountAmount: 0, message: 'Voucher sudah kedaluwarsa.' };
+  }
+
+  // 4. Check usage limit
+  if (!voucher.no_usage_limit && voucher.usage_limit > 0 && voucher.usage >= voucher.usage_limit) {
+    return { valid: false, discountAmount: 0, message: 'Voucher sudah mencapai batas penggunaan.' };
+  }
+
+  // 5. Check minimum order amount
+  const minOrder = parseFloat(voucher.min_order_amount || '0');
+  if (totalAmount < minOrder) {
     return { 
       valid: false, 
       discountAmount: 0, 
-      message: `Minimal pembelian Rp ${minPurchase.toLocaleString('id-ID')}` 
+      message: `Minimal pembelian ${voucher.fmin_order_amount || `Rp ${minOrder.toLocaleString('id-ID')}`}` 
     };
   }
 
-  // 5. Calculate discount
+  // 6. Calculate discount based on discount_with type
   let discountAmount = 0;
-  const type = voucher.discount_type || (voucher.type === '1' ? 'nominal' : 'percentage');
-  const value = Number(voucher.discount_value || voucher.value || 0);
+  let voucherType = '';
+  let voucherValue = '';
 
-  if (type === 'nominal' || type === '1') {
-    discountAmount = value;
-  } else {
-    discountAmount = Math.floor(totalAmount * (value / 100));
+  if (voucher.discount_with === 1) {
+    // Nominal discount
+    discountAmount = parseFloat(voucher.discount_amount || '0');
+    voucherType = 'nominal';
+    voucherValue = voucher.fdiscount_amount || `Rp ${discountAmount.toLocaleString('id-ID')}`;
+  } else if (voucher.discount_with === 2) {
+    // Percentage discount
+    const rate = parseFloat(voucher.discount_rate || '0'); // e.g. 0.1500
+    discountAmount = Math.floor(totalAmount * rate);
+    voucherType = 'percentage';
+    voucherValue = voucher.fdiscount_percent || `${(rate * 100).toFixed(0)}%`;
   }
 
   // Cap discount at total amount
@@ -838,7 +902,10 @@ export async function validateVoucherRemote(code: string, totalAmount: number): 
   return {
     valid: true,
     discountAmount,
-    message: 'Voucher berhasil diterapkan!'
+    message: `Voucher "${voucher.title}" berhasil! Diskon ${voucherValue}`,
+    voucherTitle: voucher.title,
+    voucherType,
+    voucherValue,
   };
 }
 
@@ -853,6 +920,8 @@ export const olseraApi = {
   createOrder,
   addItemToOrder,
   getVouchers,
+  getVoucherByCode,
+  getVoucherDetail,
   validateVoucherRemote,
   olseraFetch // Included for internal use if needed
 };
