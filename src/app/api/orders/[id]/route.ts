@@ -273,14 +273,24 @@ export async function PATCH(
           detail = await olsera.getOrderDetail(olseraOrderId);
           const rawItems = detail.items || detail.orderitems || [];
           
-          // Basic category detection for initial status
+          // Build category lookup
+          let menuItems: any[] = [];
+          try {
+            menuItems = await getMenuItems();
+          } catch (mErr) {}
+          const catMap = new Map();
+          menuItems.forEach(m => catMap.set(m.name, m.categorySlug));
+
+          // Basic category detection matching client-side KDS logic
           const hasCoffee = rawItems.some((i: any) => {
-            const name = (i.product_name || '').toLowerCase();
-            return name.includes('coffee') || name.includes('signature') || name.includes('style');
+            const name = i.product_name || i.name || '';
+            const categorySlug = catMap.get(name);
+            return ['rakken-signature', 'rakken-style'].includes(categorySlug);
           });
           const hasFood = rawItems.some((i: any) => {
-            const name = (i.product_name || '').toLowerCase();
-            return !name.includes('coffee') && !name.includes('signature') && !name.includes('style');
+            const name = i.product_name || i.name || '';
+            const categorySlug = catMap.get(name);
+            return !['rakken-signature', 'rakken-style'].includes(categorySlug);
           });
 
           // Fetch a valid user for cashierId to prevent Prisma foreign key constraints
@@ -327,14 +337,25 @@ export async function PATCH(
 
         // 3. Determine overall Olsera status
         let olseraStatus: 'P' | 'A' | 'S' | 'Z' | 'X' = 'P';
+        let localStatus: 'PENDING' | 'PREPARING' | 'COMPLETED' = 'PENDING';
         
         // If either station is preparing, overall is preparing
         if (localOrder.baristaStatus === 'PREPARING' || localOrder.kitchenStatus === 'PREPARING') {
           olseraStatus = 'A';
+          localStatus = 'PREPARING';
         }
         // If BOTH are completed, overall is completed
         if (localOrder.baristaStatus === 'COMPLETED' && localOrder.kitchenStatus === 'COMPLETED') {
           olseraStatus = 'Z';
+          localStatus = 'COMPLETED';
+        }
+
+        // Update overall local order status if changed
+        if (localOrder.status !== localStatus) {
+          localOrder = await prisma.order.update({
+            where: { id },
+            data: { status: localStatus }
+          });
         }
 
         try {

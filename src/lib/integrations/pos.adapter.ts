@@ -324,6 +324,26 @@ export async function createOrder(
     // 4. Mirror to local Prisma for Dashboard/Reporting (Sprint 4)
     try {
       const { prisma } = await import("@/lib/db");
+
+      // Load menu items to accurately map categories
+      let menuItems: any[] = [];
+      try {
+        menuItems = await getMenuItems();
+      } catch (mErr) {
+        console.warn(`[Sync] Failed to fetch menu items for category mapping:`, mErr);
+      }
+      const catMap = new Map();
+      menuItems.forEach((m) => catMap.set(m.name, m.categorySlug));
+
+      const hasCoffee = items.some((item) => {
+        const categorySlug = catMap.get(item.name || "");
+        return ["rakken-signature", "rakken-style"].includes(categorySlug);
+      });
+      const hasFood = items.some((item) => {
+        const categorySlug = catMap.get(item.name || "");
+        return !["rakken-signature", "rakken-style"].includes(categorySlug);
+      });
+
       await prisma.order.create({
         data: {
           id: `OLSERA-${orderId}`,
@@ -335,6 +355,8 @@ export async function createOrder(
             0,
           ),
           status: "PENDING",
+          baristaStatus: hasCoffee ? "PENDING" : "COMPLETED",
+          kitchenStatus: hasFood ? "PENDING" : "COMPLETED",
           items: {
             create: items.map((item) => {
               // Format customization details for local receipt fallback
