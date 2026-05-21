@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCartStore } from '@/stores/useCartStore';
 import { useCreateOrder, useValidateVoucher, usePaymentConfig } from '@/hooks/useOrders';
-import { db } from '@/lib/dexie';
+import { db, encryptPendingOrder } from '@/lib/dexie';
 import { payWithEDC } from '@/lib/print-bridge';
 import * as Sentry from "@sentry/nextjs";
 
@@ -236,7 +236,8 @@ export default function CheckoutPage() {
           status: 'pending' as const
         };
 
-        await db.pendingOrders.add(orderPayload);
+        const encryptedPayload = encryptPendingOrder(orderPayload);
+        await db.pendingOrders.add(encryptedPayload);
         
         setPaymentStatus('Order saved offline!');
         clearCart();

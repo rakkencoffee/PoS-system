@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { pusherServer } from '@/lib/pusher';
+import crypto from 'crypto';
 
 /**
  * Olsera Webhook Receiver
@@ -9,12 +10,40 @@ import { pusherServer } from '@/lib/pusher';
  * Function: Receives real-time updates for products, stock, and orders.
  */
 
+function verifyOlseraSignature(payload: string, signature: string | null): boolean {
+  if (!signature) return false;
+  const secret = process.env.OLSERA_WEBHOOK_SECRET;
+  if (!secret) {
+    console.warn('[Olsera Webhook] OLSERA_WEBHOOK_SECRET is not set, skipping verification');
+    return true; // Bypass signature check if key is not configured locally
+  }
+  const expected = crypto
+    .createHmac('sha256', secret)
+    .update(payload)
+    .digest('hex');
+    
+  const expectedBuf = Buffer.from(expected);
+  const signatureBuf = Buffer.from(signature);
+  if (expectedBuf.length !== signatureBuf.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(signatureBuf, expectedBuf);
+}
+
 export async function POST(req: Request) {
   const timestamp = new Date().toISOString();
   
   try {
+    const rawBody = await req.text();
+    const signature = req.headers.get('x-olsera-signature');
+
+    if (!verifyOlseraSignature(rawBody, signature)) {
+      console.warn(`[Olsera Webhook] [${timestamp}] Unauthorized signature check failed.`);
+      return NextResponse.json({ error: 'Unauthorized: Invalid signature' }, { status: 401 });
+    }
+
+    const body = JSON.parse(rawBody || '{}');
     const headers = Object.fromEntries(req.headers.entries());
-    const body = await req.json().catch(() => ({}));
 
     console.log(`[Olsera Webhook] [${timestamp}] Received event`);
     const event = headers['x-olsera-event'] || body.flag_webhook || body.event;

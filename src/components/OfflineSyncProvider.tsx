@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { db } from '@/lib/dexie';
+import { db, decryptPendingOrder } from '@/lib/dexie';
 import * as Sentry from "@sentry/nextjs";
 
 export default function OfflineSyncProvider({ children }: { children: React.ReactNode }) {
@@ -56,13 +56,16 @@ export default function OfflineSyncProvider({ children }: { children: React.Reac
       try {
         if (!order.id) continue;
         
+        // Decrypt the order for processing
+        const decryptedOrder = decryptPendingOrder(order);
+        
         // Update status to syncing in Dexie
         await db.pendingOrders.update(order.id, { status: 'syncing' });
 
         const response = await fetch('/api/orders', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(order.items), // In our schema, we saved the full items payload
+          body: JSON.stringify(decryptedOrder.items), // In our schema, we saved the full items payload
         });
 
         if (response.ok) {

@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Receipt } from '@/components/pos/Receipt';
-import { printReceipt, type PrintReceiptData } from '@/lib/print-bridge';
+import { type PrintReceiptData } from '@/lib/print-bridge';
 
 function SuccessContent() {
   const router = useRouter();
@@ -85,10 +85,67 @@ function SuccessContent() {
     }
   }, [orderId, isOffline, searchParams, transactionStatus]);
 
-  // Auto-print logic
+  /**
+   * Submit a print job to the Cloud Print Queue and poll for completion.
+   */
+  const submitCloudPrintJob = async (receiptData: PrintReceiptData) => {
+    try {
+      // 1. Create print job in the cloud database
+      console.log('[CloudPrint] Submitting print job to /api/print-jobs...');
+      const createRes = await fetch('/api/print-jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(receiptData),
+      });
+
+      if (!createRes.ok) {
+        throw new Error(`Failed to create print job: ${createRes.status}`);
+      }
+
+      const { jobId, status: initialStatus } = await createRes.json();
+      console.log(`[CloudPrint] Job created: ${jobId}, status: ${initialStatus}`);
+
+      if (initialStatus === 'PRINTED') {
+        // Job was already printed (duplicate request)
+        return 'success';
+      }
+
+      // 2. Poll for print completion (max 15 seconds)
+      const maxPollTime = 15000;
+      const pollInterval = 2000;
+      const startTime = Date.now();
+
+      while (Date.now() - startTime < maxPollTime) {
+        await new Promise(r => setTimeout(r, pollInterval));
+
+        const statusRes = await fetch(`/api/print-jobs/status?orderId=${receiptData.orderId}`);
+        if (!statusRes.ok) continue;
+
+        const statusData = await statusRes.json();
+        console.log(`[CloudPrint] Poll status: ${statusData.status}`);
+
+        if (statusData.status === 'PRINTED') {
+          return 'success';
+        }
+        if (statusData.status === 'FAILED' && statusData.attempts >= 3) {
+          return 'error';
+        }
+      }
+
+      // Timed out — the daemon might be offline
+      console.warn('[CloudPrint] Polling timed out. Daemon may be offline.');
+      return 'timeout';
+
+    } catch (err) {
+      console.error('[CloudPrint] Error:', err);
+      return 'error';
+    }
+  };
+
+  // Auto-print logic — uses Cloud Print Queue
   useEffect(() => {
     if (orderData && orderData.items?.length > 0 && !hasPrinted.current) {
-      console.log('[Success] Order items detected, initiating print...');
+      console.log('[Success] Order items detected, initiating cloud print...');
       
       const triggerPrint = async () => {
         if (hasPrinted.current) return;
@@ -112,9 +169,19 @@ function SuccessContent() {
             } : undefined
           };
 
-          const result = await printReceipt(receiptData);
-          console.log('[Success] Print result:', result);
-          setPrintStatus(result.method === 'bridge' ? 'success' : result.method === 'browser' ? 'fallback' : 'error');
+          const result = await submitCloudPrintJob(receiptData);
+
+          if (result === 'success') {
+            setPrintStatus('success');
+          } else if (result === 'timeout') {
+            // Daemon mungkin offline, fallback ke browser print
+            console.warn('[Success] Cloud print timed out, falling back to browser print');
+            if (typeof window !== 'undefined') window.print();
+            setPrintStatus('fallback');
+          } else {
+            setPrintStatus('error');
+            hasPrinted.current = false; // Allow retry
+          }
         } catch (err) {
           console.error('[Success] Print error:', err);
           setPrintStatus('error');
@@ -125,7 +192,7 @@ function SuccessContent() {
       const timer = setTimeout(triggerPrint, 300);
       return () => clearTimeout(timer);
     }
-  }, [orderData, orderId, queue, edcData]);
+  }, [orderData, orderId, queue, edcData, orderNo]);
 
   const handlePrint = async () => {
     setPrintStatus('printing');
@@ -145,8 +212,14 @@ function SuccessContent() {
           refNo: orderId || ''
         } : undefined
       };
-      const result = await printReceipt(receiptData);
-      setPrintStatus(result.method === 'bridge' ? 'success' : result.method === 'browser' ? 'fallback' : 'error');
+
+      const result = await submitCloudPrintJob(receiptData);
+      if (result === 'success') {
+        setPrintStatus('success');
+      } else {
+        window.print();
+        setPrintStatus('fallback');
+      }
     } catch {
       window.print();
       setPrintStatus('fallback');
