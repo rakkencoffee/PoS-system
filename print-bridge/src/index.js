@@ -28,14 +28,41 @@ const EDC_PORT = parseInt(process.env.EDC_PORT || '7000');
 const EDC_TIMEOUT = 60000; // 60 seconds for customer to tap/swipe
 // ─────────────────────────────────────────────────────────────
 
+// Load environment variables
+const fs = require('fs');
+const path = require('path');
+
+let envPath = path.join(__dirname, '../.env');
+if (!fs.existsSync(envPath)) {
+  envPath = path.join(__dirname, '../../.env');
+}
+if (fs.existsSync(envPath)) {
+  require('dotenv').config({ path: envPath });
+} else {
+  require('dotenv').config();
+}
+
+const PRINT_BRIDGE_API_KEY = process.env.NEXT_PUBLIC_PRINT_BRIDGE_API_KEY || 'rakken-print-bridge-secret-key-123';
+
 app.use(express.json());
 app.use(cors({
   origin: [
     'http://localhost:3000',
     'http://localhost:3001',
     'https://pos-system-iota-ivory.vercel.app',
+    'https://menu.rakkencoffee.com',
   ],
 }));
+
+// Auth Middleware
+function authMiddleware(req, res, next) {
+  const apiKey = req.headers['x-api-key'] || req.query?.apiKey;
+  if (!apiKey || apiKey !== PRINT_BRIDGE_API_KEY) {
+    console.warn(`[Unauthorized Access] [${new Date().toISOString()}] Access denied for URL: ${req.url}. Key: ${apiKey}`);
+    return res.status(401).json({ error: 'Unauthorized: Invalid or missing API key' });
+  }
+  next();
+}
 
 // ─── RAW SERIAL PRINT ───────────────────────────────────────
 // Kirim raw bytes ESC/POS ke printer via serial port
@@ -124,7 +151,7 @@ app.get('/health', (req, res) => {
 /**
  * GET /printers — List available serial ports
  */
-app.get('/printers', async (req, res) => {
+app.get('/printers', authMiddleware, async (req, res) => {
   try {
     const ports = await SerialPort.list();
     res.json({
@@ -146,7 +173,7 @@ app.get('/printers', async (req, res) => {
  * POST /print — Print receipt
  * Body: { orderId, queueNumber, customerName, items, total, paymentMethod, discount? }
  */
-app.post('/print', async (req, res) => {
+app.post('/print', authMiddleware, async (req, res) => {
   try {
     const data = req.body;
 
@@ -181,7 +208,7 @@ app.post('/print', async (req, res) => {
  * POST /payment/edc — Initiate payment on EDC terminal
  * Body: { amount, orderId }
  */
-app.post('/payment/edc', async (req, res) => {
+app.post('/payment/edc', authMiddleware, async (req, res) => {
   const { amount, orderId } = req.body;
 
   if (!amount) {
@@ -261,7 +288,7 @@ app.post('/payment/edc', async (req, res) => {
 /**
  * POST /test — Test print (simple text)
  */
-app.post('/test', async (req, res) => {
+app.post('/test', authMiddleware, async (req, res) => {
   try {
     const testData = {
       orderId: 'TEST-001',
@@ -288,6 +315,103 @@ app.post('/test', async (req, res) => {
   }
 });
 
+// ─── CLOUD PRINT DAEMON ─────────────────────────────────────
+const CLOUD_API_URL = process.env.CLOUD_API_URL || '';
+const CLOUD_POLLING_INTERVAL = parseInt(process.env.CLOUD_POLLING_INTERVAL || '3000');
+
+let isPolling = false;
+
+async function pollCloudPrintJobs() {
+  if (isPolling) return;
+  isPolling = true;
+
+  try {
+    const url = `${CLOUD_API_URL}/api/print-jobs?status=PENDING&limit=5`;
+    const res = await fetch(url, {
+      headers: {
+        'x-api-key': PRINT_BRIDGE_API_KEY
+      }
+    });
+
+    if (!res.ok) {
+      if (res.status === 401) {
+        console.error(`[Daemon] ❌ Unauthorized polling. Check process.env.NEXT_PUBLIC_PRINT_BRIDGE_API_KEY`);
+      } else {
+        console.warn(`[Daemon] ⚠️ Failed to fetch print jobs (Status ${res.status})`);
+      }
+      isPolling = false;
+      return;
+    }
+
+    const { jobs } = await res.json();
+    if (jobs && jobs.length > 0) {
+      console.log(`[Daemon] 📥 Found ${jobs.length} pending print jobs...`);
+
+      for (const job of jobs) {
+        try {
+          console.log(`[Daemon] Processing job ${job.id} for order ${job.orderId}...`);
+          
+          // Mark job status as PRINTING in the cloud
+          await fetch(`${CLOUD_API_URL}/api/print-jobs/${job.id}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': PRINT_BRIDGE_API_KEY
+            },
+            body: JSON.stringify({ status: 'PRINTING' })
+          });
+
+          // Print logic
+          const data = job.payload;
+          if (!data.orderId || !data.items || data.total === undefined) {
+            throw new Error('Invalid print job payload format: missing orderId, items, total');
+          }
+
+          // Format receipt & labels
+          const receiptBuffer = formatReceipt(data);
+          const labelsBuffer = formatDrinkLabels(data);
+          const finalBuffer = Buffer.concat([receiptBuffer, labelsBuffer]);
+
+          // Write to printer
+          await writeToPrinter(finalBuffer);
+
+          console.log(`[Daemon] ✅ Successfully printed job ${job.id}`);
+
+          // Update status in the cloud
+          await fetch(`${CLOUD_API_URL}/api/print-jobs/${job.id}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': PRINT_BRIDGE_API_KEY
+            },
+            body: JSON.stringify({ status: 'PRINTED' })
+          });
+
+        } catch (err) {
+          console.error(`[Daemon] ❌ Print job ${job.id} failed:`, err.message);
+          
+          // Update status to FAILED in the cloud
+          await fetch(`${CLOUD_API_URL}/api/print-jobs/${job.id}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': PRINT_BRIDGE_API_KEY
+            },
+            body: JSON.stringify({ 
+              status: 'FAILED',
+              errorMessage: err.message
+            })
+          }).catch((e) => console.error('[Daemon] Failed to update error status:', e.message));
+        }
+      }
+    }
+  } catch (err) {
+    console.error(`[Daemon] ⚠️ Polling connection error:`, err.message);
+  } finally {
+    isPolling = false;
+  }
+}
+
 // ─── START SERVER ───────────────────────────────────────────
 app.listen(PORT, () => {
   console.log('');
@@ -305,6 +429,14 @@ app.listen(PORT, () => {
   console.log(`  POST http://localhost:${PORT}/print    — Print receipt`);
   console.log(`  POST http://localhost:${PORT}/test     — Test print`);
   console.log('');
+
+  // Start polling if CLOUD_API_URL is configured
+  if (CLOUD_API_URL) {
+    console.log(`[Daemon] 🔄 Starting print queue poller pointing to ${CLOUD_API_URL} every ${CLOUD_POLLING_INTERVAL}ms`);
+    setInterval(pollCloudPrintJobs, CLOUD_POLLING_INTERVAL);
+  } else {
+    console.log('[Daemon] ⚠️ CLOUD_API_URL not configured. Running in local-only mode.');
+  }
 
   // Auto-try connect to printer on startup
   openPrinter().catch(() => {
