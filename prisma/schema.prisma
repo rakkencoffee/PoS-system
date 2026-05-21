@@ -124,6 +124,21 @@ enum OrderStatus {
   CANCELLED
 }
 
+// Cloud Print Queue — struk dikirim dari tablet via cloud, ditarik oleh daemon lokal
+model PrintJob {
+  id           String   @id @default(cuid())
+  orderId      String
+  payload      Json     // PrintReceiptData (orderId, items, total, dll)
+  status       String   @default("PENDING") // PENDING, PRINTING, PRINTED, FAILED
+  attempts     Int      @default(0)
+  errorMessage String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
+
 // Daily queue counter — resets at 00:00 WIB each day
 model QueueCounter {
   date     String @id  // Format: "2026-05-19" (WIB date)

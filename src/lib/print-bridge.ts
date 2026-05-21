@@ -10,6 +10,9 @@ const PRINT_BRIDGE_URL =
     ? process.env.NEXT_PUBLIC_PRINT_BRIDGE_URL
     : 'http://localhost:3001';
 
+const PRINT_BRIDGE_API_KEY =
+  process.env.NEXT_PUBLIC_PRINT_BRIDGE_API_KEY || 'rakken-print-bridge-secret-key-123';
+
 if (typeof window !== 'undefined') {
   console.log('[PrintBridge] Client initialized with URL:', PRINT_BRIDGE_URL);
 }
@@ -75,7 +78,10 @@ export async function printReceipt(
     console.log(`[PrintBridge] POST ${PRINT_BRIDGE_URL}/print ...`);
     const res = await fetch(`${PRINT_BRIDGE_URL}/print`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-api-key': PRINT_BRIDGE_API_KEY
+      },
       body: JSON.stringify(normalizedData),
       // Use standard timeout if AbortSignal.timeout is not supported
       signal: (AbortSignal as any).timeout ? (AbortSignal as any).timeout(10000) : undefined,
@@ -114,7 +120,10 @@ export async function payWithEDC(
   try {
     const res = await fetch(`${PRINT_BRIDGE_URL}/payment/edc`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-api-key': PRINT_BRIDGE_API_KEY
+      },
       body: JSON.stringify({ amount, orderId }),
       // No standard signal timeout here as EDC payment can take time
     });
