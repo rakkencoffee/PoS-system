@@ -101,64 +101,7 @@ export async function POST(request: NextRequest) {
       items: midtransItems,
     });
 
-    // 4. Broadcast ke Kitchen Display (KDS) via Pusher — IMMEDIATELY
-    // Agar barista langsung lihat order baru tanpa menunggu Midtrans webhook
-    try {
-      const { pusherServer } = await import("@/lib/pusher");
 
-      // Deteksi HANYA berdasarkan kategori
-      const coffeeCategories = [
-        "coffee-based",
-        "coffee based",
-        "milk-based",
-        "milk based",
-        "coffee",
-        "kopi",
-      ];
-
-      const isCoffeeOrder = items.some((item: any) => {
-        const catName = (
-          item.category ||
-          item.categoryName ||
-          item.group_name ||
-          item.product_group_name ||
-          ""
-        ).toLowerCase();
-        return coffeeCategories.some((c) => catName.includes(c));
-      });
-
-      await pusherServer.trigger("kitchen", "ORDER_CREATED", {
-        order: {
-          id: dbOrderId || orderId,
-          queueNumber: dbQueueNumber || 0,
-          orderNo: dbOrderNo || '',
-          status: "PENDING",
-          totalAmount: finalGrossAmount,
-          paymentMethod: "MIDTRANS",
-          createdAt: new Date().toISOString(),
-          isCoffeeOrder,
-          items: items.map((item: any, idx: number) => ({
-            id: idx,
-            menuItem: { name: item.name || "Item" },
-            quantity: item.quantity || 1,
-            size: item.variantName || "-",
-            categoryName:
-              item.categoryName ||
-              item.group_name ||
-              item.product_group_name ||
-              "",
-          })),
-        },
-      });
-      console.log(
-        `[Pusher] ORDER_CREATED broadcast for ${dbOrderId || orderId}`,
-      );
-    } catch (pusherErr) {
-      console.warn(
-        "[Pusher] Failed to broadcast ORDER_CREATED (non-blocking):",
-        pusherErr,
-      );
-    }
 
     return NextResponse.json({
       snapToken: snapResult.token,

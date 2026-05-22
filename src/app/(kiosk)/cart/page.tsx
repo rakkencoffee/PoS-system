@@ -12,6 +12,12 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
+const isFoodCategory = (categoryName?: string) => {
+  if (!categoryName) return false;
+  const lower = categoryName.toLowerCase();
+  return ['dessert', 'snack', 'main-course', 'bites', 'makanan', 'makanan utama', 'cemilan'].some(c => lower.includes(c));
+};
+
 export default function CartPage() {
   const router = useRouter();
   const { items, removeItem, updateQuantity, itemCount, totalAmount, setCustomerName, customerName } = useCartStore();
@@ -93,15 +99,17 @@ export default function CartPage() {
 
                 {/* Customizations */}
                 <div className="flex flex-wrap gap-1.5 mt-1.5">
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-(--bg-secondary) text-(--text-secondary) font-medium">
-                    Size {item.size}
-                  </span>
-                  {item.sugarLevel !== 'normal' && (
+                  {item.size && item.size !== '-' && item.size !== '' && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-(--bg-secondary) text-(--text-secondary) font-medium">
+                      {isFoodCategory(item.category) ? `Option: ${item.size}` : `Size ${item.size}`}
+                    </span>
+                  )}
+                  {item.sugarLevel && item.sugarLevel !== 'normal' && item.sugarLevel !== '' && (
                     <span className="text-xs px-2 py-0.5 rounded-full bg-(--bg-secondary) text-(--text-secondary) font-medium">
                       Sugar {item.sugarLevel}
                     </span>
                   )}
-                  {item.iceLevel !== 'none' && (
+                  {item.iceLevel && item.iceLevel !== 'none' && item.iceLevel !== '' && (
                     <span className="text-xs px-2 py-0.5 rounded-full bg-(--bg-secondary) text-(--text-secondary) font-medium">
                       Ice: {item.iceLevel}
                     </span>

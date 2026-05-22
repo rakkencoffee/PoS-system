@@ -236,10 +236,10 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
       price: item.price,
       image: item.image,
       quantity,
-      size: selectedSize || '-',
+      size: selectedSize || '',
       olseraVariantId: matchedVariant?.id,
-      sugarLevel: config.showSugar ? sugarLevel : 'normal',
-      iceLevel: config.showIce ? iceLevel : 'normal',
+      sugarLevel: config.showSugar ? sugarLevel : '',
+      iceLevel: config.showIce ? iceLevel : '',
       extraShot: false,
       toppings: finalToppings,
       subtotal: totalPrice,
@@ -288,7 +288,7 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
           {hasSizes && (
             <div>
               <h3 className="text-sm font-semibold text-(--text-secondary) uppercase tracking-wider mb-3">
-                {isDrink ? 'Variant' : 'Size'}
+                {isDrink ? 'Variant' : 'Option'}
               </h3>
               <div className={`grid gap-2 ${item.sizes.length <= 2 ? 'grid-cols-2' : item.sizes.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
                 {item.sizes.map((size) => (

@@ -26,16 +26,17 @@ export async function GET(
       const catMap = new Map();
       menuItems.forEach(m => catMap.set(m.name, m.categorySlug));
 
-      // Fetch stored daily queue number from local Prisma
+      // Fetch stored full order details from local Prisma
+      let localOrder: any = null;
       let storedQueueNumber: number | null = null;
       let localCreatedAt: string | null = null;
       try {
-        const localOrderForQueue = await prisma.order.findUnique({
+        localOrder = await prisma.order.findUnique({
           where: { id: id },
-          select: { queueNumber: true, createdAt: true }
+          include: { items: true }
         });
-        storedQueueNumber = localOrderForQueue?.queueNumber || null;
-        localCreatedAt = localOrderForQueue?.createdAt ? localOrderForQueue.createdAt.toISOString() : null;
+        storedQueueNumber = localOrder?.queueNumber || null;
+        localCreatedAt = localOrder?.createdAt ? localOrder.createdAt.toISOString() : null;
       } catch (_) {}
       const displayQueue = storedQueueNumber || (olseraOrderId % 1000);
 
@@ -48,7 +49,7 @@ export async function GET(
         const oStatus = orderDetail.status?.toUpperCase() || '';
         
         if (oStatus === 'A') kdsStatus = 'PREPARING';
-        else if (oStatus === 'Z') kdsStatus = 'COMPLETED';
+        else if (oStatus === 'Z' || oStatus === 'S' || oStatus === 'T') kdsStatus = 'COMPLETED';
         else if (orderDetail.payment_status === '1' || orderDetail.payment_status === 'paid') {
           kdsStatus = 'PENDING'; // Paid but not yet prepared
         }
@@ -213,15 +214,23 @@ export async function GET(
             });
         } catch (closedError) {
           console.error('Order not found even in closed orders:', closedError);
-          // Return a minimal order object as last resort
+          // Return the local status if we have it, instead of hardcoded 'PENDING'
           return NextResponse.json({
             id: id,
-            orderNo: '',
+            orderNo: localOrder?.olseraTransactionId ? `OLSERA-${localOrder.olseraTransactionId}` : '',
             queueNumber: displayQueue,
-            status: 'PENDING',
-            totalAmount: 0,
-            createdAt: new Date().toISOString(),
-            items: [],
+            status: localOrder?.status || 'PENDING',
+            totalAmount: localOrder?.total || 0,
+            createdAt: localCreatedAt || new Date().toISOString(),
+            items: localOrder?.items?.map((item: any, idx: number) => ({
+              id: idx,
+              menuItem: { name: item.name },
+              quantity: item.quantity,
+              price: item.price,
+              notes: item.notes,
+              size: item.notes?.match(/Size: ([^,)]+)/)?.[1] || '-',
+              categorySlug: catMap?.get(item.name) || 'other',
+            })) || [],
           });
         }
       }
@@ -339,15 +348,21 @@ export async function PATCH(
         let olseraStatus: 'P' | 'A' | 'S' | 'Z' | 'X' = 'P';
         let localStatus: 'PENDING' | 'PREPARING' | 'COMPLETED' = 'PENDING';
         
-        // If either station is preparing, overall is preparing
-        if (localOrder.baristaStatus === 'PREPARING' || localOrder.kitchenStatus === 'PREPARING') {
-          olseraStatus = 'A';
-          localStatus = 'PREPARING';
-        }
         // If BOTH are completed, overall is completed
         if (localOrder.baristaStatus === 'COMPLETED' && localOrder.kitchenStatus === 'COMPLETED') {
           olseraStatus = 'Z';
           localStatus = 'COMPLETED';
+        }
+        // If either is preparing, or one is completed while the other is pending/preparing:
+        // overall should be preparing (A) so it stays confirmed ("konfirmasi") in backoffice
+        else if (
+          localOrder.baristaStatus === 'PREPARING' || 
+          localOrder.kitchenStatus === 'PREPARING' ||
+          localOrder.baristaStatus === 'COMPLETED' || 
+          localOrder.kitchenStatus === 'COMPLETED'
+        ) {
+          olseraStatus = 'A';
+          localStatus = 'PREPARING';
         }
 
         // Update overall local order status if changed
