@@ -24,6 +24,12 @@ declare global {
   }
 }
 
+const isFoodCategory = (categoryName?: string) => {
+  if (!categoryName) return false;
+  const lower = categoryName.toLowerCase();
+  return ['dessert', 'snack', 'main-course', 'bites', 'makanan', 'makanan utama', 'cemilan'].some(c => lower.includes(c));
+};
+
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('id-ID', {
     style: 'currency',
@@ -306,9 +312,17 @@ export default function CheckoutPage() {
                   </div>
                   {/* Item customization details */}
                   <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
-                    <span className="text-xs text-(--text-muted)">Size: {item.size}</span>
-                    {item.sugarLevel && <span className="text-xs text-(--text-muted)">Sugar: {item.sugarLevel}</span>}
-                    {item.iceLevel && <span className="text-xs text-(--text-muted)">Ice: {item.iceLevel}</span>}
+                    {item.size && item.size !== '-' && item.size !== '' && (
+                      <span className="text-xs text-(--text-muted)">
+                        {isFoodCategory(item.category) ? `Option: ${item.size}` : `Size: ${item.size}`}
+                      </span>
+                    )}
+                    {item.sugarLevel && item.sugarLevel !== 'normal' && item.sugarLevel !== '' && (
+                      <span className="text-xs text-(--text-muted)">Sugar: {item.sugarLevel}</span>
+                    )}
+                    {item.iceLevel && item.iceLevel !== 'none' && item.iceLevel !== '' && (
+                      <span className="text-xs text-(--text-muted)">Ice: {item.iceLevel}</span>
+                    )}
                     {item.extraShot && <span className="text-xs text-(--text-muted)">+ Extra Shot</span>}
                     {item.toppings.length > 0 && (
                       <span className="text-xs text-(--text-muted)">

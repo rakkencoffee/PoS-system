@@ -24,7 +24,14 @@ export async function GET(request: NextRequest) {
         const activeOrdersToEnrich = allPotentialOrders
           .filter(o => {
             const status = (o.status || '').toUpperCase();
-            return status !== 'Z' && status !== 'T'; // Not Completed / Not Cancelled
+            const isPaid = o.is_paid === true || 
+                           o.is_paid === 1 || 
+                           o.is_paid === '1' || 
+                           o.payment_status === '1' || 
+                           o.payment_status === 'paid' || 
+                           o.payment_status_name === 'Paid' ||
+                           o.payment_status_name === 'Lunas';
+            return status !== 'Z' && status !== 'T' && isPaid; // ONLY paid orders
           })
           .slice(0, 50);
 
@@ -75,7 +82,7 @@ export async function GET(request: NextRequest) {
           const localData = localMap.get(`OLSERA-${numericId}`) as any;
           
           if (oStatus === 'A') kdsStatus = 'PREPARING';
-          else if (oStatus === 'Z' || oStatus === 'T') kdsStatus = 'COMPLETED';
+          else if (oStatus === 'Z' || oStatus === 'S' || oStatus === 'T') kdsStatus = 'COMPLETED';
           else kdsStatus = 'PENDING';
 
           let pMethod = order.payment_mode_name || order.payment_method || 'MIDTRANS';
