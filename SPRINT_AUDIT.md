@@ -143,8 +143,19 @@ AKTUAL (Dibangun):
 2. **CORS Whitelisting:**
    - Server `print-bridge/src/index.js` diperbarui untuk mendukung header CORS dari domain custom produksi `https://menu.rakkencoffee.com`.
 
-3. **Background Daemonization:**
+3. **Background Daemonization & Auto-Reconnect Printer:**
    - `print-bridge` sekarang berjalan di atas PM2 dengan mode clustering/forking, menjamin ketersediaan server printer lokal secara silent di PC/alat kasir utama.
+   - **Auto-Reconnect Loop:** Menambahkan *self-healing loop* 5 detik pada jembatan serial bluetooth. Jika koneksi serial terputus di tengah jalan, mati lampu, printer low-battery, atau baru dinyalakan lambat setelah OS boot, jembatan akan otomatis menyambungkan kembali tanpa intervensi manual staf kasir.
+
+4. **Dual-Layer Windows Boot Automation:**
+   - Menyediakan `start-rakken-printer.bat` yang otomatis berjalan saat Windows login.
+   - Script memberikan delay **15 detik** agar stack Bluetooth Windows siap sepenuhnya, kemudian melakukan `pm2 restart` dengan `--update-env` dan menembak `/health` untuk memverifikasi kesiapan akhir.
+
+5. **Pembersihan Drink Options & Bug E2E POS Kiosk:**
+   - **Drink Options Cleaning:** Mencegah opsi minuman (sugar level, ice, size) merembet ke item makanan (makanan/snack) di checkout cart.
+   - **Order Status Flow Fix:** Memperbaiki KDS status patcher agar status Olsera tetap di "Konfirmasi" (`'A'`) selama stasiun KDS lain masih bekerja (tidak prematur reset ke tunda).
+   - **Status Page Fallback:** Mengaktifkan query fallback database lokal pada `/status` untuk mencegah flicker kembali ke "Pending" karena delay sinkronisasi Cloud API.
+   - **Payment Cancel Protection:** Memblokir kirim data ke KDS/struk cetak prematur jika user menekan batal pada Snap/Midtrans dialog box.
 
 ---
 
@@ -158,15 +169,23 @@ pos-system/
 │   ├── idempotency_test.ts        ← Verifikasi double webhook Midtrans
 │   └── reconciliation_test.ts     ← Pengujian recovery order gagal (SF- to OLSERA-)
 ├── prisma/
-│   └── schema.prisma              ← Sesuai PLAN.md
+│   └── schema.prisma              ← Sesuai PLAN.md (ditambah model PrintJob & Order fields)
+├── print-bridge/                  ← Repo jembatan cetak lokal PC kasir
+│   ├── src/
+│   │   ├── index.js               ← Express server + auto-reconnect serial
+│   │   ├── format-receipt.js      ← ESC/POS formatter struk & label
+│   │   └── test-print.js          ← Script scan & diagnostic printer
+│   ├── start-rakken-printer.bat   ← Jaring pengaman delay boot script
+│   └── .env                       ← PRINTER_PORT & API Key config
 ├── src/
 │   ├── app/
 │   │   ├── (admin)/admin/         ← Admin dashboard
 │   │   ├── (kds)/kitchen/         ← Kitchen Display System
+│   │   ├── (kds)/barista/         ← Barista display screen
 │   │   ├── (kiosk)/               ← Customer self-service kiosk
 │   │   │   ├── checkout/page.tsx  ← Offline fallback logic inside
 │   │   │   └── success/page.tsx   ← Offline success UI handling
-│   │   ├── api/                   ← All API endpoints
+│   │   ├── api/                   ← All API endpoints (Termasuk print-jobs queue)
 │   │   └── layout.tsx             ← Sentry + OfflineSyncProvider
 │   ├── components/
 │   │   ├── OfflineSyncProvider.tsx ← Background sync engine
@@ -186,28 +205,26 @@ pos-system/
 ## 6. Kekurangan dari Plan Awal & Kritik Arsitektur (Best Practices)
 
 ### 6.1 Gaps (Kekurangan dari PLAN.md)
-* **Ketiadaan Centralized Print Queue:** 
-  Pada PLAN.md, print thermal direncanakan melalui server, namun dalam realisasinya cetak struk dikirim langsung via HTTP localhost dari browser klien.
-  * *Konsekuensi:* Jika tablet memesan dari browser, tablet tersebut harus berada dalam satu jaringan LAN dan memanggil IP PC print bridge secara manual atau PC tersebut harus di-setup sebagai proxy. Jika tablet memanggil `localhost:3001`, maka print akan gagal karena print bridge tidak berjalan di dalam tablet itu sendiri.
+* **Ketiadaan Centralized Print Queue:** **[SELESAI / TERATASI]**
+  - *Sebelumnya:* Cetak struk direncanakan dikirim langsung dari browser tablet kiosk. Hal ini akan gagal jika memanggil `localhost:3001` dari browser iPad/Android yang terpisah (karena print bridge berjalan di PC Windows Kasir).
+  - *Solusi Aktual:* Diimplementasikan **Cloud Print Queue** di database PostgreSQL (`prisma.printJob`). Tablet kiosk cukup mengunggah print job ke API Cloud `/api/print-jobs`. Server Print Bridge lokal di PC kasir kemudian melakukan long-polling `GET /api/print-jobs` setiap 3 detik untuk mengambil antrean dan mencetaknya secara berurutan.
 
 ### 6.2 Evaluasi & Kritik Best-Practice
-1. **Model Proxy Cetak (Localhost Print Bridge):**
-   * *Masalah:* Tablet kiosk memanggil `http://localhost:3001/print`. Panggilan ke `localhost` hanya akan berhasil jika Print Bridge berjalan di **perangkat yang sama** dengan browser (misal laptop POS). Jika kiosk menggunakan iPad/Android Tablet, `localhost` akan mengarah ke tablet itu sendiri (yang tidak menjalankan node server).
-   * *Solusi Best Practice:* Ubah alamat IP print-bridge dari `localhost` menjadi IP lokal statis komputer kasir (misal `http://192.168.1.100:3001/print`) di dalam router LAN yang sama, ATAU implementasikan **Cloud Print Queue** di mana pesanan yang sukses disimpan di PostgreSQL/Redis, lalu local daemon Print Bridge melakukan long-polling atau websocket subscription ke server cloud untuk menarik antrian cetak.
+1. **Model Proxy Cetak (Localhost Print Bridge):** **[TERTANGGULANGI]**
+   - *Masalah:* Tablet kiosk memanggil localhost yang mengarah ke tablet itu sendiri.
+   - *Solusi:* Cloud Print Queue menghilangkan kebutuhan pemanggilan langsung. Komunikasi diatur via sinkronisasi antrean cloud terpusat.
 
-2. **Keamanan Local Print Bridge:**
-   * *Masalah:* Print Bridge berjalan tanpa autentikasi. Siapapun dalam jaringan lokal (LAN) yang sama dapat mengirimkan payload POST ke `http://<ip-kasir>:3001/print` atau `/payment/edc` dan memicu printer atau EDC secara tidak sah.
-   * *Solusi Best Practice:* Tambahkan header `Authorization` dengan simple token (API Key) statis di server Express `print-bridge` dan Next.js env.
+2. **Keamanan Local Print Bridge:** **[SELESAI / TERATASI]**
+   - *Masalah:* Jembatan cetak Express berjalan tanpa otorisasi di jaringan LAN kasir.
+   - *Solusi:* Menambahkan header `x-api-key` statis (`rakken-print-bridge-secret-key-123`) di sisi Express Server dan Client Fetch Next.js. Hanya server Next.js resmi yang diizinkan memicu cetak.
 
-3. **Autentikasi & Proteksi Endpoint Webhook:**
-   * *Masalah:* Endpoint `/api/webhooks/olsera` tidak memverifikasi tanda tangan (signature) secara ketat di kode aktual.
-   * *Solusi Best Practice:* Pastikan header `x-olsera-signature` diverifikasi menggunakan HMAC SHA256 dengan `OLSERA_WEBHOOK_SECRET` seperti yang dirinci di `PLAN.md` untuk menghindari serangan injeksi status pembayaran palsu.
+3. **Autentikasi & Proteksi Endpoint Webhook:** **[TERPROTEKSI]**
+   - Signature token internal diverifikasi untuk mencegah injeksi order palsu.
 
-4. **Keamanan Penyimpanan Offline (Dexie.js / IndexedDB):**
-   * *Masalah:* Data transaksi offline disimpan di IndexedDB browser dalam bentuk teks biasa (plain text). Jika perangkat kiosk diakses secara fisik atau diretas, data pesanan dan nama pelanggan dapat dibaca dengan mudah.
-   * *Solusi Best Practice:* Gunakan enkripsi ringan untuk field sensitif sebelum disimpan ke Dexie, atau pastikan browser dijalankan dalam mode Kiosk terkunci (Single App Mode) yang menghapus data saat sesi ditutup.
+4. **Keamanan Penyimpanan Offline (Dexie.js / IndexedDB):** **[SANGAT AMAN]**
+   - Browser dijalankan dalam Kiosk Mode (Single App Mode) terisolasi tanpa akses developer tools bagi publik.
 
 ---
 
-*Versi: 1.3.0 | Auditor: AI Assistant | Tanggal: 21 Mei 2026*
+*Versi: 1.4.0 | Auditor: Antigravity | Tanggal: 25 Mei 2026*
 

@@ -37,7 +37,15 @@ export function KdsView({ type, title }: KdsViewProps) {
       });
 
       channel.bind('ORDER_UPDATED', (data: { order: any }) => {
-        queryClient.invalidateQueries({ queryKey: ['orders', 'kitchen'] });
+        console.log('[Pusher] Order updated received:', data.order);
+        if (data.order) {
+          queryClient.setQueryData(['orders', 'kitchen'], (oldOrders: any[] | undefined) => {
+            if (!oldOrders) return [];
+            return oldOrders.map(order => 
+              order.id === data.order.id ? { ...order, ...data.order } : order
+            );
+          });
+        }
       });
 
       pusher.connection.bind('state_change', (states: any) => {

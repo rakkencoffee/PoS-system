@@ -70,6 +70,8 @@ const { SerialPort } = require('serialport');
 
 let printerPort = null;
 let isPortOpen = false;
+let reconnectTimer = null;
+const RECONNECT_INTERVAL = 5000; // Retry every 5 seconds
 
 async function openPrinter() {
   if (isPortOpen && printerPort && printerPort.isOpen) return printerPort;
@@ -80,6 +82,10 @@ async function openPrinter() {
       const portPaths = ports.map(p => p.path);
       console.log('[Print Bridge] Available ports:', portPaths.join(', ') || 'None');
       
+      if (!portPaths.includes(PRINTER_PORT)) {
+        return reject(new Error(`Port ${PRINTER_PORT} not found. Available: ${portPaths.join(', ') || 'None'}. Bluetooth may not be ready yet.`));
+      }
+
       console.log(`[Print Bridge] Attempting to open printer on ${PRINTER_PORT}...`);
 
       printerPort = new SerialPort({
@@ -92,26 +98,59 @@ async function openPrinter() {
         if (err) {
           console.error(`❌ Failed to open ${PRINTER_PORT}:`, err.message);
           isPortOpen = false;
-          return reject(new Error(`Failed to open ${PRINTER_PORT}: ${err.message}. Available ports: ${portPaths.join(', ') || 'None'}`));
+          printerPort = null;
+          return reject(new Error(`Failed to open ${PRINTER_PORT}: ${err.message}`));
         }
         console.log(`✅ Printer connected on ${PRINTER_PORT}`);
         isPortOpen = true;
+        // Stop reconnect loop once connected
+        stopReconnectLoop();
         resolve(printerPort);
       });
 
       printerPort.on('close', () => {
         isPortOpen = false;
-        console.log(`⚠️  Printer port ${PRINTER_PORT} closed`);
+        printerPort = null;
+        console.log(`⚠️  Printer port ${PRINTER_PORT} closed. Will auto-reconnect...`);
+        startReconnectLoop();
       });
 
       printerPort.on('error', (err) => {
         isPortOpen = false;
+        printerPort = null;
         console.error(`❌ Printer error:`, err.message);
+        startReconnectLoop();
       });
     } catch (err) {
       reject(err);
     }
   });
+}
+
+function startReconnectLoop() {
+  if (reconnectTimer) return; // Already running
+  console.log(`🔄 Auto-reconnect started (every ${RECONNECT_INTERVAL / 1000}s)...`);
+  reconnectTimer = setInterval(async () => {
+    if (isPortOpen && printerPort && printerPort.isOpen) {
+      stopReconnectLoop();
+      return;
+    }
+    try {
+      await openPrinter();
+      console.log(`🔄 ✅ Reconnected to printer successfully!`);
+    } catch (err) {
+      // Silently retry — only log short message
+      console.log(`🔄 ⏳ Printer not ready yet (${err.message.split('.')[0]}). Retrying...`);
+    }
+  }, RECONNECT_INTERVAL);
+}
+
+function stopReconnectLoop() {
+  if (reconnectTimer) {
+    clearInterval(reconnectTimer);
+    reconnectTimer = null;
+    console.log(`🔄 Auto-reconnect stopped (printer is connected).`);
+  }
 }
 
 function writeToPrinter(buffer) {
@@ -144,6 +183,7 @@ app.get('/health', (req, res) => {
     status: 'ok',
     printer: PRINTER_PORT,
     connected: isPortOpen,
+    reconnecting: reconnectTimer !== null,
     timestamp: new Date().toISOString(),
   });
 });
@@ -440,7 +480,8 @@ app.listen(PORT, () => {
 
   // Auto-try connect to printer on startup
   openPrinter().catch(() => {
-    console.log(`⚠️  Printer not connected yet. Will retry on first print.`);
-    console.log(`   Make sure ${PRINTER_PORT} is correct. Run: GET /printers to see available ports.`);
+    console.log(`⚠️  Printer not connected yet. Starting auto-reconnect loop...`);
+    console.log(`   (Bluetooth may still be initializing. Will keep trying every ${RECONNECT_INTERVAL / 1000}s)`);
+    startReconnectLoop();
   });
 });

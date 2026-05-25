@@ -556,6 +556,71 @@ export async function updateOrderPaymentStatus(
             data: { status: "PAID" },
           });
           console.log(`[Sync] Local order ${orderId} updated to PAID.`);
+
+          // Step 6: Create Print Job in the Cloud Print Queue automatically
+          try {
+            const localOrderFull = await prisma.order.findUnique({
+              where: { id: orderId },
+              include: { items: true }
+            });
+
+            // Prevent duplicate print jobs
+            const existingJob = await prisma.printJob.findFirst({
+              where: {
+                orderId: orderId,
+                status: { in: ['PENDING', 'PRINTING', 'PRINTED'] }
+              }
+            });
+
+            if (!existingJob) {
+              const displayOrderNo = localOrderFull?.olseraTransactionId 
+                ? `OLSERA-${localOrderFull.olseraTransactionId}` 
+                : orderId;
+
+              const qNum = localOrderFull?.queueNumber 
+                ? String(localOrderFull.queueNumber) 
+                : (() => {
+                    const numericId = orderId.replace('OLSERA-', '').replace(/OFFLINE-/, '').replace(/[^0-9]/g, '');
+                    return numericId.length > 3 ? numericId.slice(-3) : numericId;
+                  })();
+
+              const itemsPayload = localOrderFull?.items.map((item, idx) => {
+                let displaySize = '-';
+                const sizeMatch = item.notes?.match(/Size:\s*([^,)]+)/i);
+                if (sizeMatch) displaySize = sizeMatch[1];
+
+                return {
+                  id: idx,
+                  menuItem: { name: item.name },
+                  quantity: item.quantity,
+                  price: item.price,
+                  notes: item.notes || '',
+                  size: displaySize,
+                };
+              }) || [];
+
+              const printPayload = {
+                orderId: displayOrderNo,
+                queueNumber: qNum,
+                customerName: orderDetail?.customer_name || 'Customer',
+                items: itemsPayload,
+                total: localOrderFull?.total || actualOlseraTotal,
+                discount: 0,
+                paymentMethod: localOrderFull?.paymentMethod || 'E-Wallet',
+              };
+
+              await prisma.printJob.create({
+                data: {
+                  orderId: orderId,
+                  payload: printPayload,
+                  status: 'PENDING',
+                }
+              });
+              console.log(`[Auto-Settlement] Cloud Print Job created for ${orderId} with ${itemsPayload.length} items.`);
+            }
+          } catch (printJobErr) {
+            console.warn(`[Auto-Settlement] Failed to automatically create cloud print job:`, printJobErr);
+          }
         } catch (dbUpdateErr) {
           console.warn(
             `[Sync] Failed to update local order status:`,
