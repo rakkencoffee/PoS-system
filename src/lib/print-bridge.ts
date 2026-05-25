@@ -19,6 +19,7 @@ if (typeof window !== 'undefined') {
 
 export interface PrintReceiptData {
   orderId: string;
+  dbOrderId?: string;
   queueNumber: string | number;
   customerName?: string;
   items: {

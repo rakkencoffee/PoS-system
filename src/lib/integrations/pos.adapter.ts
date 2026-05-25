@@ -584,6 +584,14 @@ export async function updateOrderPaymentStatus(
                     return numericId.length > 3 ? numericId.slice(-3) : numericId;
                   })();
 
+              // Fetch menu items for category mapping
+              let menuItems: any[] = [];
+              try {
+                menuItems = await getMenuItems();
+              } catch (mErr) {}
+              const catMap = new Map();
+              menuItems.forEach(m => catMap.set(m.name, m.categorySlug));
+
               const itemsPayload = localOrderFull?.items.map((item, idx) => {
                 let displaySize = '-';
                 const sizeMatch = item.notes?.match(/Size:\s*([^,)]+)/i);
@@ -596,6 +604,7 @@ export async function updateOrderPaymentStatus(
                   price: item.price,
                   notes: item.notes || '',
                   size: displaySize,
+                  categorySlug: catMap.get(item.name) || 'other',
                 };
               }) || [];
 

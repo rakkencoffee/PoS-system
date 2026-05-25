@@ -22,10 +22,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const dbOrderId = payload.dbOrderId || payload.orderId;
+
     // Prevent duplicate print jobs for the same order
     const existing = await prisma.printJob.findFirst({
       where: {
-        orderId: payload.orderId,
+        OR: [
+          { orderId: dbOrderId },
+          { orderId: payload.orderId }
+        ],
         status: { in: ['PENDING', 'PRINTING', 'PRINTED'] }
       }
     });
@@ -40,7 +45,7 @@ export async function POST(request: NextRequest) {
 
     const job = await prisma.printJob.create({
       data: {
-        orderId: payload.orderId,
+        orderId: dbOrderId,
         payload: payload, // Store entire PrintReceiptData as JSON
         status: 'PENDING',
       }
