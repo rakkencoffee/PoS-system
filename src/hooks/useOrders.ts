@@ -32,13 +32,13 @@ export function useUpdateOrderStatus() {
       return res.json();
     },
     onMutate: async ({ orderId, status, stationType }) => {
-      // Cancel outgoing refetches so they don't overwrite our optimistic update
-      await queryClient.cancelQueries({ queryKey: ['orders', 'kitchen'] });
-
-      // Snapshot the previous cache value
+      // 1. Snapshot the previous cache value synchronously
       const previousOrders = queryClient.getQueryData<any[]>(['orders', 'kitchen']);
 
-      // Optimistically update the cache
+      // 2. Cancel outgoing queries in background (non-blocking)
+      queryClient.cancelQueries({ queryKey: ['orders', 'kitchen'] }).catch(() => {});
+
+      // 3. Optimistically update the cache synchronously!
       queryClient.setQueryData(['orders', 'kitchen'], (oldOrders: any[] | undefined) => {
         if (!oldOrders) return [];
         return oldOrders.map(order => {

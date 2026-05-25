@@ -102,16 +102,16 @@ export function KdsView({ type, title }: KdsViewProps) {
     return (currentStatus || o.status) === 'PREPARING';
   });
 
-  const updateOrderStatus = async (orderId: number | string, newStatus: string) => {
-    try {
-      await updateStatusMutation.mutateAsync({ 
-        orderId, 
-        status: newStatus,
-        stationType: type // Add this line
-      });
-    } catch (error: any) {
-      alert(`Gagal: ${error.message}`);
-    }
+  const updateOrderStatus = (orderId: number | string, newStatus: string) => {
+    updateStatusMutation.mutate({ 
+      orderId, 
+      status: newStatus,
+      stationType: type
+    }, {
+      onError: (error: any) => {
+        alert(`Gagal: ${error.message}`);
+      }
+    });
   };
 
   if (loading) {
