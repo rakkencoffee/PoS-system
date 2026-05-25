@@ -32,17 +32,23 @@ export function useUpdateOrderStatus() {
       return res.json();
     },
     onMutate: async ({ orderId, status, stationType }) => {
+      console.log(`[onMutate] Triggered for orderId: ${orderId}, status: ${status}, stationType: ${stationType}`);
+      
       // 1. Snapshot the previous cache value synchronously
       const previousOrders = queryClient.getQueryData<any[]>(['orders', 'kitchen']);
+      console.log('[onMutate] Snapshot previousOrders count:', previousOrders?.length);
 
       // 2. Cancel outgoing queries in background (non-blocking)
       queryClient.cancelQueries({ queryKey: ['orders', 'kitchen'] }).catch(() => {});
+
+      let matchFound = false;
 
       // 3. Optimistically update the cache synchronously!
       queryClient.setQueryData(['orders', 'kitchen'], (oldOrders: any[] | undefined) => {
         if (!oldOrders) return [];
         return oldOrders.map(order => {
           if (String(order.id) === String(orderId)) {
+            matchFound = true;
             const updated = { ...order };
             if (stationType === 'barista') {
               updated.baristaStatus = status;
@@ -64,11 +70,16 @@ export function useUpdateOrderStatus() {
               updated.status = 'PREPARING';
             }
 
+            console.log('[onMutate] Found matching order in cache. Updated order detail:', updated);
             return updated;
           }
           return order;
         });
       });
+
+      if (!matchFound) {
+        console.warn(`[onMutate] WARNING: No matching order found in cache for ID: ${orderId}. Existing IDs:`, previousOrders?.map(o => o.id));
+      }
 
       return { previousOrders };
     },

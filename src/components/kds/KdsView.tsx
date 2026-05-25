@@ -92,17 +92,26 @@ export function KdsView({ type, title }: KdsViewProps) {
     }).filter(Boolean);
   }, [orders, type, searchQuery]);
 
-  const ordersPending = filteredOrders.filter((o: any) => {
-    const currentStatus = type === 'barista' ? o.baristaStatus : o.kitchenStatus;
-    return (currentStatus || o.status) === 'PENDING';
-  });
+  const ordersPending = useMemo(() => {
+    const res = filteredOrders.filter((o: any) => {
+      const currentStatus = type === 'barista' ? o.baristaStatus : o.kitchenStatus;
+      return (currentStatus || o.status) === 'PENDING';
+    });
+    console.log(`[KdsView - ${type}] Computed ordersPending count: ${res.length}`, res.map(o => ({ id: o.id, baristaStatus: o.baristaStatus, kitchenStatus: o.kitchenStatus, status: o.status })));
+    return res;
+  }, [filteredOrders, type]);
   
-  const ordersPreparing = filteredOrders.filter((o: any) => {
-    const currentStatus = type === 'barista' ? o.baristaStatus : o.kitchenStatus;
-    return (currentStatus || o.status) === 'PREPARING';
-  });
+  const ordersPreparing = useMemo(() => {
+    const res = filteredOrders.filter((o: any) => {
+      const currentStatus = type === 'barista' ? o.baristaStatus : o.kitchenStatus;
+      return (currentStatus || o.status) === 'PREPARING';
+    });
+    console.log(`[KdsView - ${type}] Computed ordersPreparing count: ${res.length}`, res.map(o => ({ id: o.id, baristaStatus: o.baristaStatus, kitchenStatus: o.kitchenStatus, status: o.status })));
+    return res;
+  }, [filteredOrders, type]);
 
   const updateOrderStatus = (orderId: number | string, newStatus: string) => {
+    console.log(`[KdsView - ${type}] updateOrderStatus called for ID: ${orderId}, target newStatus: ${newStatus}`);
     updateStatusMutation.mutate({ 
       orderId, 
       status: newStatus,
