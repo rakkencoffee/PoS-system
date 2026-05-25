@@ -9,7 +9,9 @@ export function useKitchenOrders() {
       const data = await res.json();
       return Array.isArray(data) ? data.filter((o: any) => o.status !== 'COMPLETED') : [];
     },
-    refetchInterval: 10000, // 10 detik polling sebagai backup jika Pusher miss
+    refetchInterval: 10000, // 10 detik polling backup
+    refetchOnWindowFocus: false, // JANGAN refetch otomatis saat browser/window focus
+    staleTime: 5000, // Anggap data fresh selama 5 detik
   });
 }
 
@@ -40,7 +42,7 @@ export function useUpdateOrderStatus() {
       queryClient.setQueryData(['orders', 'kitchen'], (oldOrders: any[] | undefined) => {
         if (!oldOrders) return [];
         return oldOrders.map(order => {
-          if (order.id === orderId) {
+          if (String(order.id) === String(orderId)) {
             const updated = { ...order };
             if (stationType === 'barista') {
               updated.baristaStatus = status;
@@ -71,7 +73,7 @@ export function useUpdateOrderStatus() {
       return { previousOrders };
     },
     onError: (err, variables, context) => {
-      // Rollback to previous snapshot if mutaton fails
+      // Rollback to previous snapshot if mutation fails
       if (context?.previousOrders) {
         queryClient.setQueryData(['orders', 'kitchen'], context.previousOrders);
       }
@@ -81,13 +83,9 @@ export function useUpdateOrderStatus() {
       queryClient.setQueryData(['orders', 'kitchen'], (oldOrders: any[] | undefined) => {
         if (!oldOrders) return [];
         return oldOrders.map(order => 
-          order.id === updatedOrder.id ? { ...order, ...updatedOrder } : order
+          String(order.id) === String(updatedOrder.id) ? { ...order, ...updatedOrder } : order
         );
       });
-    },
-    onSettled: () => {
-      // Silently refresh in the background
-      queryClient.invalidateQueries({ queryKey: ['orders'], refetchType: 'none' });
     },
   });
 }
