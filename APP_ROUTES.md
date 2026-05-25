@@ -27,16 +27,18 @@ Berada di dalam folder `src/app/(kds)/`. Digunakan oleh Barista di dapur (biasan
 | URL Path | Nama File Valid | Deksripsi & Alur |
 | --- | --- | --- |
 | `/kitchen` | `(kds)/kitchen/page.tsx` | **Dashboard Dapur.** Menarik daftar pesanan yang statusnya `PENDING` atau `PREPARING`. <br/><br/>Barista membaca tiket (termasuk catatan seperti Addon, Sugar Level, Ice Level). <br/><br/>Alur Tombol: <br/>1. Klik "Mulai Proses" → Berubah menjadi *Preparing* <br/>2. Klik "Selesai" → Berubah menjadi *Ready* (Muncul di layar `status` milik pelanggan). |
+| `/barista` | `(kds)/barista/page.tsx` | **Layar Khusus Barista.** Versi minimalis dashboard yang dikhususkan bagi pembuatan minuman kopi realtime. |
 
 ---
 
 ## 3. 👨‍💻 ADMIN BACKOFFICE (Manajemen Lokal)
-Berada di dalam folder `src/app/(admin)/`. Digunakan oleh Manajer/Owner. 
+Berada di dalam folder `src/app/(admin)/` dan root path. Digunakan oleh Manajer/Owner. 
 
 | URL Path | Nama File Valid | Deksripsi & Alur |
 | --- | --- | --- |
 | `/admin` | `(admin)/admin/page.tsx` | **Halaman Login Admin.** Untuk menjaga keamanan (meskipun tanpa *auth* kompleks, di sini titik masuknya). |
 | `/admin/dashboard` | `(admin)/admin/dashboard/page.tsx` | **Panel Kendali.** Menampilkan: <br/>- Statistik Penjualan hari ini. <br/>- Sinkronisasi Menu (Refresh paksa database PRISMA dengan Olsera). <br/>- Mengedit status produk lokal (opsional). |
+| `/login` | `login/page.tsx` | **Halaman Otorisasi Umum.** Form credentials login menggunakan Auth.js untuk mengamankan akses backoffice dan dashboard stasiun. |
 
 ---
 
@@ -49,17 +51,27 @@ Semua rute API ini merespons dengan JSON (tanpa antarmuka visual). Berada di baw
 | `/api/categories` | `GET` | Memanggil Adapter (`pos.adapter.ts`), lalu menarik data Kategori Produk secara dinamis dari **Olsera Open API**. |
 | `/api/menu` | `GET` | Menarik daftar menu (Katalog) dari **Olsera API**. Terdapat sistem *parameter URL* untuk *search* dan filter (`?category=...&search=...`). |
 | `/api/menu/[id]` | `PUT` / `DELETE` | Digunakan Admin untuk operasi CRUD Database Lokal (Jika Olsera dimatikan). |
+| `/api/products` | `GET` | Endpoint internal untuk mengambil cache produk cepat dari database Prisma lokal (Offline-ready backup). |
 | `/api/toppings` | `GET`| Menarik daftar topping standar (Meskipun kini topping digantikan dengan *hardcode React Logic*). |
+| `/api/jobs/sync-products` | `GET` / `POST` | Job sinkronisasi terjadwal (melalui QStash/Cron) untuk memperbarui data produk dan stok dari Olsera ke Prisma lokal. |
 
-### 💱 Sistem Transaksi (Order & Pembayaran)
+### 💱 Sistem Transaksi (Order & Pembayaran) & Administrasi
 | Endpoint | Method | Deskripsi |
 | --- | --- | --- |
 | `/api/payment/create` | `POST` | **Jantung Pembayaran.** Menerima total keranjang, menembak server *Midtrans* diam-diam, dan merespons "*Snap Token*" ke klien. |
 | `/api/payment/webhook` | `POST` | **Jalur Notifikasi Midtrans.** Setelah Midtrans sukses menagih saldo GoPay/QRIS pelanggan, server Midtrans akan mengetuk *Endpoint* ini. Lalu webhook ini akan memicu `/api/orders` (Olsera Sinkronisasi). |
+| `/api/payment/config` | `GET` | Mengambil konfigurasi variabel lingkungan pembayaran yang aman untuk sisi klien. |
+| `/api/payment/validate-voucher` | `POST` | Memvalidasi kode voucher promosi dari Olsera dan mengembalikan potongan harga yang sah. |
+| `/api/payment/verify` | `GET` / `POST` | Memverifikasi silang status pembayaran Midtrans langsung ke API Midtrans. |
 | `/api/orders` | `GET` | Mendapatkan rekapan Database Order hari ini (digunakan oleh Admin Dashboard dan Kitchen). |
 | `/api/orders` | `POST` | Menyimpan order ke **Database Prisma Lokal** dan meneruskan/membuat *Open Order* di **Olsera POS** via `olsera.service.ts` agar Struk Penjualannya legal. |
-| `/api/orders/[id]`| `PATCH`| Digunakan Barista di `/kitchen` untuk mengubah progress order (`PENDING` -> `PREPARING` -> `READY`). |
+| `/api/orders/[id]`| `PATCH` | Digunakan Barista di `/kitchen` untuk mengubah progress order (`PENDING` -> `PREPARING` -> `READY`). |
 | `/api/orders/stream` | `GET` | **Socket Event.** Membuka terowongan real-time. Jika status order di-*update* Barista, layar Kiosk `/status` akan otomatis berubah tanpa *refresh*. |
+| `/api/print-jobs` | `GET` / `POST` | **Cloud Print Queue.** Kiosk mengunggah print job via `POST`; daemon lokal `print-bridge` menarik job via `GET` dengan header `x-api-key`. |
+| `/api/print-jobs/[id]` | `PATCH` | Mengupdate status print job di cloud (`PENDING` -> `PRINTING` -> `PRINTED` / `FAILED`). |
+| `/api/print-jobs/status` | `GET` | Mengecek status spesifik dari print job tertentu. |
+| `/api/admin/menu` | `POST` / `PUT` / `DELETE` | Operasi administrasi katalog produk lokal. |
+| `/api/admin/reports/sales` | `GET` | Menyediakan data statistik penjualan harian/mingguan teragregasi untuk Admin Dashboard. |
 
 ---
 

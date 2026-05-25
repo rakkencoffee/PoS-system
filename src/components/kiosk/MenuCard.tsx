@@ -82,8 +82,8 @@ export default function MenuCard({ item, index, onSelect }: MenuCardProps) {
         <h3 className="font-semibold text-(--text-primary) text-sm leading-tight mb-1 line-clamp-1">
           {item.name}
         </h3>
-        <p className="text-(--text-muted) text-xs line-clamp-2 mb-3 min-h-8">
-          {item.description}
+        <p className="text-(--text-muted) text-xs line-clamp-2 mb-3 min-h-8 whitespace-pre-line">
+          {item.description?.replace(/\\n/g, '\n')}
         </p>
         <div className="flex items-center justify-between">
           <span className="text-(--brand-500) font-bold text-sm">

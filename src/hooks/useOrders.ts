@@ -26,8 +26,15 @@ export function useUpdateOrderStatus() {
       if (!res.ok) throw new Error('Failed to update order status');
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
+    onSuccess: (updatedOrder) => {
+      queryClient.setQueryData(['orders', 'kitchen'], (oldOrders: any[] | undefined) => {
+        if (!oldOrders) return [];
+        return oldOrders.map(order => 
+          order.id === updatedOrder.id ? { ...order, ...updatedOrder } : order
+        );
+      });
+      // Invalidate in background without blocking refetchType
+      queryClient.invalidateQueries({ queryKey: ['orders'], refetchType: 'none' });
     },
   });
 }

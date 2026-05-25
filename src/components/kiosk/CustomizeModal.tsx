@@ -276,7 +276,7 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
         >
           <div>
             <h2 className="text-xl font-bold text-(--text-primary)">{item.name}</h2>
-            <p className="text-sm text-(--text-muted)">{item.description}</p>
+            <p className="text-sm text-(--text-muted) whitespace-pre-line">{item.description?.replace(/\\n/g, '\n')}</p>
           </div>
           <button onClick={onClose} className="w-10 h-10 rounded-full bg-(--bg-card) flex items-center justify-center text-(--text-secondary) hover:text-(--text-primary) transition-colors">
             ✕
