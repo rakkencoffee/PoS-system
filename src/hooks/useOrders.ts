@@ -90,12 +90,43 @@ export function useUpdateOrderStatus() {
       }
     },
     onSuccess: (updatedOrder) => {
-      // Apply the server-confirmed result
+      // Apply the server-confirmed result with status weight checks to prevent overwrites
       queryClient.setQueryData(['orders', 'kitchen'], (oldOrders: any[] | undefined) => {
         if (!oldOrders) return [];
-        return oldOrders.map(order => 
-          String(order.id) === String(updatedOrder.id) ? { ...order, ...updatedOrder } : order
-        );
+        
+        const STATUS_WEIGHTS: Record<string, number> = {
+          'PENDING': 1,
+          'PREPARING': 2,
+          'COMPLETED': 3
+        };
+
+        return oldOrders.map(order => {
+          if (String(order.id) === String(updatedOrder.id)) {
+            const oldBaristaW = STATUS_WEIGHTS[order.baristaStatus] || 0;
+            const oldKitchenW = STATUS_WEIGHTS[order.kitchenStatus] || 0;
+            const oldStatusW = STATUS_WEIGHTS[order.status] || 0;
+
+            const newBaristaW = STATUS_WEIGHTS[updatedOrder.baristaStatus] || 0;
+            const newKitchenW = STATUS_WEIGHTS[updatedOrder.kitchenStatus] || 0;
+            const newStatusW = STATUS_WEIGHTS[updatedOrder.status] || 0;
+
+            const merged = { ...order, ...updatedOrder };
+            
+            // Prevent downgrading to an older status
+            if (oldBaristaW > newBaristaW) {
+              merged.baristaStatus = order.baristaStatus;
+            }
+            if (oldKitchenW > newKitchenW) {
+              merged.kitchenStatus = order.kitchenStatus;
+            }
+            if (oldStatusW > newStatusW) {
+              merged.status = order.status;
+            }
+
+            return merged;
+          }
+          return order;
+        });
       });
     },
   });

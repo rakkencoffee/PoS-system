@@ -41,9 +41,40 @@ export function KdsView({ type, title }: KdsViewProps) {
         if (data.order) {
           queryClient.setQueryData(['orders', 'kitchen'], (oldOrders: any[] | undefined) => {
             if (!oldOrders) return [];
-            return oldOrders.map(order => 
-              order.id === data.order.id ? { ...order, ...data.order } : order
-            );
+            
+            const STATUS_WEIGHTS: Record<string, number> = {
+              'PENDING': 1,
+              'PREPARING': 2,
+              'COMPLETED': 3
+            };
+
+            return oldOrders.map(order => {
+              if (String(order.id) === String(data.order.id)) {
+                const oldBaristaW = STATUS_WEIGHTS[order.baristaStatus] || 0;
+                const oldKitchenW = STATUS_WEIGHTS[order.kitchenStatus] || 0;
+                const oldStatusW = STATUS_WEIGHTS[order.status] || 0;
+
+                const newBaristaW = STATUS_WEIGHTS[data.order.baristaStatus] || 0;
+                const newKitchenW = STATUS_WEIGHTS[data.order.kitchenStatus] || 0;
+                const newStatusW = STATUS_WEIGHTS[data.order.status] || 0;
+
+                const merged = { ...order, ...data.order };
+                
+                // Prevent downgrading to an older status
+                if (oldBaristaW > newBaristaW) {
+                  merged.baristaStatus = order.baristaStatus;
+                }
+                if (oldKitchenW > newKitchenW) {
+                  merged.kitchenStatus = order.kitchenStatus;
+                }
+                if (oldStatusW > newStatusW) {
+                  merged.status = order.status;
+                }
+
+                return merged;
+              }
+              return order;
+            });
           });
         }
       });
