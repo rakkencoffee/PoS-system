@@ -156,6 +156,7 @@ function SuccessContent() {
           const displayOrderNo = (orderNo || orderData?.orderNo) || orderId || '';
           const receiptData: PrintReceiptData = {
             orderId: displayOrderNo,
+            dbOrderId: orderId || undefined,
             queueNumber: queue,
             customerName: orderData.customerName || '',
             items: orderData.items || [],
@@ -200,6 +201,7 @@ function SuccessContent() {
       const displayOrderNo = (orderNo || orderData?.orderNo) || orderId || '';
       const receiptData: PrintReceiptData = {
         orderId: displayOrderNo,
+        dbOrderId: orderId || undefined,
         queueNumber: queue,
         customerName: orderData?.customerName || '',
         items: orderData?.items || [],

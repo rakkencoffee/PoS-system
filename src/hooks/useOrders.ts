@@ -23,17 +23,70 @@ export function useUpdateOrderStatus() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status, stationType }),
       });
-      if (!res.ok) throw new Error('Failed to update order status');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.details || errData.error || 'Failed to update order status');
+      }
       return res.json();
     },
+    onMutate: async ({ orderId, status, stationType }) => {
+      // Cancel outgoing refetches so they don't overwrite our optimistic update
+      await queryClient.cancelQueries({ queryKey: ['orders', 'kitchen'] });
+
+      // Snapshot the previous cache value
+      const previousOrders = queryClient.getQueryData<any[]>(['orders', 'kitchen']);
+
+      // Optimistically update the cache
+      queryClient.setQueryData(['orders', 'kitchen'], (oldOrders: any[] | undefined) => {
+        if (!oldOrders) return [];
+        return oldOrders.map(order => {
+          if (order.id === orderId) {
+            const updated = { ...order };
+            if (stationType === 'barista') {
+              updated.baristaStatus = status;
+            } else if (stationType === 'kitchen') {
+              updated.kitchenStatus = status;
+            } else {
+              updated.status = status;
+            }
+
+            // Combined status determination
+            if (updated.baristaStatus === 'COMPLETED' && updated.kitchenStatus === 'COMPLETED') {
+              updated.status = 'COMPLETED';
+            } else if (
+              updated.baristaStatus === 'PREPARING' || 
+              updated.kitchenStatus === 'PREPARING' ||
+              updated.baristaStatus === 'COMPLETED' || 
+              updated.kitchenStatus === 'COMPLETED'
+            ) {
+              updated.status = 'PREPARING';
+            }
+
+            return updated;
+          }
+          return order;
+        });
+      });
+
+      return { previousOrders };
+    },
+    onError: (err, variables, context) => {
+      // Rollback to previous snapshot if mutaton fails
+      if (context?.previousOrders) {
+        queryClient.setQueryData(['orders', 'kitchen'], context.previousOrders);
+      }
+    },
     onSuccess: (updatedOrder) => {
+      // Apply the server-confirmed result
       queryClient.setQueryData(['orders', 'kitchen'], (oldOrders: any[] | undefined) => {
         if (!oldOrders) return [];
         return oldOrders.map(order => 
           order.id === updatedOrder.id ? { ...order, ...updatedOrder } : order
         );
       });
-      // Invalidate in background without blocking refetchType
+    },
+    onSettled: () => {
+      // Silently refresh in the background
       queryClient.invalidateQueries({ queryKey: ['orders'], refetchType: 'none' });
     },
   });
