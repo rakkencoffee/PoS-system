@@ -397,15 +397,17 @@ const CACHE_TTL_ORDER_DETAIL = 300_000; // 5 minutes
  * GET /order/openorder/detail?id=xxx
  * Note: Use the numeric internal ID.
  */
-export async function getOrderDetail(orderId: number | string): Promise<any> {
+export async function getOrderDetail(orderId: number | string, forceRefresh: boolean = false): Promise<any> {
   const numericId = typeof orderId === 'string' 
     ? orderId.replace('OLSERA-', '') 
     : orderId;
 
   // Check Cache First
-  const cached = orderDetailCache.get(numericId);
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.data;
+  if (!forceRefresh) {
+    const cached = orderDetailCache.get(numericId);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.data;
+    }
   }
 
   console.log(`[Olsera API] Fetching detail for order: ${numericId}`);
