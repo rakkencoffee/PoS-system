@@ -88,7 +88,7 @@ export default function CartPage() {
                 <div className="flex items-start justify-between">
                   <h3 className="font-semibold text-(--text-primary) truncate pr-2">{item.name}</h3>
                   <div className="flex items-center gap-3 shrink-0 -mt-1">
-                    <span className="font-bold text-(--text-primary) text-sm">
+                    <span className="font-bold text-(--brand-500) text-sm">
                       {formatCurrency(item.price)}
                     </span>
                     <button
