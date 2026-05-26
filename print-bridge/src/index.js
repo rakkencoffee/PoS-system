@@ -155,19 +155,27 @@ function stopReconnectLoop() {
 
 function writeToPrinter(buffer) {
   return new Promise(async (resolve, reject) => {
+    const timeout = setTimeout(() => {
+      console.error('❌ Printer write/drain timeout (10 seconds) reached.');
+      reject(new Error('Printer write/drain timeout (10 seconds)'));
+    }, 10000);
+
     try {
       const port = await openPrinter();
       port.write(buffer, (err) => {
         if (err) {
+          clearTimeout(timeout);
           console.error('❌ Write error:', err.message);
           return reject(err);
         }
         port.drain((drainErr) => {
+          clearTimeout(timeout);
           if (drainErr) return reject(drainErr);
           resolve();
         });
       });
     } catch (err) {
+      clearTimeout(timeout);
       reject(err);
     }
   });
@@ -359,6 +367,22 @@ app.post('/test', authMiddleware, async (req, res) => {
 const CLOUD_API_URL = process.env.CLOUD_API_URL || '';
 const CLOUD_POLLING_INTERVAL = parseInt(process.env.CLOUD_POLLING_INTERVAL || '3000');
 
+// Helper for fetch with abort timeout
+async function fetchWithTimeout(url, options = {}) {
+  const { timeout = 8000 } = options;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    return response;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 let isPolling = false;
 
 async function pollCloudPrintJobs() {
@@ -367,7 +391,7 @@ async function pollCloudPrintJobs() {
 
   try {
     const url = `${CLOUD_API_URL}/api/print-jobs?status=PENDING&limit=5`;
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       headers: {
         'x-api-key': PRINT_BRIDGE_API_KEY
       }
@@ -392,7 +416,7 @@ async function pollCloudPrintJobs() {
           console.log(`[Daemon] Processing job ${job.id} for order ${job.orderId}...`);
           
           // Mark job status as PRINTING in the cloud
-          await fetch(`${CLOUD_API_URL}/api/print-jobs/${job.id}`, {
+          await fetchWithTimeout(`${CLOUD_API_URL}/api/print-jobs/${job.id}`, {
             method: 'PATCH',
             headers: {
               'Content-Type': 'application/json',
@@ -418,7 +442,7 @@ async function pollCloudPrintJobs() {
           console.log(`[Daemon] ✅ Successfully printed job ${job.id}`);
 
           // Update status in the cloud
-          await fetch(`${CLOUD_API_URL}/api/print-jobs/${job.id}`, {
+          await fetchWithTimeout(`${CLOUD_API_URL}/api/print-jobs/${job.id}`, {
             method: 'PATCH',
             headers: {
               'Content-Type': 'application/json',
@@ -431,7 +455,7 @@ async function pollCloudPrintJobs() {
           console.error(`[Daemon] ❌ Print job ${job.id} failed:`, err.message);
           
           // Update status to FAILED in the cloud
-          await fetch(`${CLOUD_API_URL}/api/print-jobs/${job.id}`, {
+          await fetchWithTimeout(`${CLOUD_API_URL}/api/print-jobs/${job.id}`, {
             method: 'PATCH',
             headers: {
               'Content-Type': 'application/json',

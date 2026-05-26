@@ -152,7 +152,7 @@ export async function GET(request: NextRequest) {
             status: kdsStatus,
             baristaStatus,
             kitchenStatus,
-            totalAmount: Number(order.total || order.total_amount || order.grand_total || 0),
+            totalAmount: localData?.total || Number(order.total || order.total_amount || order.grand_total || 0),
             paymentMethod: pMethod,
             createdAt: localData?.createdAt || order.order_date || order.created_at || new Date().toISOString(),
             customerName: customerName,
