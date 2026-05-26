@@ -353,7 +353,7 @@ export async function createOrder(
           // Find the matching item added to Olsera using robust string comparison
           const matchingOlseraItem = olseraItems.find((oi: any) => {
             const oiProductId = String(oi.product_id || '');
-            const oiVariantId = oi.variant_id ? String(oi.variant_id) : '';
+            const oiVariantId = (oi.product_variant_id || oi.variant_id) ? String(oi.product_variant_id || oi.variant_id) : '';
             return oiProductId === localProductId && oiVariantId === localVariantId;
           });
 
