@@ -233,7 +233,7 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
       id: `${item.id}-${Date.now()}`,
       menuItemId: item.id as number | string,
       name: item.name,
-      price: item.price,
+      price: item.price + sizeAdjustment,
       image: item.image,
       quantity,
       size: selectedSize || '',
