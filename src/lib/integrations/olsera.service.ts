@@ -610,6 +610,47 @@ export async function addItemToOrder(
 }
 
 /**
+ * Update item details (price, discount, qty, note) in an open order
+ */
+export async function updateOrderItemDetail(
+  orderId: number,
+  orderItemId: number,
+  price: number,
+  discount: number,
+  qty: number,
+  note: string = ''
+): Promise<unknown> {
+  const formData = new URLSearchParams();
+  formData.append('order_id', String(orderId));
+  formData.append('id', String(orderItemId));
+  formData.append('price', String(Math.round(price)));
+  formData.append('discount', String(Math.round(discount)));
+  formData.append('qty', String(qty));
+  if (note) {
+    formData.append('note', note);
+    formData.append('notes', note);
+    formData.append('item_note', note);
+  }
+
+  console.log(`[Olsera API] updateOrderItemDetail payload:`, Object.fromEntries(formData));
+
+  const response = await olseraFetch('/order/openorder/updatedetail', {
+    method: 'POST',
+    body: formData,
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  });
+
+  const resData = await response.json();
+  console.log(`[Olsera API] updateOrderItemDetail response:`, JSON.stringify(resData));
+
+  if (!response.ok || (resData.status !== 'success' && resData.error)) {
+    throw new Error(`Olsera Update Detail Error: ${resData.error || response.statusText}`);
+  }
+
+  return resData;
+}
+
+/**
  * Fetch available payment methods from Olsera
  * GET /global/list-payment
  */
@@ -919,6 +960,7 @@ export const olseraApi = {
   getOrderDetail,
   createOrder,
   addItemToOrder,
+  updateOrderItemDetail,
   getVouchers,
   getVoucherByCode,
   getVoucherDetail,

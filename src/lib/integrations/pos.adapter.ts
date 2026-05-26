@@ -313,6 +313,74 @@ export async function createOrder(
       }
     }
 
+    // 2b. Synchronize custom prices and distribute voucher discount in Olsera Open Order
+    try {
+      const totalOrderAmount = items.reduce((acc, item) => acc + (item.price || 0) * item.quantity, 0);
+
+      // Fetch the generated order detail from Olsera to get the generated orderitem IDs
+      // Add a small 800ms delay to ensure Olsera API has finished inserting
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      const orderDetail = await olsera.getOrderDetail(orderId);
+      
+      const olseraItems = Array.isArray(orderDetail.orderitems || orderDetail.items)
+        ? (orderDetail.orderitems || orderDetail.items)
+        : [];
+
+      let remainingDiscount = discountAmount;
+
+      for (let idx = 0; idx < items.length; idx++) {
+        const localItem = items[idx];
+        const localProductId = parseInt(localItem.productId);
+        const localVariantId = localItem.variantId ? parseInt(localItem.variantId) : null;
+
+        // Find the matching item added to Olsera
+        const matchingOlseraItem = olseraItems.find((oi: any) => {
+          const oiProductId = oi.product_id;
+          const oiVariantId = oi.variant_id;
+          return oiProductId === localProductId && (localVariantId === null || oiVariantId === localVariantId);
+        });
+
+        if (matchingOlseraItem && matchingOlseraItem.id) {
+          const itemPrice = localItem.price || 0;
+
+          // Distribute discount proportionally across items
+          let itemDiscount = 0;
+          if (discountAmount > 0 && totalOrderAmount > 0) {
+            if (idx === items.length - 1) {
+              itemDiscount = remainingDiscount;
+            } else {
+              const share = (itemPrice * localItem.quantity) / totalOrderAmount;
+              itemDiscount = Math.round(discountAmount * share);
+              remainingDiscount -= itemDiscount;
+            }
+          }
+
+          // Concatenate note and options for the item details
+          let fullNote = localItem.note || "";
+          if (localItem.options) {
+            const optStr = Object.entries(localItem.options)
+              .filter(([_, v]) => v && v !== "-" && !Array.isArray(v))
+              .map(([k, v]) => `${k}: ${v}`)
+              .join(", ");
+            if (optStr) fullNote = fullNote ? `${fullNote} (${optStr})` : optStr;
+          }
+
+          // Push the price and discount details to Olsera
+          await olsera.updateOrderItemDetail(
+            orderId,
+            matchingOlseraItem.id,
+            itemPrice,
+            itemDiscount,
+            localItem.quantity,
+            fullNote
+          );
+        }
+      }
+      console.log(`[Sync] Successfully synchronized custom prices and Rp ${discountAmount} discount to Olsera Open Order #${orderId}`);
+    } catch (syncErr: any) {
+      console.warn(`[Sync] Failed to synchronize prices/discount details to Olsera Open Order:`, syncErr.message);
+    }
+
     // 3. Generate daily queue number (resets at 00:00 WIB)
     let queueNum: number | undefined;
     try {
