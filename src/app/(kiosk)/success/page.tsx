@@ -372,6 +372,7 @@ function SuccessContent() {
             queueNumber={queue}
             items={orderData.items || []}
             total={orderData.totalAmount || 0}
+            discount={orderData.discount || 0}
             paymentMethod={orderData.paymentMethod || 'E-Wallet'}
           />
         )}

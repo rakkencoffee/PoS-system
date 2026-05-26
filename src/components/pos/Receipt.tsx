@@ -18,6 +18,7 @@ interface ReceiptProps {
   queueNumber: string | number;
   items: ReceiptItem[];
   total: number;
+  discount?: number;
   paymentMethod: string;
 }
 
@@ -26,6 +27,7 @@ export const Receipt: React.FC<ReceiptProps> = ({
   queueNumber,
   items,
   total,
+  discount = 0,
   paymentMethod,
 }) => {
   const now = new Date().toLocaleString('id-ID', {
@@ -78,6 +80,19 @@ export const Receipt: React.FC<ReceiptProps> = ({
 
       {/* Totals */}
       <div className="receipt-summary">
+        {discount > 0 && (
+          <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Subtotal:</span>
+              <span>Rp {(total + discount).toLocaleString('id-ID')}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+              <span>Diskon:</span>
+              <span>-Rp {discount.toLocaleString('id-ID')}</span>
+            </div>
+            <div className="receipt-divider-thin" style={{ margin: '4px 0' }}>-------------------------------</div>
+          </div>
+        )}
         <div className="receipt-total-row">
           <span className="receipt-total-label">T O T A L</span>
           <span className="receipt-total-value">Rp {total.toLocaleString('id-ID')}</span>
