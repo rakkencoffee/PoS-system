@@ -279,6 +279,7 @@ export async function createOrder(
     options?: any;
   }[],
   customerName?: string,
+  discountAmount: number = 0,
 ): Promise<{ orderId: string; olseraOrderId?: number; orderNo?: string; queueNumber?: number }> {
   if (USE_OLSERA) {
     // 1. Create open order (Header only)
@@ -344,16 +345,19 @@ export async function createOrder(
         return !["rakken-signature", "rakken-style"].includes(categorySlug);
       });
 
+      const baseTotal = items.reduce(
+        (acc, item) => acc + (item.price || 0) * item.quantity,
+        0,
+      );
+      const finalTotal = Math.max(0, baseTotal - discountAmount);
+
       await prisma.order.create({
         data: {
           id: `OLSERA-${orderId}`,
           stationId: "KIOSK", // Kiosk self-service
           cashierId: "cmo83g6140000vq5g10u03858", // Valid system user for Kiosk sync
           queueNumber: queueNum || null,
-          total: items.reduce(
-            (acc, item) => acc + (item.price || 0) * item.quantity,
-            0,
-          ),
+          total: finalTotal,
           status: "PENDING",
           baristaStatus: hasCoffee ? "PENDING" : "COMPLETED",
           kitchenStatus: hasFood ? "PENDING" : "COMPLETED",
@@ -608,13 +612,17 @@ export async function updateOrderPaymentStatus(
                 };
               }) || [];
 
+              const itemsSum = itemsPayload.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+              const finalTotal = localOrderFull?.total || actualOlseraTotal;
+              const calculatedDiscount = Math.max(0, itemsSum - finalTotal);
+
               const printPayload = {
                 orderId: displayOrderNo,
                 queueNumber: qNum,
                 customerName: orderDetail?.customer_name || 'Customer',
                 items: itemsPayload,
-                total: localOrderFull?.total || actualOlseraTotal,
-                discount: 0,
+                total: finalTotal,
+                discount: calculatedDiscount,
                 paymentMethod: localOrderFull?.paymentMethod || 'E-Wallet',
               };
 

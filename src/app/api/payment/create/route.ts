@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
           options: item.options // Pass options for receipt formatting
         })),
         customerName,
+        discountAmount || 0
       );
       dbOrderId = adapterOrder.orderId;
       dbOrderNo = adapterOrder.orderNo || null;

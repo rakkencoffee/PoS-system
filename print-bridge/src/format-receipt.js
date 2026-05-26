@@ -332,16 +332,16 @@ function formatDrinkLabels(data) {
 
   if (!data.items || data.items.length === 0) return Buffer.concat(parts);
 
-  // Filter out food items
-  const excludedCategories = ['bites', 'dessert', 'main-course'];
+  // Filter out food items (dessert, snack, main course, pastry, bites, makanan, cemilan)
+  const excludedCategories = ['bites', 'dessert', 'main-course', 'snack', 'pastry', 'makanan', 'cemilan'];
   const drinkItems = data.items.filter(item => {
-    if (item.categorySlug) {
-      return !excludedCategories.includes(item.categorySlug.toLowerCase());
+    const category = (item.categorySlug || item.category || '').toLowerCase();
+    if (category) {
+      return !excludedCategories.some(excluded => category.includes(excluded));
     }
     // Fallback if categorySlug is missing
     const name = (item.menuItem?.name || item.name || '').toLowerCase();
-    if (name.includes('bites') || name.includes('dessert')) return false;
-    return true; // Default to drink
+    return !excludedCategories.some(excluded => name.includes(excluded));
   });
 
   if (drinkItems.length === 0) return Buffer.concat(parts);

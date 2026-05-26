@@ -56,7 +56,7 @@ export async function GET(
 
         // Determine base data from Olsera
         const olseraItems = Array.isArray(orderDetail.items) ? orderDetail.items : [];
-        let totalAmount = parseFloat(orderDetail.total || orderDetail.grand_total || '0');
+        let totalAmount = localOrder?.total || parseFloat(orderDetail.total || orderDetail.grand_total || '0');
         let finalItems = olseraItems.map((item: any, idx: number) => {
           const name = item.product_name || item.name || 'Item';
           return {
@@ -75,11 +75,6 @@ export async function GET(
         if (totalAmount === 0 || finalItems.length === 0 || finalItems.every((i: any) => i.price === 0)) {
           console.log(`[Sync] Olsera data incomplete for ${id}, fetching from local Prisma fallback...`);
           try {
-            const localOrder = await prisma.order.findUnique({
-              where: { id: id },
-              include: { items: true }
-            });
-
             if (localOrder) {
               totalAmount = localOrder.total;
               finalItems = localOrder.items.map((item: any, idx: number) => {
@@ -104,14 +99,9 @@ export async function GET(
             console.error('[Sync] Local fallback failed:', prismaError);
           }
         } else {
-          // ENRICH NOTES: Olsera's OpenOrder API frequently drops the notes payload.
-          // We MUST retrieve the notes from our local Prisma mirror where we saved them at checkout.
+          // ENRICH NOTES & PRICES: Olsera's OpenOrder API frequently drops the notes payload and lacks custom prices.
+          // We MUST retrieve them from our local Prisma mirror where we saved them at checkout.
           try {
-            const localOrder = await prisma.order.findUnique({
-              where: { id: id },
-              include: { items: true }
-            });
-
             if (localOrder && localOrder.items && localOrder.items.length > 0) {
               // We copy the items array so we can remove matched items and avoid duplicate assignments
               const availableLocalItems = [...localOrder.items];
@@ -127,6 +117,9 @@ export async function GET(
                   // Remove it from available so we don't match the same local item twice if they ordered 2 of the same drink separately
                   availableLocalItems.splice(matchIdx, 1);
                   
+                  // Enrich both price and notes from our local mirror where all custom toppings are factored in
+                  fItem.price = lItem.price;
+
                   if (lItem.notes) {
                     fItem.notes = fItem.notes ? `${fItem.notes}, ${lItem.notes}` : lItem.notes;
                     // Also try to extract Size if Olsera didn't return it
@@ -138,7 +131,7 @@ export async function GET(
                 }
                 return fItem;
               });
-              console.log(`[Sync] Successfully enriched notes from local fallback for ${id}`);
+              console.log(`[Sync] Successfully enriched notes and prices from local fallback for ${id}`);
             }
           } catch (e) {
             console.error('[Sync] Local notes enrichment failed:', e);

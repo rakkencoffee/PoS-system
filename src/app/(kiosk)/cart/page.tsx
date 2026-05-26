@@ -119,12 +119,21 @@ export default function CartPage() {
                       +Shot
                     </span>
                   )}
-                  {item.toppings.map((t) => (
-                    <span key={t.id} className="text-xs px-2 py-0.5 rounded-full bg-(--bg-secondary) text-(--text-secondary) font-medium">
-                      {t.name}
-                    </span>
-                  ))}
                 </div>
+
+                {/* Price additions (Toppings & Premium Customizations) */}
+                {item.toppings && item.toppings.length > 0 && (
+                  <div className="mt-2.5 space-y-1 pl-1 border-t border-(--border-subtle)/20 pt-2">
+                    {item.toppings.map((t) => (
+                      <div key={t.id} className="flex justify-between text-xs text-(--text-secondary)">
+                        <span>• {t.name}</span>
+                        <span className="font-semibold text-(--brand-500)">
+                          +{formatCurrency(t.price)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {/* Price & Quantity */}
                 <div className="flex items-center justify-between mt-3">
