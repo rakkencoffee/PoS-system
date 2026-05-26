@@ -138,12 +138,22 @@ export async function GET(
           }
         }
 
+        // Calculate total discount
+        let discount = 0;
+        if (localOrder) {
+          const baseTotal = localOrder.items.reduce((acc: number, item: any) => acc + item.price * item.quantity, 0);
+          discount = Math.max(0, baseTotal - localOrder.total);
+        } else if (orderDetail.discount_amount) {
+          discount = parseFloat(orderDetail.discount_amount);
+        }
+
         return NextResponse.json({
           id: id,
           orderNo: orderDetail.order_no || '',
           queueNumber: displayQueue,
           status: kdsStatus,
           totalAmount: totalAmount,
+          discount: discount,
           customerName: orderDetail.customer_name || '',
           createdAt: localCreatedAt || orderDetail.order_date || new Date().toISOString(),
           items: finalItems,
@@ -195,18 +205,35 @@ export async function GET(
               }
             } catch (e) {}
 
+            // Calculate total discount
+            let closedDiscount = 0;
+            if (localOrder) {
+              const baseTotal = localOrder.items.reduce((acc: number, item: any) => acc + item.price * item.quantity, 0);
+              closedDiscount = Math.max(0, baseTotal - localOrder.total);
+            } else if (closedOrder.discount_amount) {
+              closedDiscount = parseFloat(closedOrder.discount_amount);
+            }
+
             return NextResponse.json({
               id: id,
               orderNo: closedOrder.order_no || '',
               queueNumber: displayQueue,
               status: 'COMPLETED', // Found in closed orders, must be completed
               totalAmount: parseFloat(closedOrder.total || closedOrder.grand_total || '0'),
+              discount: closedDiscount,
               customerName: closedOrder.customer_name || '',
               createdAt: localCreatedAt || closedOrder.order_date || new Date().toISOString(),
               items: finalClosedItems,
             });
         } catch (closedError) {
           console.error('Order not found even in closed orders:', closedError);
+          // Calculate local discount
+          let localDiscount = 0;
+          if (localOrder) {
+            const baseTotal = localOrder.items.reduce((acc: number, item: any) => acc + item.price * item.quantity, 0);
+            localDiscount = Math.max(0, baseTotal - localOrder.total);
+          }
+
           // Return the local status if we have it, instead of hardcoded 'PENDING'
           return NextResponse.json({
             id: id,
@@ -214,6 +241,7 @@ export async function GET(
             queueNumber: displayQueue,
             status: localOrder?.status || 'PENDING',
             totalAmount: localOrder?.total || 0,
+            discount: localDiscount,
             createdAt: localCreatedAt || new Date().toISOString(),
             items: localOrder?.items?.map((item: any, idx: number) => ({
               id: idx,
