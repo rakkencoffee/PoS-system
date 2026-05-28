@@ -133,6 +133,7 @@ export async function GET(
             size: item.variant_name || '-',
             notes: item.notes || item.note || item.item_notes || '',
             categorySlug: catMap.get(name) || 'other',
+            discount: parseFloat(item.discount || '0'),
           };
         });
 
@@ -204,16 +205,22 @@ export async function GET(
           }
         }
 
-        // Calculate total discount - Prioritize Olsera's discount_amount to bypass toppings calculation bugs
-        let discount = 0;
-        if (orderDetail && orderDetail.discount_amount) {
-          discount = parseFloat(orderDetail.discount_amount);
-        } else if (localOrder) {
-          const baseTotal = localOrder.items.reduce((acc: number, item: any) => acc + item.price * item.quantity, 0);
-          discount = Math.max(0, baseTotal - localOrder.total);
+        // Calculate total discount - Prioritize summing up individual item discounts if synced, then fallback to Olsera discount_amount
+        let discount = finalItems.reduce((sum: number, item: any) => sum + (item.discount || 0), 0);
+        
+        if (discount === 0) {
+          if (orderDetail && orderDetail.discount_amount) {
+            discount = parseFloat(orderDetail.discount_amount);
+          } else if (localOrder) {
+            const baseTotal = localOrder.items.reduce((acc: number, item: any) => acc + item.price * item.quantity, 0);
+            discount = Math.max(0, baseTotal - localOrder.total);
+          }
         }
 
-        const discountedItems = distributeItemsDiscount(finalItems, discount, totalAmount);
+        const hasItemDiscounts = finalItems.some((item: any) => item.discount && item.discount > 0);
+        const discountedItems = hasItemDiscounts 
+          ? finalItems 
+          : distributeItemsDiscount(finalItems, discount, totalAmount);
 
         return NextResponse.json({
           id: id,
@@ -241,6 +248,7 @@ export async function GET(
                 size: item.variant_name || '-',
                 notes: item.notes || item.note || item.item_notes || '',
                 categorySlug: catMap?.get(name) || 'other',
+                discount: parseFloat(item.discount || '0'),
               };
             });
             
@@ -273,17 +281,23 @@ export async function GET(
               }
             } catch (e) {}
 
-            // Calculate total discount - Prioritize Olsera's discount_amount to bypass toppings calculation bugs
-            let closedDiscount = 0;
-            if (closedOrder && closedOrder.discount_amount) {
-              closedDiscount = parseFloat(closedOrder.discount_amount);
-            } else if (localOrder) {
-              const baseTotal = localOrder.items.reduce((acc: number, item: any) => acc + item.price * item.quantity, 0);
-              closedDiscount = Math.max(0, baseTotal - localOrder.total);
+            // Calculate total discount - Prioritize summing up individual item discounts if synced, then fallback to Olsera discount_amount
+            let closedDiscount = finalClosedItems.reduce((sum: number, item: any) => sum + (item.discount || 0), 0);
+            
+            if (closedDiscount === 0) {
+              if (closedOrder && closedOrder.discount_amount) {
+                closedDiscount = parseFloat(closedOrder.discount_amount);
+              } else if (localOrder) {
+                const baseTotal = localOrder.items.reduce((acc: number, item: any) => acc + item.price * item.quantity, 0);
+                closedDiscount = Math.max(0, baseTotal - localOrder.total);
+              }
             }
 
             const closedTotalAmount = parseFloat(closedOrder.total || closedOrder.grand_total || '0');
-            const discountedClosedItems = distributeItemsDiscount(finalClosedItems, closedDiscount, closedTotalAmount);
+            const hasClosedItemDiscounts = finalClosedItems.some((item: any) => item.discount && item.discount > 0);
+            const discountedClosedItems = hasClosedItemDiscounts 
+              ? finalClosedItems 
+              : distributeItemsDiscount(finalClosedItems, closedDiscount, closedTotalAmount);
 
             return NextResponse.json({
               id: id,
