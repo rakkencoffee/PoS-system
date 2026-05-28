@@ -76,6 +76,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+    const refresh = request.nextUrl.searchParams.get('refresh') === 'true';
 
     // Handle Olsera order IDs (e.g. "OLSERA-1262474270")
     if (USE_OLSERA && id.startsWith('OLSERA-')) {
@@ -106,7 +107,7 @@ export async function GET(
       const displayQueue = storedQueueNumber || (olseraOrderId % 1000);
 
       try {
-        const orderDetail = await olsera.getOrderDetail(olseraOrderId);
+        const orderDetail = await olsera.getOrderDetail(olseraOrderId, refresh);
         
         // Normalize Olsera response to match our frontend format
         const items = Array.isArray(orderDetail.items) ? orderDetail.items : [];
