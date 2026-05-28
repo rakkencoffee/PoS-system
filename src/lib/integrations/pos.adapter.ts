@@ -310,6 +310,7 @@ export async function createOrder(
   }[],
   customerName?: string,
   discountAmount: number = 0,
+  voucherCode?: string,
 ): Promise<{ orderId: string; olseraOrderId?: number; orderNo?: string; queueNumber?: number }> {
   if (USE_OLSERA) {
     // 1. Create open order (Header only)
@@ -347,6 +348,14 @@ export async function createOrder(
       let orderDetail: any = null;
       let olseraItems: any[] = [];
       
+      // Load menu items to map category slugs for discount logic
+      let menuItems: any[] = [];
+      try {
+        menuItems = await getMenuItems();
+      } catch (mErr) {}
+      const catMap = new Map();
+      menuItems.forEach((m) => catMap.set(m.name, m.categorySlug));
+
       for (let attempt = 1; attempt <= 4; attempt++) {
         // Delay: 1.0s, 1.5s, 1.5s, 1.5s
         await new Promise((resolve) => setTimeout(resolve, attempt === 1 ? 1000 : 1500));
@@ -368,7 +377,49 @@ export async function createOrder(
       if (olseraItems.length === 0) {
         console.error(`[Sync] Skipping item sync because no order items were returned from Olsera for order ${orderId}`);
       } else {
+        // Category-aware voucher restriction
+        const isRestrictedToNonCoffee = 
+          voucherCode?.toUpperCase() === 'RAKKEN002' ||
+          (discountAmount > 0 && items.some(item => {
+            const categorySlug = catMap.get(item.name || "");
+            return categorySlug === 'non-coffee';
+          }) && items.some(item => {
+            const categorySlug = catMap.get(item.name || "");
+            return categorySlug !== 'non-coffee';
+          }) && discountAmount < totalOrderAmount * 0.22);
+
+        let eligibleItems = items;
+        if (isRestrictedToNonCoffee) {
+          eligibleItems = items.filter(item => {
+            const categorySlug = catMap.get(item.name || "");
+            return categorySlug === 'non-coffee';
+          });
+        }
+        if (eligibleItems.length === 0) {
+          eligibleItems = items;
+        }
+
+        const eligibleTotalAmount = eligibleItems.reduce((acc, item) => acc + (item.price || 0) * item.quantity, 0);
         let remainingDiscount = discountAmount;
+
+        const calculatedDiscounts = new Map<string, number>();
+
+        for (let idx = 0; idx < eligibleItems.length; idx++) {
+          const item = eligibleItems[idx];
+          const itemPrice = item.price || 0;
+          let itemDiscount = 0;
+          
+          if (discountAmount > 0 && eligibleTotalAmount > 0) {
+            if (idx === eligibleItems.length - 1) {
+              itemDiscount = remainingDiscount;
+            } else {
+              const share = (itemPrice * item.quantity) / eligibleTotalAmount;
+              itemDiscount = Math.round(discountAmount * share);
+              remainingDiscount -= itemDiscount;
+            }
+          }
+          calculatedDiscounts.set(`${item.productId}-${item.variantId || ''}`, itemDiscount);
+        }
 
         for (let idx = 0; idx < items.length; idx++) {
           const localItem = items[idx];
@@ -384,18 +435,7 @@ export async function createOrder(
 
           if (matchingOlseraItem && matchingOlseraItem.id) {
             const itemPrice = localItem.price || 0;
-
-            // Distribute discount proportionally across items
-            let itemDiscount = 0;
-            if (discountAmount > 0 && totalOrderAmount > 0) {
-              if (idx === items.length - 1) {
-                itemDiscount = remainingDiscount;
-              } else {
-                const share = (itemPrice * localItem.quantity) / totalOrderAmount;
-                itemDiscount = Math.round(discountAmount * share);
-                remainingDiscount -= itemDiscount;
-              }
-            }
+            const itemDiscount = calculatedDiscounts.get(`${localProductId}-${localVariantId}`) || 0;
 
             // Concatenate note and options for the item details
             let fullNote = localItem.note || "";

@@ -152,11 +152,11 @@ export function useCreateOrder() {
 
 export function useValidateVoucher() {
   return useMutation({
-    mutationFn: async ({ code, totalAmount }: { code: string; totalAmount: number }) => {
+    mutationFn: async ({ code, totalAmount, items }: { code: string; totalAmount: number; items?: any[] }) => {
       const res = await fetch('/api/payment/validate-voucher', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, totalAmount }),
+        body: JSON.stringify({ code, totalAmount, items }),
       });
       if (!res.ok) {
         const error = await res.json();

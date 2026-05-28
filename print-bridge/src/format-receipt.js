@@ -327,6 +327,12 @@ function formatReceipt(data) {
         newline();
       }
 
+      // ── Item Discount ──
+      if (item.discount && item.discount > 0) {
+        add(leftRight('  Diskon', `-${formatRp(item.discount)}`));
+        newline();
+      }
+
       // Small gap between items
       newline();
     }
