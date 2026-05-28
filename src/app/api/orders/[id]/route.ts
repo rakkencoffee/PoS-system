@@ -5,18 +5,39 @@ import { getMenuItems } from '@/lib/integrations/pos.adapter';
 
 const USE_OLSERA = process.env.USE_OLSERA === 'true';
 
+function isNonCoffeeItem(category: string, name: string): boolean {
+  const cat = String(category || '').toLowerCase().trim();
+  const itemName = String(name || '').toLowerCase().trim();
+  return (
+    cat === 'non-coffee' || 
+    cat === 'non coffee' ||
+    cat === 'milk-based' ||
+    cat === 'refreshment' ||
+    itemName.includes('tea') ||
+    itemName.includes('milk') ||
+    itemName.includes('matcha') ||
+    (itemName.includes('latte') && !itemName.includes('coffee') && !itemName.includes('espresso'))
+  );
+}
+
 function distributeItemsDiscount(items: any[], discount: number, totalAmount: number): any[] {
   if (!discount || discount <= 0 || !items || items.length === 0) {
     return items.map(item => ({ ...item, discount: 0 }));
   }
 
-  const hasNonCoffee = items.some(i => (i.categorySlug || '').toLowerCase() === 'non-coffee');
-  const hasOtherThanNonCoffee = items.some(i => (i.categorySlug || '').toLowerCase() !== 'non-coffee');
+  const isNonCoffee = (i: any) => {
+    const cat = i.categorySlug || '';
+    const name = i.menuItem?.name || i.name || '';
+    return isNonCoffeeItem(cat, name);
+  };
+
+  const hasNonCoffee = items.some(i => isNonCoffee(i));
+  const hasOtherThanNonCoffee = items.some(i => !isNonCoffee(i));
   const isRestrictedToNonCoffee = hasNonCoffee && hasOtherThanNonCoffee && discount < totalAmount * 0.22;
 
   let eligibleItems = items;
   if (isRestrictedToNonCoffee) {
-    eligibleItems = items.filter(i => (i.categorySlug || '').toLowerCase() === 'non-coffee');
+    eligibleItems = items.filter(i => isNonCoffee(i));
   }
   if (eligibleItems.length === 0) {
     eligibleItems = items;
@@ -182,13 +203,13 @@ export async function GET(
           }
         }
 
-        // Calculate total discount
+        // Calculate total discount - Prioritize Olsera's discount_amount to bypass toppings calculation bugs
         let discount = 0;
-        if (localOrder) {
+        if (orderDetail && orderDetail.discount_amount) {
+          discount = parseFloat(orderDetail.discount_amount);
+        } else if (localOrder) {
           const baseTotal = localOrder.items.reduce((acc: number, item: any) => acc + item.price * item.quantity, 0);
           discount = Math.max(0, baseTotal - localOrder.total);
-        } else if (orderDetail.discount_amount) {
-          discount = parseFloat(orderDetail.discount_amount);
         }
 
         const discountedItems = distributeItemsDiscount(finalItems, discount, totalAmount);
@@ -251,13 +272,13 @@ export async function GET(
               }
             } catch (e) {}
 
-            // Calculate total discount
+            // Calculate total discount - Prioritize Olsera's discount_amount to bypass toppings calculation bugs
             let closedDiscount = 0;
-            if (localOrder) {
+            if (closedOrder && closedOrder.discount_amount) {
+              closedDiscount = parseFloat(closedOrder.discount_amount);
+            } else if (localOrder) {
               const baseTotal = localOrder.items.reduce((acc: number, item: any) => acc + item.price * item.quantity, 0);
               closedDiscount = Math.max(0, baseTotal - localOrder.total);
-            } else if (closedOrder.discount_amount) {
-              closedDiscount = parseFloat(closedOrder.discount_amount);
             }
 
             const closedTotalAmount = parseFloat(closedOrder.total || closedOrder.grand_total || '0');
