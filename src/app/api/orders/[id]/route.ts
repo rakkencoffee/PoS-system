@@ -5,6 +5,50 @@ import { getMenuItems } from '@/lib/integrations/pos.adapter';
 
 const USE_OLSERA = process.env.USE_OLSERA === 'true';
 
+function distributeItemsDiscount(items: any[], discount: number, totalAmount: number): any[] {
+  if (!discount || discount <= 0 || !items || items.length === 0) {
+    return items.map(item => ({ ...item, discount: 0 }));
+  }
+
+  const hasNonCoffee = items.some(i => (i.categorySlug || '').toLowerCase() === 'non-coffee');
+  const hasOtherThanNonCoffee = items.some(i => (i.categorySlug || '').toLowerCase() !== 'non-coffee');
+  const isRestrictedToNonCoffee = hasNonCoffee && hasOtherThanNonCoffee && discount < totalAmount * 0.22;
+
+  let eligibleItems = items;
+  if (isRestrictedToNonCoffee) {
+    eligibleItems = items.filter(i => (i.categorySlug || '').toLowerCase() === 'non-coffee');
+  }
+  if (eligibleItems.length === 0) {
+    eligibleItems = items;
+  }
+
+  const eligibleSum = eligibleItems.reduce((sum, i) => sum + ((i.price || i.subtotal || 0) * (i.quantity || 1)), 0);
+  let remainingD = discount;
+
+  const enrichedItems = items.map(item => ({ ...item, discount: 0 }));
+
+  if (eligibleSum > 0) {
+    eligibleItems.forEach((eligibleItem, idx) => {
+      const targetItem = enrichedItems.find(ei => ei.id === eligibleItem.id);
+      if (targetItem) {
+        let itemD = 0;
+        if (idx === eligibleItems.length - 1) {
+          itemD = remainingD;
+        } else {
+          const itemPrice = targetItem.price || targetItem.subtotal || 0;
+          const share = (itemPrice * (targetItem.quantity || 1)) / eligibleSum;
+          itemD = Math.round(discount * share);
+          remainingD -= itemD;
+        }
+        targetItem.discount = itemD;
+      }
+    });
+  }
+
+  return enrichedItems;
+}
+
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -147,6 +191,8 @@ export async function GET(
           discount = parseFloat(orderDetail.discount_amount);
         }
 
+        const discountedItems = distributeItemsDiscount(finalItems, discount, totalAmount);
+
         return NextResponse.json({
           id: id,
           orderNo: orderDetail.order_no || '',
@@ -156,7 +202,7 @@ export async function GET(
           discount: discount,
           customerName: orderDetail.customer_name || '',
           createdAt: localCreatedAt || orderDetail.order_date || new Date().toISOString(),
-          items: finalItems,
+          items: discountedItems,
         });
       } catch (olseraError) {
         console.warn(`Order ${olseraOrderId} not in open orders, checking closed orders...`);
@@ -214,16 +260,19 @@ export async function GET(
               closedDiscount = parseFloat(closedOrder.discount_amount);
             }
 
+            const closedTotalAmount = parseFloat(closedOrder.total || closedOrder.grand_total || '0');
+            const discountedClosedItems = distributeItemsDiscount(finalClosedItems, closedDiscount, closedTotalAmount);
+
             return NextResponse.json({
               id: id,
               orderNo: closedOrder.order_no || '',
               queueNumber: displayQueue,
               status: 'COMPLETED', // Found in closed orders, must be completed
-              totalAmount: parseFloat(closedOrder.total || closedOrder.grand_total || '0'),
+              totalAmount: closedTotalAmount,
               discount: closedDiscount,
               customerName: closedOrder.customer_name || '',
               createdAt: localCreatedAt || closedOrder.order_date || new Date().toISOString(),
-              items: finalClosedItems,
+              items: discountedClosedItems,
             });
         } catch (closedError) {
           console.error('Order not found even in closed orders:', closedError);
@@ -234,6 +283,18 @@ export async function GET(
             localDiscount = Math.max(0, baseTotal - localOrder.total);
           }
 
+          const mappedItems = localOrder?.items?.map((item: any, idx: number) => ({
+            id: idx,
+            menuItem: { name: item.name },
+            quantity: item.quantity,
+            price: item.price,
+            notes: item.notes,
+            size: item.notes?.match(/Size: ([^,)]+)/)?.[1] || '-',
+            categorySlug: catMap?.get(item.name) || 'other',
+          })) || [];
+
+          const discountedLocalItems = distributeItemsDiscount(mappedItems, localDiscount, localOrder?.total || 0);
+
           // Return the local status if we have it, instead of hardcoded 'PENDING'
           return NextResponse.json({
             id: id,
@@ -243,15 +304,7 @@ export async function GET(
             totalAmount: localOrder?.total || 0,
             discount: localDiscount,
             createdAt: localCreatedAt || new Date().toISOString(),
-            items: localOrder?.items?.map((item: any, idx: number) => ({
-              id: idx,
-              menuItem: { name: item.name },
-              quantity: item.quantity,
-              price: item.price,
-              notes: item.notes,
-              size: item.notes?.match(/Size: ([^,)]+)/)?.[1] || '-',
-              categorySlug: catMap?.get(item.name) || 'other',
-            })) || [],
+            items: discountedLocalItems,
           });
         }
       }

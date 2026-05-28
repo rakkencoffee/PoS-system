@@ -51,6 +51,7 @@ export default function CheckoutPage() {
   // Voucher states
   const [voucherCode, setVoucherCode] = useState('');
   const [appliedDiscount, setAppliedDiscount] = useState<number>(0);
+  const [itemDiscounts, setItemDiscounts] = useState<Record<string, number>>({});
   const [voucherMessage, setVoucherMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
 
   // TanStack Query Hooks
@@ -188,7 +189,6 @@ export default function CheckoutPage() {
       });
 
       setPaymentStatus('Please tap/swipe card on EDC terminal...');
-
       // 2. Trigger EDC via local bridge
       const edcResult = await payWithEDC(total, data.orderId);
 
@@ -266,11 +266,24 @@ export default function CheckoutPage() {
     
     setVoucherMessage(null);
     try {
-      const data = await validateVoucherMutation.mutateAsync({ code: voucherCode, totalAmount });
+      const data = await validateVoucherMutation.mutateAsync({ 
+        code: voucherCode, 
+        totalAmount,
+        items: items.map(item => ({
+          id: item.id,
+          productId: String(item.menuItemId),
+          name: item.name,
+          price: item.subtotal / item.quantity,
+          quantity: item.quantity,
+          category: item.category
+        }))
+      });
       setAppliedDiscount(data.discountAmount);
+      setItemDiscounts(data.itemDiscounts || {});
       setVoucherMessage({type: 'success', text: `Voucher applied! Discount: ${formatCurrency(data.discountAmount)}`});
     } catch (error: any) {
       setAppliedDiscount(0);
+      setItemDiscounts({});
       setVoucherMessage({type: 'error', text: error.message});
     }
   };
@@ -332,7 +345,18 @@ export default function CheckoutPage() {
                   </div>
                   {item.notes && <p className="text-xs text-[#A8131E] mt-1 italic">"{item.notes}"</p>}
                 </div>
-                <span className="font-medium text-(--text-primary)">{formatCurrency(item.subtotal)}</span>
+                <div className="text-right flex flex-col items-end">
+                  {itemDiscounts[item.id] > 0 && (
+                    <span className="text-xs font-bold text-green-600 mb-0.5">
+                      -{formatCurrency(itemDiscounts[item.id])}
+                    </span>
+                  )}
+                  <span className="font-medium text-(--text-primary)">
+                    {itemDiscounts[item.id] > 0
+                      ? formatCurrency(item.subtotal - itemDiscounts[item.id])
+                      : formatCurrency(item.subtotal)}
+                  </span>
+                </div>
               </div>
             ))}
           </div>
