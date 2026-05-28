@@ -265,6 +265,36 @@ export async function getCategories(): Promise<NormalizedCategory[]> {
   throw new Error("Local database (Prisma) is no longer supported.");
 }
 
+function formatOptionsWithToppings(options: any): string {
+  if (!options) return "";
+  const optParts = [];
+  if (options.size && options.size !== "-") optParts.push(`Size: ${options.size}`);
+  if (options.sugarLevel && options.sugarLevel !== "-") optParts.push(`${options.sugarLevel} Sugar`);
+  if (options.iceLevel && options.iceLevel !== "-") optParts.push(`${options.iceLevel} Ice`);
+  if (options.extraShot) optParts.push("Extra Shot");
+  
+  if (Array.isArray(options.toppings) && options.toppings.length > 0) {
+    const TOPPING_MAP: Record<string | number, string> = {
+      9001: "Almond Milk",
+      9002: "Espresso Shot",
+      9003: "Whip Cream",
+      9004: "Sea Salt Cream",
+      9005: "Cheese Cream",
+      "milk-skim": "Skim Milk",
+      "milk-oat": "Oat Milk",
+      "beans-png-signature": "PNG Signature",
+      "shot-extra-1": "Extra 1 Shot",
+      "shot-extra-2": "Extra 2 Shots",
+    };
+    const toppingsStr = options.toppings
+      .map((tId: string | number) => TOPPING_MAP[tId] || String(tId))
+      .join(", ");
+    if (toppingsStr) optParts.push(toppingsStr);
+  }
+  
+  return optParts.join(", ");
+}
+
 /**
  * Create order in POS system
  */
@@ -293,13 +323,8 @@ export async function createOrder(
       try {
         // Concatenate note and options for Olsera
         let fullNote = item.note || "";
-        if (item.options) {
-          const optStr = Object.entries(item.options)
-            .filter(([_, v]) => v && v !== "-" && !Array.isArray(v))
-            .map(([k, v]) => `${k}: ${v}`)
-            .join(", ");
-          if (optStr) fullNote = fullNote ? `${fullNote} (${optStr})` : optStr;
-        }
+        const optStr = formatOptionsWithToppings(item.options);
+        if (optStr) fullNote = fullNote ? `${fullNote} (${optStr})` : optStr;
 
         await olsera.addItemToOrder(
           orderId,
@@ -374,13 +399,8 @@ export async function createOrder(
 
             // Concatenate note and options for the item details
             let fullNote = localItem.note || "";
-            if (localItem.options) {
-              const optStr = Object.entries(localItem.options)
-                .filter(([_, v]) => v && v !== "-" && !Array.isArray(v))
-                .map(([k, v]) => `${k}: ${v}`)
-                .join(", ");
-              if (optStr) fullNote = fullNote ? `${fullNote} (${optStr})` : optStr;
-            }
+            const optStr = formatOptionsWithToppings(localItem.options);
+            if (optStr) fullNote = fullNote ? `${fullNote} (${optStr})` : optStr;
 
             console.log(`[Sync] Updating Olsera orderitem #${matchingOlseraItem.id} (Product: ${localProductId}) to price: ${itemPrice}, discount: ${itemDiscount}`);
             
@@ -455,16 +475,8 @@ export async function createOrder(
             create: items.map((item) => {
               // Format customization details for local receipt fallback
               let displayNotes = item.note || "";
-              if (item.options) {
-                const optParts = [];
-                if (item.options.size && item.options.size !== "-") optParts.push(`Size: ${item.options.size}`);
-                if (item.options.sugarLevel && item.options.sugarLevel !== "-") optParts.push(`${item.options.sugarLevel} Sugar`);
-                if (item.options.iceLevel && item.options.iceLevel !== "-") optParts.push(`${item.options.iceLevel} Ice`);
-                if (item.options.extraShot) optParts.push("Extra Shot");
-                
-                const optStr = optParts.join(", ");
-                if (optStr) displayNotes = displayNotes ? `${displayNotes} (${optStr})` : optStr;
-              }
+              const optStr = formatOptionsWithToppings(item.options);
+              if (optStr) displayNotes = displayNotes ? `${displayNotes} (${optStr})` : optStr;
 
               return {
                 olseraId: item.productId,
