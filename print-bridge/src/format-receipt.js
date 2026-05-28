@@ -211,6 +211,41 @@ function formatReceipt(data) {
   add(CMD.ALIGN_LEFT);
   add(CMD.LINE_SPACING_TIGHT);
 
+  // Known add-on price lookup (name pattern → price in IDR)
+  const ADDON_PRICES = [
+    { pattern: /^extra 2 shots?$/i, price: 12000 },
+    { pattern: /^extra 1 shots?$/i, price: 6000 },
+    { pattern: /^png signature$/i, price: 6000 },
+    { pattern: /^skim milk$/i, price: 6000 },
+    { pattern: /^oat milk$/i, price: 6000 },
+    { pattern: /^sea salt cream$/i, price: 6000 },
+    { pattern: /^cheese cream$/i, price: 6000 },
+    { pattern: /^almond milk$/i, price: 6000 },
+    { pattern: /^espresso shot$/i, price: 6000 },
+    { pattern: /^whip cream$/i, price: 6000 },
+    { pattern: /^extra shot$/i, price: 6000 },
+  ];
+
+  // Notes that are customization options (no extra cost)
+  const FREE_NOTE_PATTERNS = [
+    /^size:/i, /sugar$/i, /ice$/i, /^hot$/i, /^iced?$/i,
+    /^no sugar$/i, /^no ice$/i, /^normal$/i,
+    /^dairy milk$/i, /^rakken blend$/i, /^normal shot$/i,
+  ];
+
+  function lookupAddonPrice(noteName) {
+    const trimmed = noteName.trim();
+    for (const addon of ADDON_PRICES) {
+      if (addon.pattern.test(trimmed)) return addon.price;
+    }
+    return 0;
+  }
+
+  function isFreeNote(noteName) {
+    const trimmed = noteName.trim();
+    return FREE_NOTE_PATTERNS.some(p => p.test(trimmed));
+  }
+
   if (data.items && data.items.length > 0) {
     for (const item of data.items) {
       const name = item.menuItem?.name || item.name || 'Item';
@@ -218,45 +253,78 @@ function formatReceipt(data) {
       const price = item.price || item.subtotal || 0;
       const subtotal = price * qty;
 
-      // Item name (bold)
+      // Parse notes to extract add-ons with prices
+      let addons = []; // { name, price }
+      let freeNotes = []; // customizations without price (sugar, ice, etc.)
+      
+      if (item.notes) {
+        const notesArray = item.notes.split(/,\s+/).filter(Boolean);
+        for (const note of notesArray) {
+          const cleanNote = note.replace(/,/g, ', ').replace(/\s+/g, ' ').trim();
+          const capitalized = cleanNote.charAt(0).toUpperCase() + cleanNote.slice(1);
+          const addonPrice = lookupAddonPrice(cleanNote);
+          
+          if (addonPrice > 0) {
+            addons.push({ name: capitalized, price: addonPrice });
+          } else if (!isFreeNote(cleanNote)) {
+            // Unknown add-on — show without price
+            freeNotes.push(capitalized);
+          } else {
+            freeNotes.push(capitalized);
+          }
+        }
+      }
+
+      // Calculate base+variant price (full price minus recognized add-ons)
+      const totalAddonPrice = addons.reduce((sum, a) => sum + a.price, 0);
+      const basePrice = Math.max(0, price - totalAddonPrice);
+
+      // ── Line 1: Item name + full subtotal (bold) ──
       add(CMD.BOLD_ON);
-      const nameLines = wrapText(name, 0);
-      for (const nl of nameLines) {
-        add(textBuf(nl));
+      if (name.length + formatRp(subtotal).length + 1 <= LINE_WIDTH) {
+        add(leftRight(name, formatRp(subtotal)));
         newline();
+      } else {
+        // Name too long — wrap name, then show subtotal on next line
+        const nameLines = wrapText(name, 0);
+        for (const nl of nameLines) {
+          add(textBuf(nl));
+          newline();
+        }
+        add(CMD.ALIGN_RIGHT);
+        add(textBuf(formatRp(subtotal)));
+        newline();
+        add(CMD.ALIGN_LEFT);
       }
       add(CMD.BOLD_OFF);
 
-      // Qty x Price = Subtotal
-      const qtyStr = `  ${qty}x ${formatRp(price)}`;
-      const subStr = formatRp(subtotal);
-      add(leftRight(qtyStr, subStr));
+      // ── Line 2: Qty x base price ──
+      const qtyStr = `  ${qty}x ${formatRp(basePrice)}`;
+      add(textBuf(qtyStr));
       newline();
 
-      // Size
-      // Skip printing standalone Size if it's already in notes
+      // ── Size (if not in notes) ──
       const hasSizeInNotes = item.notes && item.notes.toLowerCase().includes('size:');
       if (item.size && item.size !== '-' && !hasSizeInNotes) {
         add(textBuf(`  Size: ${item.size}`));
         newline();
       }
 
-      // Notes / customization
-      if (item.notes) {
-        // Split by comma+space to keep "Hot,Small" together, but separate "normal Sugar"
-        const notesArray = item.notes.split(/,\s+/).filter(Boolean);
-        for (const note of notesArray) {
-          // Add a space after comma for readability, e.g. "Hot,Small" -> "Hot, Small"
-          const cleanNote = note.replace(/,/g, ', ').replace(/\s+/g, ' ');
-          // Capitalize first letter
-          const capitalized = cleanNote.charAt(0).toUpperCase() + cleanNote.slice(1);
-          
-          const noteLines = wrapText(`  * ${capitalized}`, 0);
-          for (const nl of noteLines) {
-            add(textBuf(nl));
-            newline();
-          }
+      // ── Free customizations (sugar, ice, etc.) ──
+      for (const fn of freeNotes) {
+        const fnLines = wrapText(`  * ${fn}`, 0);
+        for (const nl of fnLines) {
+          add(textBuf(nl));
+          newline();
         }
+      }
+
+      // ── Paid add-ons with prices ──
+      for (const addon of addons) {
+        const label = `  + ${addon.name}`;
+        const priceStr = `+${formatRp(addon.price)}`;
+        add(leftRight(label, priceStr));
+        newline();
       }
 
       // Small gap between items
