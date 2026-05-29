@@ -109,18 +109,9 @@ export default function CartPage() {
                 <div className="flex items-start justify-between">
                   <h3 className="font-semibold text-(--text-primary) truncate pr-2">{item.name}</h3>
                   <div className="flex items-center gap-2 shrink-0 -mt-1">
-                    <span className="font-bold text-(--brand-500) text-sm">
+                    <span className="font-semibold text-(--text-secondary) text-sm">
                       {formatCurrency(item.price)}
                     </span>
-                    <button
-                      onClick={() => handleEditItem(item)}
-                      className="text-(--text-muted) hover:text-[var(--brand-500)] transition-colors p-1"
-                      title="Edit item"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                    </button>
                     <button
                       onClick={() => removeItem(item.id)}
                       className="text-(--text-muted) hover:text-red-400 transition-colors p-1"
@@ -171,23 +162,38 @@ export default function CartPage() {
                   </div>
                 )}
 
-                {/* Price & Quantity */}
-                <div className="flex items-center justify-between mt-3">
-                  <span className="font-bold text-(--brand-500)">{formatCurrency(item.subtotal)}</span>
+                {/* Price, Edit & Quantity */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between mt-4 pt-3 border-t border-(--border-subtle)/20 gap-3">
                   <div className="flex items-center gap-3">
+                    <span className="font-bold text-(--brand-500) text-base">{formatCurrency(item.subtotal)}</span>
                     <button
-                      onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                      className="w-8 h-8 rounded-full bg-(--bg-card) border border-(--border-subtle) flex items-center justify-center text-(--text-primary) active:scale-90 transition-transform"
+                      onClick={() => handleEditItem(item)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--brand-100)] hover:bg-[var(--brand-200)] text-[var(--brand-700)] font-bold text-xs active:scale-95 transition-all shadow-xs"
+                      title="Edit Customization"
                     >
-                      −
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                      </svg>
+                      Edit Customization
                     </button>
-                    <span className="font-semibold text-(--text-primary) w-6 text-center">{item.quantity}</span>
-                    <button
-                      onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                      className="w-8 h-8 rounded-full bg-[var(--brand-500)] flex items-center justify-center text-white active:scale-90 transition-transform"
-                    >
-                      +
-                    </button>
+                  </div>
+                  <div className="flex items-center justify-between sm:justify-end gap-3">
+                    <span className="text-xs text-(--text-muted) sm:hidden">Quantity</span>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                        className="w-8 h-8 rounded-full bg-(--bg-card) border border-(--border-subtle) flex items-center justify-center text-(--text-primary) active:scale-90 transition-transform"
+                      >
+                        −
+                      </button>
+                      <span className="font-semibold text-(--text-primary) w-6 text-center">{item.quantity}</span>
+                      <button
+                        onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                        className="w-8 h-8 rounded-full bg-[var(--brand-500)] flex items-center justify-center text-white active:scale-90 transition-transform"
+                      >
+                        +
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
