@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useCartStore } from '@/stores/useCartStore';
+import { CartItem } from '@/lib/types';
 
 interface Topping {
   id: number;
@@ -29,6 +30,7 @@ interface CustomizeModalProps {
     olseraVariants?: { id: number; name: string; price: number }[];
   };
   onClose: () => void;
+  editingCartItem?: CartItem;
 }
 
 function formatCurrency(amount: number): string {
@@ -101,17 +103,36 @@ function getMenuConfig(itemName: string, categorySlug: string) {
   return config;
 }
 
-export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
-  const { addItem } = useCartStore();
+export default function CustomizeModal({ item, onClose, editingCartItem }: CustomizeModalProps) {
+  const { addItem, updateItem } = useCartStore();
+  const isEditMode = !!editingCartItem;
+
+  // Parse existing toppings from editingCartItem to recover milk/beans/shot/cream state
+  const parsedEdit = (() => {
+    if (!editingCartItem) return null;
+    let milk = 'dairy';
+    let beans = 'rakken-blend';
+    let shot = 'normal';
+    const creamChoices: Topping[] = [];
+    for (const t of editingCartItem.toppings) {
+      const tid = String(t.id);
+      if (tid.startsWith('milk-')) { milk = tid.replace('milk-', ''); }
+      else if (tid.startsWith('beans-')) { beans = tid.replace('beans-', ''); }
+      else if (tid.startsWith('shot-')) { shot = tid.replace('shot-', ''); }
+      else { creamChoices.push({ id: t.id as number, name: t.name, price: t.price }); }
+    }
+    return { milk, beans, shot, creamChoices };
+  })();
+
   const [optionalChoices, setOptionalChoices] = useState<Topping[]>([]);
-  const [selectedSize, setSelectedSize] = useState('');
-  const [sugarLevel, setSugarLevel] = useState('normal');
-  const [iceLevel, setIceLevel] = useState('normal');
-  const [milkChoice, setMilkChoice] = useState('dairy');
-  const [beansChoice, setBeansChoice] = useState('rakken-blend');
-  const [shotChoice, setShotChoice] = useState('normal');
-  const [selectedChoices, setSelectedChoices] = useState<Topping[]>([]);
-  const [quantity, setQuantity] = useState(1);
+  const [selectedSize, setSelectedSize] = useState(editingCartItem?.size || '');
+  const [sugarLevel, setSugarLevel] = useState(editingCartItem?.sugarLevel || 'normal');
+  const [iceLevel, setIceLevel] = useState(editingCartItem?.iceLevel || 'normal');
+  const [milkChoice, setMilkChoice] = useState(parsedEdit?.milk || 'dairy');
+  const [beansChoice, setBeansChoice] = useState(parsedEdit?.beans || 'rakken-blend');
+  const [shotChoice, setShotChoice] = useState(parsedEdit?.shot || 'normal');
+  const [selectedChoices, setSelectedChoices] = useState<Topping[]>(parsedEdit?.creamChoices || []);
+  const [quantity, setQuantity] = useState(editingCartItem?.quantity || 1);
 
   const slug = item.category?.slug || item.categorySlug || '';
   const config = getMenuConfig(item.name as string, slug);
@@ -142,13 +163,12 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
     }
   }, [slug, config.showCream, config.freeCream]);
 
-  // Set default selected size
+  // Set default selected size (only when NOT editing)
   useEffect(() => {
-    if (item.sizes.length > 0) {
-      // Default to first available size
+    if (!isEditMode && item.sizes.length > 0) {
       setSelectedSize(item.sizes[0].size);
     }
-  }, [item.sizes]);
+  }, [item.sizes, isEditMode]);
 
   const milkChoices = [
     { key: 'dairy', label: 'Dairy Milk', sub: 'Susu standar', price: 0 },
@@ -204,7 +224,7 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
     );
   };
 
-  const handleAddToCart = () => {
+  const handleSubmit = () => {
     // Look up the Olsera variant ID that matches the selected size name
     // Use robust matching (lowercase + trim) to handle subtle discrepancies in Olsera data
     const matchedVariant = item.olseraVariants?.find((v) => 
@@ -228,9 +248,9 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
       const selectedShot = shotChoices.find(s => s.key === shotChoice);
       if (selectedShot) finalToppings.push({ id: `shot-${selectedShot.key}` as any, name: selectedShot.label, price: selectedShot.price });
     }
-    
-    addItem({
-      id: `${item.id}-${Date.now()}`,
+
+    const cartItemData: CartItem = {
+      id: isEditMode ? editingCartItem!.id : `${item.id}-${Date.now()}`,
       menuItemId: item.id as number | string,
       name: item.name,
       price: item.price + sizeAdjustment,
@@ -243,8 +263,14 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
       extraShot: false,
       toppings: finalToppings,
       subtotal: totalPrice,
-      category: typeof item.category === 'string' ? item.category : item.category?.name || '', // Pass the category along
-    });
+      category: typeof item.category === 'string' ? item.category : item.category?.name || '',
+    };
+
+    if (isEditMode) {
+      updateItem(editingCartItem!.id, cartItemData);
+    } else {
+      addItem(cartItemData);
+    }
     onClose();
   };
 
@@ -503,10 +529,10 @@ export default function CustomizeModal({ item, onClose }: CustomizeModalProps) {
           style={{ background: 'var(--bg-secondary)' }}
         >
           <button
-            onClick={handleAddToCart}
+            onClick={handleSubmit}
             className="btn-primary w-full flex items-center justify-between text-lg py-4 rounded-2xl"
           >
-            <span>Add to Cart</span>
+            <span>{isEditMode ? 'Update Item' : 'Add to Cart'}</span>
             <span className="font-bold">{formatCurrency(totalPrice)}</span>
           </button>
         </div>
