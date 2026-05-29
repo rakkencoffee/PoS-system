@@ -5,6 +5,7 @@ import { CartItem, CartState } from '@/lib/types';
 interface CartStore extends CartState {
   addItem: (item: CartItem) => void;
   removeItem: (id: string) => void;
+  updateItem: (id: string, updatedItem: CartItem) => void;
   updateQuantity: (id: string, quantity: number) => void;
   setCustomerName: (name: string) => void;
   clearCart: () => void;
@@ -61,6 +62,16 @@ export const useCartStore = create<CartStore>()(
       removeItem: (id: string) => {
         const { items } = get();
         const newItems = items.filter((item) => item.id !== id);
+        const totalAmount = calculateTotal(newItems);
+        const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0);
+        set({ items: newItems, totalAmount, itemCount });
+      },
+
+      updateItem: (id: string, updatedItem: CartItem) => {
+        const { items } = get();
+        const newItems = items.map((item) =>
+          item.id === id ? { ...updatedItem, id } : item
+        );
         const totalAmount = calculateTotal(newItems);
         const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0);
         set({ items: newItems, totalAmount, itemCount });

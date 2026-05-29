@@ -1,7 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCartStore } from '@/stores/useCartStore';
+import { useMenuItems, MenuItem } from '@/hooks/useMenu';
+import CustomizeModal from '@/components/kiosk/CustomizeModal';
+import { CartItem } from '@/lib/types';
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('id-ID', {
@@ -21,8 +25,25 @@ const isFoodCategory = (categoryName?: string) => {
 export default function CartPage() {
   const router = useRouter();
   const { items, removeItem, updateQuantity, itemCount, totalAmount, setCustomerName, customerName } = useCartStore();
+  const { data: allMenuItems = [] } = useMenuItems('all');
+
+  // Edit state
+  const [editingCartItem, setEditingCartItem] = useState<CartItem | null>(null);
+  const [editingMenuItem, setEditingMenuItem] = useState<MenuItem | null>(null);
 
   const isNameValid = customerName.trim().length >= 2;
+
+  const handleEditItem = (cartItem: CartItem) => {
+    // Find the full menu item data (with sizes, variants, category, etc.)
+    const menuItem = allMenuItems.find(
+      (m) => String(m.id) === String(cartItem.menuItemId)
+    );
+
+    if (menuItem) {
+      setEditingMenuItem(menuItem);
+      setEditingCartItem(cartItem);
+    }
+  };
 
   if (itemCount === 0) {
     return (
@@ -87,13 +108,23 @@ export default function CartPage() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between">
                   <h3 className="font-semibold text-(--text-primary) truncate pr-2">{item.name}</h3>
-                  <div className="flex items-center gap-3 shrink-0 -mt-1">
+                  <div className="flex items-center gap-2 shrink-0 -mt-1">
                     <span className="font-bold text-(--brand-500) text-sm">
                       {formatCurrency(item.price)}
                     </span>
                     <button
+                      onClick={() => handleEditItem(item)}
+                      className="text-(--text-muted) hover:text-[var(--brand-500)] transition-colors p-1"
+                      title="Edit item"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
+                    <button
                       onClick={() => removeItem(item.id)}
                       className="text-(--text-muted) hover:text-red-400 transition-colors p-1"
+                      title="Remove item"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -209,6 +240,18 @@ export default function CartPage() {
           </div>
         </div>
       </div>
+
+      {/* Edit Item Modal */}
+      {editingMenuItem && editingCartItem && (
+        <CustomizeModal
+          item={editingMenuItem}
+          editingCartItem={editingCartItem}
+          onClose={() => {
+            setEditingMenuItem(null);
+            setEditingCartItem(null);
+          }}
+        />
+      )}
     </div>
   );
 }
