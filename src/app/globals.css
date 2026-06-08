@@ -489,6 +489,21 @@ button:active {
 .receipt-feedback { font-size: 10px; margin-top: 3mm; }
 .receipt-cut-guide { text-align: center; font-size: 9px; color: #999; margin-top: 8mm; border-bottom: 1px dotted #ccc; padding-bottom: 2mm; }
 
+/* ===== MATERIAL SYMBOLS GLOBAL CONFIG ===== */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  display: inline-block;
+  line-height: 1;
+  text-transform: none;
+  letter-spacing: normal;
+  word-wrap: normal;
+  white-space: nowrap;
+  direction: ltr;
+  width: 1em;
+  height: 1em;
+  overflow: hidden;
+}
+
 /* === PRINT MODE === */
 @media print {
   @page {

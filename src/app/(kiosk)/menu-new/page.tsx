@@ -5,7 +5,10 @@ import { useRouter } from 'next/navigation';
 import { useCartStore } from '@/stores/useCartStore';
 import { useDebouncedCallback } from 'use-debounce';
 import { useCategories, useMenuItems, Category, MenuItem } from '@/hooks/useMenu';
-import CustomizeModal from '@/components/kiosk/CustomizeModal';
+import dynamic from 'next/dynamic';
+const CustomizeModal = dynamic(() => import('@/components/kiosk/CustomizeModal'), {
+  ssr: false,
+});
 
 /* ─────────────────────────────────────────────
    Helpers
@@ -308,11 +311,6 @@ export default function MenuNewPage() {
   return (
     <div className="min-h-screen bg-[#fff8f2] relative" style={JKT}>
       <style dangerouslySetInnerHTML={{ __html: `
-        .material-symbols-outlined {
-          font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-          display: inline-block; line-height: 1; text-transform: none;
-          letter-spacing: normal; word-wrap: normal; white-space: nowrap; direction: ltr;
-        }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         .product-card-hover:active { transform: scale(0.97); transition: transform 0.15s ease-in-out; }

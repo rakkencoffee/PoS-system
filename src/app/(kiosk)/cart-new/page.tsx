@@ -4,7 +4,10 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCartStore } from '@/stores/useCartStore';
 import { useMenuItems, MenuItem } from '@/hooks/useMenu';
-import CustomizeModal from '@/components/kiosk/CustomizeModal';
+import dynamic from 'next/dynamic';
+const CustomizeModal = dynamic(() => import('@/components/kiosk/CustomizeModal'), {
+  ssr: false,
+});
 import { CartItem } from '@/lib/types';
 
 /* ─────────────────────────────────────────────
@@ -245,11 +248,6 @@ export default function CartNewPage() {
   return (
     <div className="min-h-screen bg-[#fff8f2]" style={JKT}>
       <style dangerouslySetInnerHTML={{ __html: `
-        .material-symbols-outlined {
-          font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-          display: inline-block; line-height: 1; text-transform: none;
-          letter-spacing: normal; word-wrap: normal; white-space: nowrap; direction: ltr;
-        }
         @keyframes live-pulse {
           0%,100% { opacity:1; transform:scale(1); }
           50% { opacity:0.7; transform:scale(1.1); }
