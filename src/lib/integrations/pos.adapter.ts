@@ -298,6 +298,29 @@ function formatOptionsWithToppings(options: any): string {
 /**
  * Create order in POS system
  */
+// Background task helper that works in Next.js runtime and Node CLI tests
+const runInBackground = (fn: () => Promise<any> | any) => {
+  import("next/server")
+    .then(({ after }) => {
+      if (typeof after === "function") {
+        after(fn);
+      } else {
+        Promise.resolve(fn()).catch((err) => {
+          console.error("[Background Error] Task failed:", err);
+        });
+      }
+    })
+    .catch(() => {
+      // Fallback for environments without next/server (CLI scripts)
+      Promise.resolve(fn()).catch((err) => {
+        console.error("[Background Error] Task failed:", err);
+      });
+    });
+};
+
+/**
+ * Create order in POS system
+ */
 export async function createOrder(
   items: {
     productId: string;
@@ -313,157 +336,12 @@ export async function createOrder(
   voucherCode?: string,
 ): Promise<{ orderId: string; olseraOrderId?: number; orderNo?: string; queueNumber?: number }> {
   if (USE_OLSERA) {
-    // 1. Create open order (Header only)
+    // 1. Create open order (Header only) - VERY FAST (<500ms)
     const order = await olsera.createOrder([], { customer_name: customerName });
     const orderId = (order.id || order.order_id) as number;
     const orderNo = (order.order_no as string) || '';
 
-    // 2. Add each item separately (required by Olsera Open API for Open Orders)
-    for (const item of items) {
-      if (!item.productId) continue;
-      try {
-        // Concatenate note and options for Olsera
-        let fullNote = item.note || "";
-        const optStr = formatOptionsWithToppings(item.options);
-        if (optStr) fullNote = fullNote ? `${fullNote} (${optStr})` : optStr;
-
-        await olsera.addItemToOrder(
-          orderId,
-          parseInt(item.productId),
-          item.variantId ? parseInt(item.variantId) : null,
-          item.quantity,
-          fullNote
-        );
-      } catch (err) {
-        console.error(`Failed to add item ${item.productId} to order ${orderId}:`, err);
-      }
-    }
-
-    // 2b. Synchronize custom prices and distribute voucher discount in Olsera Open Order
-    try {
-      const totalOrderAmount = items.reduce((acc, item) => acc + (item.price || 0) * item.quantity, 0);
-
-      // Fetch the generated order detail from Olsera to get the generated orderitem IDs
-      // Olsera Open API writes items asynchronously or with slight lag, so we use progressive retries.
-      let orderDetail: any = null;
-      let olseraItems: any[] = [];
-      
-      // Load menu items to map category slugs for discount logic
-      let menuItems: any[] = [];
-      try {
-        menuItems = await getMenuItems();
-      } catch (mErr) {}
-      const catMap = new Map();
-      menuItems.forEach((m) => catMap.set(m.name, m.categorySlug));
-
-      for (let attempt = 1; attempt <= 4; attempt++) {
-        // Delay: 1.0s, 1.5s, 1.5s, 1.5s
-        await new Promise((resolve) => setTimeout(resolve, attempt === 1 ? 1000 : 1500));
-        
-        console.log(`[Sync] Fetching order detail for #${orderId} (Attempt ${attempt}/4)...`);
-        orderDetail = await olsera.getOrderDetail(orderId, true); // Force bypass cache!
-        
-        olseraItems = Array.isArray(orderDetail.orderitems || orderDetail.items)
-          ? (orderDetail.orderitems || orderDetail.items)
-          : [];
-          
-        if (olseraItems.length >= items.length) {
-          console.log(`[Sync] Olsera items populated successfully: ${olseraItems.length}/${items.length}`);
-          break;
-        }
-        console.warn(`[Sync] Olsera items incomplete: ${olseraItems.length}/${items.length}. Retrying...`);
-      }
-
-      if (olseraItems.length === 0) {
-        console.error(`[Sync] Skipping item sync because no order items were returned from Olsera for order ${orderId}`);
-      } else {
-        // Category-aware voucher restriction
-        const isRestrictedToNonCoffee = 
-          voucherCode?.toUpperCase() === 'RAKKEN002' ||
-          (discountAmount > 0 && items.some(item => {
-            const categorySlug = catMap.get(item.name || "");
-            return categorySlug === 'non-coffee';
-          }) && items.some(item => {
-            const categorySlug = catMap.get(item.name || "");
-            return categorySlug !== 'non-coffee';
-          }) && discountAmount < totalOrderAmount * 0.22);
-
-        let eligibleItems = items;
-        if (isRestrictedToNonCoffee) {
-          eligibleItems = items.filter(item => {
-            const categorySlug = catMap.get(item.name || "");
-            return categorySlug === 'non-coffee';
-          });
-        }
-        if (eligibleItems.length === 0) {
-          eligibleItems = items;
-        }
-
-        const eligibleTotalAmount = eligibleItems.reduce((acc, item) => acc + (item.price || 0) * item.quantity, 0);
-        let remainingDiscount = discountAmount;
-
-        const calculatedDiscounts = new Map<string, number>();
-
-        for (let idx = 0; idx < eligibleItems.length; idx++) {
-          const item = eligibleItems[idx];
-          const itemPrice = item.price || 0;
-          let itemDiscount = 0;
-          
-          if (discountAmount > 0 && eligibleTotalAmount > 0) {
-            if (idx === eligibleItems.length - 1) {
-              itemDiscount = remainingDiscount;
-            } else {
-              const share = (itemPrice * item.quantity) / eligibleTotalAmount;
-              itemDiscount = Math.round(discountAmount * share);
-              remainingDiscount -= itemDiscount;
-            }
-          }
-          calculatedDiscounts.set(`${item.productId}-${item.variantId || ''}`, itemDiscount);
-        }
-
-        for (let idx = 0; idx < items.length; idx++) {
-          const localItem = items[idx];
-          const localProductId = String(localItem.productId || '');
-          const localVariantId = localItem.variantId ? String(localItem.variantId) : '';
-
-          // Find the matching item added to Olsera using robust string comparison
-          const matchingOlseraItem = olseraItems.find((oi: any) => {
-            const oiProductId = String(oi.product_id || '');
-            const oiVariantId = (oi.product_variant_id || oi.variant_id) ? String(oi.product_variant_id || oi.variant_id) : '';
-            return oiProductId === localProductId && oiVariantId === localVariantId;
-          });
-
-          if (matchingOlseraItem && matchingOlseraItem.id) {
-            const itemPrice = localItem.price || 0;
-            const itemDiscount = calculatedDiscounts.get(`${localProductId}-${localVariantId}`) || 0;
-
-            // Concatenate note and options for the item details
-            let fullNote = localItem.note || "";
-            const optStr = formatOptionsWithToppings(localItem.options);
-            if (optStr) fullNote = fullNote ? `${fullNote} (${optStr})` : optStr;
-
-            console.log(`[Sync] Updating Olsera orderitem #${matchingOlseraItem.id} (Product: ${localProductId}) to price: ${itemPrice}, discount: ${itemDiscount}`);
-            
-            // Push the price and discount details to Olsera
-            await olsera.updateOrderItemDetail(
-              orderId,
-              matchingOlseraItem.id,
-              itemPrice,
-              itemDiscount,
-              localItem.quantity,
-              fullNote
-            );
-          } else {
-            console.warn(`[Sync] Could not find matching Olsera item for local product ID: ${localProductId}, variant ID: ${localVariantId}`);
-          }
-        }
-        console.log(`[Sync] Successfully synchronized custom prices and Rp ${discountAmount} discount to Olsera Open Order #${orderId}`);
-      }
-    } catch (syncErr: any) {
-      console.warn(`[Sync] Failed to synchronize prices/discount details to Olsera Open Order:`, syncErr.message);
-    }
-
-    // 3. Generate daily queue number (resets at 00:00 WIB)
+    // 2. Generate daily queue number (resets at 00:00 WIB) - VERY FAST
     let queueNum: number | undefined;
     try {
       const { getNextQueueNumber } = await import("@/lib/queue-number");
@@ -472,68 +350,218 @@ export async function createOrder(
       console.warn(`[Queue] Failed to generate queue number:`, qErr);
     }
 
-    // 4. Mirror to local Prisma for Dashboard/Reporting (Sprint 4)
-    try {
-      const { prisma } = await import("@/lib/db");
+    // 3. Offload all heavy synchronization steps to the background
+    runInBackground(async () => {
+      console.log(`[Sync] Starting background synchronization for POS order #${orderId}`);
+      
+      // 3a. Add each item separately (required by Olsera Open API for Open Orders)
+      for (const item of items) {
+        if (!item.productId) continue;
+        try {
+          // Concatenate note and options for Olsera
+          let fullNote = item.note || "";
+          const optStr = formatOptionsWithToppings(item.options);
+          if (optStr) fullNote = fullNote ? `${fullNote} (${optStr})` : optStr;
 
-      // Load menu items to accurately map categories
-      let menuItems: any[] = [];
-      try {
-        menuItems = await getMenuItems();
-      } catch (mErr) {
-        console.warn(`[Sync] Failed to fetch menu items for category mapping:`, mErr);
+          await olsera.addItemToOrder(
+            orderId,
+            parseInt(item.productId),
+            item.variantId ? parseInt(item.variantId) : null,
+            item.quantity,
+            fullNote
+          );
+        } catch (err) {
+          console.error(`Failed to add item ${item.productId} to order ${orderId}:`, err);
+        }
       }
-      const catMap = new Map();
-      menuItems.forEach((m) => catMap.set(m.name, m.categorySlug));
 
-      const hasCoffee = items.some((item) => {
-        const categorySlug = catMap.get(item.name || "");
-        return ["rakken-signature", "rakken-style"].includes(categorySlug);
-      });
-      const hasFood = items.some((item) => {
-        const categorySlug = catMap.get(item.name || "");
-        return !["rakken-signature", "rakken-style"].includes(categorySlug);
-      });
+      // 3b. Synchronize custom prices and distribute voucher discount in Olsera Open Order
+      try {
+        const totalOrderAmount = items.reduce((acc, item) => acc + (item.price || 0) * item.quantity, 0);
 
-      const baseTotal = items.reduce(
-        (acc, item) => acc + (item.price || 0) * item.quantity,
-        0,
-      );
-      const finalTotal = Math.max(0, baseTotal - discountAmount);
+        // Fetch the generated order detail from Olsera to get the generated orderitem IDs
+        // Olsera Open API writes items asynchronously or with slight lag, so we use progressive retries.
+        let orderDetail: any = null;
+        let olseraItems: any[] = [];
+        
+        // Load menu items to map category slugs for discount logic
+        let menuItems: any[] = [];
+        try {
+          menuItems = await getMenuItems();
+        } catch (mErr) {}
+        const catMap = new Map();
+        menuItems.forEach((m) => catMap.set(m.name, m.categorySlug));
 
-      await prisma.order.create({
-        data: {
-          id: `OLSERA-${orderId}`,
-          stationId: "KIOSK", // Kiosk self-service
-          cashierId: "cmo83g6140000vq5g10u03858", // Valid system user for Kiosk sync
-          queueNumber: queueNum || null,
-          total: finalTotal,
-          status: "PENDING",
-          baristaStatus: hasCoffee ? "PENDING" : "COMPLETED",
-          kitchenStatus: hasFood ? "PENDING" : "COMPLETED",
-          items: {
-            create: items.map((item) => {
-              // Format customization details for local receipt fallback
-              let displayNotes = item.note || "";
-              const optStr = formatOptionsWithToppings(item.options);
-              if (optStr) displayNotes = displayNotes ? `${displayNotes} (${optStr})` : optStr;
+        for (let attempt = 1; attempt <= 4; attempt++) {
+          // Delay: 1.0s, 1.5s, 1.5s, 1.5s
+          await new Promise((resolve) => setTimeout(resolve, attempt === 1 ? 1000 : 1500));
+          
+          console.log(`[Sync] Fetching order detail for #${orderId} (Attempt ${attempt}/4)...`);
+          orderDetail = await olsera.getOrderDetail(orderId, true); // Force bypass cache!
+          
+          olseraItems = Array.isArray(orderDetail.orderitems || orderDetail.items)
+            ? (orderDetail.orderitems || orderDetail.items)
+            : [];
+            
+          if (olseraItems.length >= items.length) {
+            console.log(`[Sync] Olsera items populated successfully: ${olseraItems.length}/${items.length}`);
+            break;
+          }
+          console.warn(`[Sync] Olsera items incomplete: ${olseraItems.length}/${items.length}. Retrying...`);
+        }
 
-              return {
-                olseraId: item.productId,
-                name: item.name || "Item",
-                quantity: item.quantity,
-                price: item.price || 0,
-                subtotal: (item.price || 0) * item.quantity,
-                notes: displayNotes,
-              };
-            }),
+        if (olseraItems.length === 0) {
+          console.error(`[Sync] Skipping item sync because no order items were returned from Olsera for order ${orderId}`);
+        } else {
+          // Category-aware voucher restriction
+          const isRestrictedToNonCoffee = 
+            voucherCode?.toUpperCase() === 'RAKKEN002' ||
+            (discountAmount > 0 && items.some(item => {
+              const categorySlug = catMap.get(item.name || "");
+              return categorySlug === 'non-coffee';
+            }) && items.some(item => {
+              const categorySlug = catMap.get(item.name || "");
+              return categorySlug !== 'non-coffee';
+            }) && discountAmount < totalOrderAmount * 0.22);
+
+          let eligibleItems = items;
+          if (isRestrictedToNonCoffee) {
+            eligibleItems = items.filter(item => {
+              const categorySlug = catMap.get(item.name || "");
+              return categorySlug === 'non-coffee';
+            });
+          }
+          if (eligibleItems.length === 0) {
+            eligibleItems = items;
+          }
+
+          const eligibleTotalAmount = eligibleItems.reduce((acc, item) => acc + (item.price || 0) * item.quantity, 0);
+          let remainingDiscount = discountAmount;
+
+          const calculatedDiscounts = new Map<string, number>();
+
+          for (let idx = 0; idx < eligibleItems.length; idx++) {
+            const item = eligibleItems[idx];
+            const itemPrice = item.price || 0;
+            let itemDiscount = 0;
+            
+            if (discountAmount > 0 && eligibleTotalAmount > 0) {
+              if (idx === eligibleItems.length - 1) {
+                itemDiscount = remainingDiscount;
+              } else {
+                const share = (itemPrice * item.quantity) / eligibleTotalAmount;
+                itemDiscount = Math.round(discountAmount * share);
+                remainingDiscount -= itemDiscount;
+              }
+            }
+            calculatedDiscounts.set(`${item.productId}-${item.variantId || ''}`, itemDiscount);
+          }
+
+          for (let idx = 0; idx < items.length; idx++) {
+            const localItem = items[idx];
+            const localProductId = String(localItem.productId || '');
+            const localVariantId = localItem.variantId ? String(localItem.variantId) : '';
+
+            // Find the matching item added to Olsera using robust string comparison
+            const matchingOlseraItem = olseraItems.find((oi: any) => {
+              const oiProductId = String(oi.product_id || '');
+              const oiVariantId = (oi.product_variant_id || oi.variant_id) ? String(oi.product_variant_id || oi.variant_id) : '';
+              return oiProductId === localProductId && oiVariantId === localVariantId;
+            });
+
+            if (matchingOlseraItem && matchingOlseraItem.id) {
+              const itemPrice = localItem.price || 0;
+              const itemDiscount = calculatedDiscounts.get(`${localProductId}-${localVariantId}`) || 0;
+
+              // Concatenate note and options for the item details
+              let fullNote = localItem.note || "";
+              const optStr = formatOptionsWithToppings(localItem.options);
+              if (optStr) fullNote = fullNote ? `${fullNote} (${optStr})` : optStr;
+
+              console.log(`[Sync] Updating Olsera orderitem #${matchingOlseraItem.id} (Product: ${localProductId}) to price: ${itemPrice}, discount: ${itemDiscount}`);
+              
+              // Push the price and discount details to Olsera
+              await olsera.updateOrderItemDetail(
+                orderId,
+                matchingOlseraItem.id,
+                itemPrice,
+                itemDiscount,
+                localItem.quantity,
+                fullNote
+              );
+            } else {
+              console.warn(`[Sync] Could not find matching Olsera item for local product ID: ${localProductId}, variant ID: ${localVariantId}`);
+            }
+          }
+          console.log(`[Sync] Successfully synchronized custom prices and Rp ${discountAmount} discount to Olsera Open Order #${orderId}`);
+        }
+      } catch (syncErr: any) {
+        console.warn(`[Sync] Failed to synchronize prices/discount details to Olsera Open Order:`, syncErr.message);
+      }
+
+      // 3c. Mirror to local Prisma for Dashboard/Reporting (Sprint 4)
+      try {
+        const { prisma } = await import("@/lib/db");
+
+        // Load menu items to accurately map categories
+        let menuItems: any[] = [];
+        try {
+          menuItems = await getMenuItems();
+        } catch (mErr) {
+          console.warn(`[Sync] Failed to fetch menu items for category mapping:`, mErr);
+        }
+        const catMap = new Map();
+        menuItems.forEach((m) => catMap.set(m.name, m.categorySlug));
+
+        const hasCoffee = items.some((item) => {
+          const categorySlug = catMap.get(item.name || "");
+          return ["rakken-signature", "rakken-style"].includes(categorySlug);
+        });
+        const hasFood = items.some((item) => {
+          const categorySlug = catMap.get(item.name || "");
+          return !["rakken-signature", "rakken-style"].includes(categorySlug);
+        });
+
+        const baseTotal = items.reduce(
+          (acc, item) => acc + (item.price || 0) * item.quantity,
+          0,
+        );
+        const finalTotal = Math.max(0, baseTotal - discountAmount);
+
+        await prisma.order.create({
+          data: {
+            id: `OLSERA-${orderId}`,
+            stationId: "KIOSK", // Kiosk self-service
+            cashierId: "cmo83g6140000vq5g10u03858", // Valid system user for Kiosk sync
+            queueNumber: queueNum || null,
+            total: finalTotal,
+            status: "PENDING",
+            baristaStatus: hasCoffee ? "PENDING" : "COMPLETED",
+            kitchenStatus: hasFood ? "PENDING" : "COMPLETED",
+            items: {
+              create: items.map((item) => {
+                // Format customization details for local receipt fallback
+                let displayNotes = item.note || "";
+                const optStr = formatOptionsWithToppings(item.options);
+                if (optStr) displayNotes = displayNotes ? `${displayNotes} (${optStr})` : optStr;
+
+                return {
+                  olseraId: item.productId,
+                  name: item.name || "Item",
+                  quantity: item.quantity,
+                  price: item.price || 0,
+                  subtotal: (item.price || 0) * item.quantity,
+                  notes: displayNotes,
+                };
+              }),
+            },
           },
-        },
-      });
-      console.log(`[Sync] Order OLSERA-${orderId} (${orderNo}) Queue=#${String(queueNum).padStart(3, '0')} mirrored.`);
-    } catch (dbErr) {
-      console.warn(`[Sync] Failed to mirror order to local database:`, dbErr);
-    }
+        });
+        console.log(`[Sync] Order OLSERA-${orderId} (${orderNo}) Queue=#${String(queueNum).padStart(3, '0')} mirrored.`);
+      } catch (dbErr) {
+        console.warn(`[Sync] Failed to mirror order to local database:`, dbErr);
+      }
+    });
 
     return {
       orderId: `OLSERA-${orderId}`,
