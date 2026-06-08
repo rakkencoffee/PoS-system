@@ -294,7 +294,6 @@ export default function CheckoutNewPage() {
 
   return (
     <div className="min-h-screen bg-background font-body-md text-on-background relative">
-      <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@800&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
       <style dangerouslySetInnerHTML={{__html: `
         .material-symbols-outlined {
             font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;

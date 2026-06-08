@@ -19,7 +19,7 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-const JKT = { fontFamily: 'Plus Jakarta Sans, sans-serif' } as const;
+const JKT = { fontFamily: 'var(--font-plus-jakarta-sans), sans-serif' } as const;
 
 function buildCustomText(item: CartItem): string {
   const parts: string[] = [];
@@ -244,11 +244,6 @@ export default function CartNewPage() {
 
   return (
     <div className="min-h-screen bg-[#fff8f2]" style={JKT}>
-      {/* Fonts */}
-      <link
-        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
-        rel="stylesheet"
-      />
       <style dangerouslySetInnerHTML={{ __html: `
         .material-symbols-outlined {
           font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;

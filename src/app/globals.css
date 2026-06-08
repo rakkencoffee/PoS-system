@@ -57,17 +57,17 @@
   --spacing-tight: 4px;
 
   /* Font Families */
-  --font-display: 'Plus Jakarta Sans', sans-serif;
-  --font-body-md: 'Plus Jakarta Sans', sans-serif;
-  --font-body-lg: 'Plus Jakarta Sans', sans-serif;
-  --font-tag: 'Plus Jakarta Sans', sans-serif;
-  --font-h1: 'Plus Jakarta Sans', sans-serif;
-  --font-h2: 'Plus Jakarta Sans', sans-serif;
-  --font-h3: 'Plus Jakarta Sans', sans-serif;
-  --font-h4: 'Plus Jakarta Sans', sans-serif;
-  --font-price: 'Plus Jakarta Sans', sans-serif;
-  --font-caption: 'Plus Jakarta Sans', sans-serif;
-  --font-queue-no: 'JetBrains Mono', monospace;
+  --font-display: var(--font-plus-jakarta-sans), sans-serif;
+  --font-body-md: var(--font-plus-jakarta-sans), sans-serif;
+  --font-body-lg: var(--font-plus-jakarta-sans), sans-serif;
+  --font-tag: var(--font-plus-jakarta-sans), sans-serif;
+  --font-h1: var(--font-plus-jakarta-sans), sans-serif;
+  --font-h2: var(--font-plus-jakarta-sans), sans-serif;
+  --font-h3: var(--font-plus-jakarta-sans), sans-serif;
+  --font-h4: var(--font-plus-jakarta-sans), sans-serif;
+  --font-price: var(--font-plus-jakarta-sans), sans-serif;
+  --font-caption: var(--font-plus-jakarta-sans), sans-serif;
+  --font-queue-no: var(--font-jetbrains-mono), monospace;
 }
 
 

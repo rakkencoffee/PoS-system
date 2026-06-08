@@ -19,31 +19,32 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-const JKT = { fontFamily: 'Plus Jakarta Sans, sans-serif' } as const;
+const JKT = { fontFamily: 'var(--font-plus-jakarta-sans), sans-serif' } as const;
 
 /* ─────────────────────────────────────────────
    Sub-components
 ───────────────────────────────────────────── */
 
-function KioskProductCard({ item, onSelect }: { item: MenuItem; onSelect: () => void }) {
+function KioskProductCard({ item, onSelect, priority }: { item: MenuItem; onSelect: () => void; priority?: boolean }) {
   return (
     <button
       onClick={onSelect}
       className="bg-white rounded-xl border border-[#f3e0be] shadow-sm overflow-hidden flex flex-col group product-card-hover text-left w-full"
     >
-      <div className="relative aspect-square overflow-hidden bg-[#F5F5F5] m-2 rounded-lg">
+      <div className="relative aspect-[4/3] overflow-hidden bg-[#F5F5F5] m-1.5 rounded-lg">
         {item.image ? (
           <img
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             src={item.image}
             alt={item.name}
+            fetchPriority={priority ? "high" : "auto"}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-5xl opacity-30">☕</div>
+          <div className="w-full h-full flex items-center justify-center text-4xl opacity-30">☕</div>
         )}
         {item.isBestSeller && (
           <span
-            className="absolute top-2 left-2 bg-[#5a632f] text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full"
+            className="absolute top-1.5 left-1.5 bg-[#5a632f] text-white text-[9px] font-bold px-2 py-0.5 rounded-full"
             style={JKT}
           >
             Best Seller
@@ -51,26 +52,28 @@ function KioskProductCard({ item, onSelect }: { item: MenuItem; onSelect: () => 
         )}
         {item.isRecommended && !item.isBestSeller && (
           <span
-            className="absolute top-2 left-2 bg-[#78000f] text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full"
+            className="absolute top-1.5 left-1.5 bg-[#78000f] text-white text-[9px] font-bold px-2 py-0.5 rounded-full"
             style={JKT}
           >
             Recommended
           </span>
         )}
       </div>
-      <div className="p-4 flex-1 flex flex-col">
-        <h3 className="text-[20px] font-[600] text-[#323131] mb-1 line-clamp-1" style={JKT}>
-          {item.name}
-        </h3>
-        <p className="text-[12px] text-[#998075] mb-3 line-clamp-2 min-h-[32px]" style={JKT}>
-          {item.description?.replace(/\\n/g, ' ')}
-        </p>
-        <div className="mt-auto flex flex-col gap-2">
-          <span className="text-[22px] font-bold text-[#78000f]" style={JKT}>
+      <div className="p-3 flex-1 flex flex-col justify-between">
+        <div>
+          <h3 className="text-[15px] font-[600] text-[#323131] mb-0.5 line-clamp-1" style={JKT}>
+            {item.name}
+          </h3>
+          <p className="text-[11px] text-[#998075] mb-2 line-clamp-2 min-h-[30px] leading-tight" style={JKT}>
+            {item.description?.replace(/\\n/g, ' ')}
+          </p>
+        </div>
+        <div className="flex items-center justify-between gap-2 mt-auto">
+          <span className="text-[17px] font-bold text-[#78000f] whitespace-nowrap" style={JKT}>
             {formatCurrency(item.price)}
           </span>
           <div
-            className="w-full bg-[#78000f] text-white text-[16px] font-[600] py-3 rounded-lg hover:bg-[#7D0F18] transition-colors flex items-center justify-center active:scale-95"
+            className="bg-[#78000f] text-white text-[13px] font-[600] px-3.5 py-1.5 rounded-lg hover:bg-[#7D0F18] transition-colors flex items-center justify-center active:scale-95"
             style={JKT}
           >
             Pilih
@@ -81,7 +84,7 @@ function KioskProductCard({ item, onSelect }: { item: MenuItem; onSelect: () => 
   );
 }
 
-function MobileProductCard({ item, onSelect }: { item: MenuItem; onSelect: () => void }) {
+function MobileProductCard({ item, onSelect, priority }: { item: MenuItem; onSelect: () => void; priority?: boolean }) {
   return (
     <button
       onClick={onSelect}
@@ -93,6 +96,7 @@ function MobileProductCard({ item, onSelect }: { item: MenuItem; onSelect: () =>
             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
             src={item.image}
             alt={item.name}
+            fetchPriority={priority ? "high" : "auto"}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-3xl opacity-30">☕</div>
@@ -128,14 +132,17 @@ function MobileProductCard({ item, onSelect }: { item: MenuItem; onSelect: () =>
 
 function KioskSkeleton() {
   return (
-    <div className="grid grid-cols-3 gap-6">
-      {[...Array(6)].map((_, i) => (
+    <div className="grid grid-cols-4 gap-3">
+      {[...Array(8)].map((_, i) => (
         <div key={i} className="bg-white rounded-xl border border-[#f3e0be] overflow-hidden animate-pulse">
-          <div className="aspect-square bg-[#F5F5F5] m-2 rounded-lg" />
-          <div className="p-4 space-y-2">
-            <div className="h-5 bg-[#F5F5F5] rounded w-3/4" />
+          <div className="aspect-[4/3] bg-[#F5F5F5] m-1.5 rounded-lg" />
+          <div className="p-3 space-y-2">
+            <div className="h-4 bg-[#F5F5F5] rounded w-3/4" />
             <div className="h-3 bg-[#F5F5F5] rounded w-1/2" />
-            <div className="h-9 bg-[#F5F5F5] rounded w-full mt-3" />
+            <div className="flex justify-between items-center mt-3">
+              <div className="h-5 bg-[#F5F5F5] rounded w-1/3" />
+              <div className="h-7 bg-[#F5F5F5] rounded w-1/4" />
+            </div>
           </div>
         </div>
       ))}
@@ -300,11 +307,6 @@ export default function MenuNewPage() {
 
   return (
     <div className="min-h-screen bg-[#fff8f2] relative" style={JKT}>
-      {/* ── Fonts & Critical CSS ── */}
-      <link
-        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@800&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
-        rel="stylesheet"
-      />
       <style dangerouslySetInnerHTML={{ __html: `
         .material-symbols-outlined {
           font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
@@ -395,7 +397,7 @@ export default function MenuNewPage() {
         </div>
 
         {/* Main Content */}
-        <main className="px-12 pb-40 pt-6">
+        <main className="px-12 pb-24 pt-4">
           {loading ? (
             <KioskSkeleton />
           ) : debouncedSearch ? (
@@ -406,29 +408,34 @@ export default function MenuNewPage() {
               {filteredItems.length === 0 ? (
                 <SearchEmpty query={debouncedSearch} isMobile={false} />
               ) : (
-                <div className="grid grid-cols-3 gap-6">
-                  {filteredItems.map((item: MenuItem) => (
-                    <KioskProductCard key={item.id} item={item} onSelect={() => setSelectedItem(item)} />
+                <div className="grid grid-cols-4 gap-3">
+                  {filteredItems.map((item: MenuItem, index: number) => (
+                    <KioskProductCard key={item.id} item={item} onSelect={() => setSelectedItem(item)} priority={index < 4} />
                   ))}
                 </div>
               )}
             </div>
           ) : (
-            <div className="space-y-12">
-              {categories.map((cat: Category) => {
+            <div className="space-y-6">
+              {categories.map((cat: Category, catIdx: number) => {
                 const group = groupedItems?.[cat.slug];
                 if (!group) return null;
                 return (
                   <div key={cat.slug} id={`mnew-${cat.slug}`} className="scroll-mt-40">
-                    <div className="flex items-center gap-3 mb-6">
+                    <div className="flex items-center gap-3 mb-3">
                       <h2 className="text-[20px] font-bold text-[#323131] whitespace-nowrap" style={JKT}>
                         {cat.name}
                       </h2>
                       <div className="h-px bg-[#f3e0be] flex-1 ml-2" />
                     </div>
-                    <div className="grid grid-cols-3 gap-6">
-                      {group.items.map((item: MenuItem) => (
-                        <KioskProductCard key={item.id} item={item} onSelect={() => setSelectedItem(item)} />
+                    <div className="grid grid-cols-4 gap-3">
+                      {group.items.map((item: MenuItem, itemIdx: number) => (
+                        <KioskProductCard
+                          key={item.id}
+                          item={item}
+                          onSelect={() => setSelectedItem(item)}
+                          priority={catIdx === 0 && itemIdx < 4}
+                        />
                       ))}
                     </div>
                   </div>
@@ -560,8 +567,8 @@ export default function MenuNewPage() {
                 <SearchEmpty query={debouncedSearch} isMobile />
               ) : (
                 <div className="grid grid-cols-2 gap-3">
-                  {filteredItems.map((item: MenuItem) => (
-                    <MobileProductCard key={item.id} item={item} onSelect={() => setSelectedItem(item)} />
+                  {filteredItems.map((item: MenuItem, index: number) => (
+                    <MobileProductCard key={item.id} item={item} onSelect={() => setSelectedItem(item)} priority={index < 2} />
                   ))}
                 </div>
               )}
@@ -576,7 +583,7 @@ export default function MenuNewPage() {
                 </div>
               </div>
               <div className="space-y-8">
-                {categories.map((cat: Category) => {
+                {categories.map((cat: Category, catIdx: number) => {
                   const group = groupedItems?.[cat.slug];
                   if (!group) return null;
                   return (
@@ -585,8 +592,13 @@ export default function MenuNewPage() {
                         {cat.name}
                       </h3>
                       <div className="grid grid-cols-2 gap-3">
-                        {group.items.map((item: MenuItem) => (
-                          <MobileProductCard key={item.id} item={item} onSelect={() => setSelectedItem(item)} />
+                        {group.items.map((item: MenuItem, itemIdx: number) => (
+                          <MobileProductCard
+                            key={item.id}
+                            item={item}
+                            onSelect={() => setSelectedItem(item)}
+                            priority={catIdx === 0 && itemIdx < 2}
+                          />
                         ))}
                       </div>
                     </div>
