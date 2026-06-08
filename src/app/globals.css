@@ -1,5 +1,76 @@
 @import "tailwindcss";
 
+@theme {
+  /* Design System Colors */
+  --color-primary: #78000f;
+  --color-primary-container: #9f131e;
+  --color-red-dark: #7D0F18;
+  --color-red-light: #F5E6E8;
+  
+  --color-secondary: #5a632f;
+  --color-secondary-container: #dce6a4;
+  
+  --color-tertiary: #47342c;
+  --color-tertiary-container: #604b42;
+  
+  --color-taupe: #998075;
+  --color-near-black: #323131;
+  --color-off-white: #F5F5F5;
+  
+  --color-background: #fff8f2;
+  --color-surface: #FFFFFF;
+  --color-surface-variant: #f3e0be;
+  
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #fff2de;
+  --color-surface-container: #ffecc9;
+  --color-surface-container-high: #f9e6c4;
+  --color-surface-container-highest: #f3e0be;
+
+  --color-primary-fixed: #ffdad7;
+  --color-primary-fixed-dim: #ffb3ae;
+  --color-secondary-fixed: #dee8a7;
+  --color-secondary-fixed-dim: #c2cc8d;
+  --color-tertiary-fixed: #fbdcd0;
+  --color-tertiary-fixed-dim: #ddc1b4;
+  
+  --color-on-background: #231a05;
+  --color-on-surface: #231a05;
+  --color-on-surface-variant: #5a403f;
+  --color-on-primary: #ffffff;
+  --color-on-secondary: #ffffff;
+  --color-on-tertiary: #ffffff;
+  
+  --color-error: #ba1a1a;
+  --color-error-container: #ffdad6;
+  --color-on-error: #ffffff;
+  --color-on-error-container: #93000a;
+
+  /* Custom Spacing */
+  --spacing-page-gutter: 48px;
+  --spacing-section-sep: 32px;
+  --spacing-section-item: 24px;
+  --spacing-card-inner: 16px;
+  --spacing-standard: 12px;
+  --spacing-compact: 8px;
+  --spacing-hero: 64px;
+  --spacing-tight: 4px;
+
+  /* Font Families */
+  --font-display: 'Plus Jakarta Sans', sans-serif;
+  --font-body-md: 'Plus Jakarta Sans', sans-serif;
+  --font-body-lg: 'Plus Jakarta Sans', sans-serif;
+  --font-tag: 'Plus Jakarta Sans', sans-serif;
+  --font-h1: 'Plus Jakarta Sans', sans-serif;
+  --font-h2: 'Plus Jakarta Sans', sans-serif;
+  --font-h3: 'Plus Jakarta Sans', sans-serif;
+  --font-h4: 'Plus Jakarta Sans', sans-serif;
+  --font-price: 'Plus Jakarta Sans', sans-serif;
+  --font-caption: 'Plus Jakarta Sans', sans-serif;
+  --font-queue-no: 'JetBrains Mono', monospace;
+}
+
+
 /* ===== STARTFRIDAY BRAND DESIGN SYSTEM ===== */
 /* Primary Brand Color: #A8131E */
 

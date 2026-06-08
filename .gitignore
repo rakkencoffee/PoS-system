@@ -42,3 +42,7 @@ e2e_voucher_test.js
 next-env.d.ts
 
 /src/generated/prisma
+
+# IDE and tool settings
+.vscode/
+.claude/

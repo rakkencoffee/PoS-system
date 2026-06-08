@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Rakken Coffee - Order Status</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "secondary-fixed-dim": "#c2cc8d",
+                        "surface": "#fdf8f8",
+                        "surface-tint": "#b4252b",
+                        "on-error": "#ffffff",
+                        "surface-variant": "#e5e2e1",
+                        "on-secondary-fixed-variant": "#434b19",
+                        "primary-fixed-dim": "#ffb3ae",
+                        "on-surface-variant": "#5a403f",
+                        "background": "#fdf8f8",
+                        "outline": "#8e706e",
+                        "surface-bright": "#fdf8f8",
+                        "on-primary-fixed": "#410004",
+                        "secondary": "#5a632f",
+                        "inverse-primary": "#ffb3ae",
+                        "on-tertiary": "#ffffff",
+                        "surface-container-high": "#ebe7e7",
+                        "primary-container": "#9f131e",
+                        "warm-sand": "#D9C7A6",
+                        "tertiary-fixed": "#fbdcd0",
+                        "secondary-container": "#dce6a4",
+                        "on-secondary-container": "#5e6732",
+                        "surface-container-highest": "#e5e2e1",
+                        "on-background": "#1c1b1b",
+                        "tertiary-container": "#604b42",
+                        "muted-taupe": "#998075",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary": "#47342c",
+                        "surface-container": "#f1edec",
+                        "on-surface": "#1c1b1b",
+                        "surface-container-low": "#f7f3f2",
+                        "on-primary": "#ffffff",
+                        "success": "#22C55E",
+                        "on-tertiary-fixed": "#281810",
+                        "kds-dark": "#0F0F0F",
+                        "on-primary-container": "#ffada7",
+                        "on-primary-fixed-variant": "#920416",
+                        "tertiary-fixed-dim": "#ddc1b4",
+                        "on-tertiary-fixed-variant": "#574239",
+                        "bg-soft": "#FDFAF6",
+                        "inverse-surface": "#313030",
+                        "secondary-fixed": "#dee8a7",
+                        "warning": "#F59E0B",
+                        "on-error-container": "#93000a",
+                        "on-secondary-fixed": "#191e00",
+                        "primary": "#78000f",
+                        "on-tertiary-container": "#d9bcb0",
+                        "surface-dim": "#ddd9d9",
+                        "error-container": "#ffdad6",
+                        "inverse-on-surface": "#f4f0ef",
+                        "primary-fixed": "#ffdad7",
+                        "bg-section": "#F5EDE0",
+                        "error": "#EF4444",
+                        "outline-variant": "#e2bebb",
+                        "on-secondary": "#ffffff"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    spacing: {
+                        "xl": "24px",
+                        "margin": "48px",
+                        "gutter": "24px",
+                        "3xl": "48px",
+                        "touch-min": "52px",
+                        "xs": "4px",
+                        "2xl": "32px",
+                        "sm": "8px",
+                        "md": "12px",
+                        "lg": "16px"
+                    },
+                    fontFamily: {
+                        "display-xl": ["Plus Jakarta Sans"],
+                        "body-lg": ["Plus Jakarta Sans"],
+                        "caption": ["Plus Jakarta Sans"],
+                        "heading-md": ["Plus Jakarta Sans"],
+                        "body-md": ["Plus Jakarta Sans"],
+                        "display-lg": ["Plus Jakarta Sans"],
+                        "label-mono": ["JetBrains Mono"],
+                        "display-md": ["Plus Jakarta Sans"],
+                        "heading-lg": ["Plus Jakarta Sans"]
+                    },
+                    fontSize: {
+                        "display-xl": ["64px", { lineHeight: "1.1", fontWeight: "800" }],
+                        "body-lg": ["18px", { lineHeight: "1.6", fontWeight: "400" }],
+                        "caption": ["12px", { lineHeight: "1.4", letterSpacing: "0.05em", fontWeight: "500" }],
+                        "heading-md": ["22px", { lineHeight: "1.4", fontWeight: "600" }],
+                        "body-md": ["14px", { lineHeight: "1.6", fontWeight: "400" }],
+                        "display-lg": ["48px", { lineHeight: "1.2", fontWeight: "800" }],
+                        "label-mono": ["16px", { lineHeight: "1.2", letterSpacing: "-0.02em", fontWeight: "500" }],
+                        "display-md": ["36px", { lineHeight: "1.2", fontWeight: "700" }],
+                        "heading-lg": ["28px", { lineHeight: "1.3", fontWeight: "700" }]
+                    },
+                    boxShadow: {
+                        'sm': '0 1px 2px 0 rgba(83, 63, 54, 0.05)',
+                        'glow': '0 0 24px 0 rgba(120, 0, 15, 0.25)',
+                        'glass': '0 8px 32px rgba(83, 63, 54, 0.12)'
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined[style*="FILL' 1"] {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(120, 0, 15, 0.5); }
+            70% { transform: scale(1); box-shadow: 0 0 0 15px rgba(120, 0, 15, 0); }
+            100% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(120, 0, 15, 0); }
+        }
+        .animate-pulse-ring {
+            animation: pulse-ring 2s infinite;
+        }
+    </style>
+</head>
+<body class="bg-bg-soft text-on-surface font-body-lg min-h-screen flex flex-col antialiased">
+<!-- TopAppBar (Modified for Linear Status Flow) -->
+<header class="bg-surface/80 backdrop-blur-md border-b border-warm-sand/40 shadow-sm flex justify-between items-center w-full px-xl h-touch-min z-50 sticky top-0">
+<div class="font-display-md text-display-md font-extrabold text-primary tracking-tight">
+            RAKKEN COFFEE
+        </div>
+<div class="flex items-center gap-sm bg-surface-variant/50 px-lg py-sm rounded-full">
+<span class="relative flex h-3 w-3">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+</span>
+<span class="font-label-mono text-label-mono text-primary font-bold uppercase tracking-widest">Live Updates</span>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 w-full max-w-3xl mx-auto px-xl py-3xl flex flex-col gap-3xl">
+<!-- Order Header -->
+<section class="flex flex-col items-center justify-center text-center gap-md">
+<h2 class="font-body-lg text-body-lg text-on-surface-variant uppercase tracking-widest">Order Status</h2>
+<h1 class="font-display-xl text-display-xl text-primary drop-shadow-sm">#042</h1>
+<p class="font-heading-md text-heading-md text-tertiary">We're on it!</p>
+</section>
+<!-- Glassmorphic Status Indicator Card -->
+<section class="bg-surface-container-lowest/80 backdrop-blur-xl border border-warm-sand/40 rounded-[2rem] p-3xl shadow-glass flex flex-col items-center gap-xl relative overflow-hidden">
+<!-- Decorative Background Element -->
+<div class="absolute -top-1/2 -right-1/4 w-96 h-96 bg-warm-sand/20 rounded-full blur-3xl -z-10"></div>
+<div class="w-32 h-32 rounded-full bg-surface-container flex items-center justify-center shadow-glow animate-pulse-ring mb-lg">
+<span class="material-symbols-outlined text-[64px] text-primary" style="font-variation-settings: 'FILL' 1;">
+                    coffee_maker
+                </span>
+</div>
+<div class="text-center">
+<h3 class="font-heading-lg text-heading-lg text-on-surface mb-sm">Preparing</h3>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Your barista is carefully crafting your selections.</p>
+</div>
+</section>
+<!-- 3-Step Progress Bar -->
+<section class="w-full px-xl py-lg">
+<div class="flex items-center justify-between relative">
+<!-- Connecting Lines -->
+<div class="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-surface-variant rounded-full -z-10"></div>
+<div class="absolute left-0 top-1/2 -translate-y-1/2 w-1/2 h-1 bg-primary rounded-full -z-10 transition-all duration-500"></div>
+<!-- Step 1: Received (Completed) -->
+<div class="flex flex-col items-center gap-md bg-bg-soft">
+<div class="w-12 h-12 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-sm">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">check</span>
+</div>
+<span class="font-label-mono text-caption text-on-surface-variant">Received</span>
+</div>
+<!-- Step 2: Preparing (Active) -->
+<div class="flex flex-col items-center gap-md bg-bg-soft">
+<div class="w-12 h-12 rounded-full bg-surface-container-lowest border-4 border-primary text-primary flex items-center justify-center shadow-glow">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">local_cafe</span>
+</div>
+<span class="font-label-mono text-caption text-primary font-bold">Preparing</span>
+</div>
+<!-- Step 3: Ready (Pending) -->
+<div class="flex flex-col items-center gap-md bg-bg-soft">
+<div class="w-12 h-12 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center">
+<span class="material-symbols-outlined">takeout_dining</span>
+</div>
+<span class="font-label-mono text-caption text-on-surface-variant">Ready</span>
+</div>
+</div>
+</section>
+<!-- Order Summary Bento -->
+<section class="flex flex-col gap-lg">
+<h4 class="font-heading-md text-heading-md text-tertiary px-sm">Your Order</h4>
+<div class="flex flex-col gap-sm">
+<!-- Item 1 -->
+<div class="bg-surface-container-lowest/80 backdrop-blur-md border border-warm-sand/40 rounded-xl p-lg flex items-start gap-lg shadow-sm hover:bg-surface-container transition-colors">
+<div class="w-16 h-16 rounded-lg bg-surface-variant overflow-hidden flex-shrink-0">
+<!-- Placeholder Image handled implicitly via data-alt as requested, but standard prompt rule applied -->
+<div class="w-full h-full bg-cover bg-center" data-alt="A close-up, high-quality photograph of an artisanal iced latte in a clear plastic takeaway cup with condensation. The cup sits on a pristine, light-colored wooden counter in a brightly lit, minimalist cafe. Soft natural sunlight illuminates the creamy swirl of oat milk mixing with rich, dark espresso. The overall aesthetic is clean, modern, and aligned with specialty coffee culture." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCNbnYGIKCiv5rJ8klwdB_R1BKS8oWoyROcetZIBp_O8EZOFa3rSJQilrFquIRyc0hg23MRN1qTMx5YFuBMPG0vpqF0rrkpscl1uhZBsurAq10ITGKKko2i9T8WAZxGn18QXAsQyZWU3HUJzLKw6e3rUcKmAxu69VEQzh0zgSbvYZLk-zxGKz4qgkGb7HrwC5MKsBUwjl7_MQOz7mtzRJxzYrDwac-PEUBjMwh7KdWjI_bJMVVTwZLMADuw16It7UfFXiRihlYYbM4');"></div>
+</div>
+<div class="flex-1 flex flex-col gap-xs">
+<div class="flex justify-between items-start w-full">
+<span class="font-heading-md text-heading-md text-on-surface">Iced Oat Latte</span>
+<span class="font-label-mono text-label-mono text-tertiary">x1</span>
+</div>
+<span class="font-caption text-caption text-on-surface-variant">Less Ice, No Syrup</span>
+</div>
+</div>
+<!-- Item 2 -->
+<div class="bg-surface-container-lowest/80 backdrop-blur-md border border-warm-sand/40 rounded-xl p-lg flex items-start gap-lg shadow-sm hover:bg-surface-container transition-colors">
+<div class="w-16 h-16 rounded-lg bg-surface-variant overflow-hidden flex-shrink-0">
+<div class="w-full h-full bg-cover bg-center" data-alt="A top-down, brightly lit photograph of a freshly baked, flaky almond croissant resting on a minimalist white ceramic plate. The pastry is dusted with powdered sugar and generously topped with toasted sliced almonds. The background features a soft, out-of-focus cafe table surface in a warm sand tone. The lighting is inviting and highlights the crisp texture of the pastry." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBXxdoSqfMoVfOOZv2aUgPuL7TYAbfOAvQoVxM-qbbhyV3XnqmKcHhe2e6NB3_DLX1SL3J3JaQWPPfKw2geKYjw-nDLIjQKTBevRvNLR-4aipxnuZYruTOTd7f57WV5GPn8XHoYPIWFO6MN_IgZ0xv7SRqGm0r77W3jvjxpCYxdyHa8W7i6mk4X-v--U2tsnMH7BrnRPmJE5V9KnV5fEzQlLyDM7UVzui7mj5nr_hSxuIi8gkkPC-SkOtZWX9sm-kzzuac6N6Y-W1k');"></div>
+</div>
+<div class="flex-1 flex flex-col gap-xs">
+<div class="flex justify-between items-start w-full">
+<span class="font-heading-md text-heading-md text-on-surface">Almond Croissant</span>
+<span class="font-label-mono text-label-mono text-tertiary">x2</span>
+</div>
+<span class="font-caption text-caption text-on-surface-variant">Warmed up</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Spacer for Bottom Action -->
+<div class="h-2xl"></div>
+</main>
+<!-- Footer Action Area (Sticky on Kiosk) -->
+<div class="fixed bottom-0 left-0 w-full p-xl bg-gradient-to-t from-bg-soft via-bg-soft to-transparent z-40 pb-3xl">
+<div class="max-w-3xl mx-auto">
+<button class="w-full h-touch-min bg-surface border-2 border-warm-sand text-on-surface font-heading-md text-heading-md rounded-full shadow-sm hover:bg-surface-container active:scale-95 transition-all duration-100 flex items-center justify-center gap-sm">
+<span class="material-symbols-outlined">receipt_long</span>
+                View Digital Receipt
+            </button>
+</div>
+</div>
+</body></html>

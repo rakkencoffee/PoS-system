@@ -1,0 +1,300 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Kyoto House Blend - Rakken POS Kiosk</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@500&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@100..900&amp;display=swap" rel="stylesheet">
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #F5ECD9; /* bg-page from design system */
+            height: 100vh;
+            overflow: hidden;
+        }
+        /* Custom scrollbar for kiosk touch feel */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #D9C7A6;
+            border-radius: 10px;
+        }
+        .touch-ripple:active {
+            transform: scale(0.96);
+            transition: transform 0.1s ease-out;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary-fixed": "#191e00",
+                        "surface": "#fff8f7",
+                        "secondary-container": "#dce6a4",
+                        "on-tertiary-container": "#d9bcb0",
+                        "on-secondary-fixed-variant": "#434b19",
+                        "text-secondary": "#533F36",
+                        "on-primary": "#ffffff",
+                        "bg-surface": "#FAF5EE",
+                        "on-error": "#ffffff",
+                        "on-primary-fixed-variant": "#920416",
+                        "background": "#fff8f7",
+                        "accent-beige": "#D9C7A6",
+                        "surface-container-high": "#fde2e0",
+                        "surface-dim": "#efd4d2",
+                        "on-secondary-container": "#5e6732",
+                        "surface-tint": "#b4252b",
+                        "surface-container-highest": "#f7dcda",
+                        "tertiary-container": "#604b42",
+                        "tertiary": "#47342c",
+                        "surface-container-low": "#fff0ef",
+                        "on-background": "#261817",
+                        "inverse-on-surface": "#ffedeb",
+                        "outline": "#8e706e",
+                        "bg-page": "#F5ECD9",
+                        "on-primary-fixed": "#410004",
+                        "on-error-container": "#93000a",
+                        "accent-taupe": "#998075",
+                        "on-primary-container": "#ffada7",
+                        "primary-fixed-dim": "#ffb3ae",
+                        "surface-bright": "#fff8f7",
+                        "error": "#ba1a1a",
+                        "bg-card": "#FFFFFF",
+                        "tertiary-fixed": "#fbdcd0",
+                        "surface-variant": "#f7dcda",
+                        "secondary-fixed-dim": "#c2cc8d",
+                        "error-container": "#ffdad6",
+                        "on-tertiary-fixed-variant": "#574239",
+                        "on-secondary": "#ffffff",
+                        "primary-container": "#9f131e",
+                        "tertiary-fixed-dim": "#ddc1b4",
+                        "text-price": "#9F131E",
+                        "outline-variant": "#e2bebb",
+                        "on-surface": "#261817",
+                        "on-surface-variant": "#5a403f",
+                        "secondary-fixed": "#dee8a7",
+                        "inverse-surface": "#3d2c2b",
+                        "surface-container": "#ffe9e7",
+                        "text-primary": "#323131",
+                        "primary-fixed": "#ffdad7",
+                        "inverse-primary": "#ffb3ae",
+                        "secondary": "#5a632f",
+                        "primary": "#78000f",
+                        "on-tertiary": "#ffffff",
+                        "border-subtle": "rgba(217, 199, 166, 0.60)",
+                        "on-tertiary-fixed": "#281810"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "margin-desktop": "2.5rem",
+                        "touch-target": "56px",
+                        "margin-mobile": "1rem",
+                        "gutter": "1.5rem"
+                    },
+                    "fontFamily": {
+                        "heading-md": ["Plus Jakarta Sans"],
+                        "mono-sm": ["JetBrains Mono"],
+                        "display-lg": ["Plus Jakarta Sans"],
+                        "body-lg": ["Plus Jakarta Sans"],
+                        "heading-xl": ["Plus Jakarta Sans"],
+                        "display-lg-mobile": ["Plus Jakarta Sans"],
+                        "body-md": ["Plus Jakarta Sans"]
+                    },
+                    "fontSize": {
+                        "heading-md": ["22px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                        "mono-sm": ["13px", {"lineHeight": "1.4", "fontWeight": "500"}],
+                        "display-lg": ["48px", {"lineHeight": "1.2", "fontWeight": "800"}],
+                        "body-lg": ["17px", {"lineHeight": "1.5", "fontWeight": "500"}],
+                        "heading-xl": ["36px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                        "display-lg-mobile": ["32px", {"lineHeight": "1.2", "fontWeight": "800"}],
+                        "body-md": ["15px", {"lineHeight": "1.5", "fontWeight": "400"}]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="flex items-center justify-center p-6 md:p-12">
+<!-- Modal Backdrop Overlay (Simulated) -->
+<div class="fixed inset-0 bg-on-surface/20 backdrop-blur-sm z-0"></div>
+<!-- Main Customization Modal -->
+<div class="relative z-10 w-full max-w-[600px] h-full max-h-[920px] bg-bg-surface shadow-2xl rounded-[32px] overflow-hidden flex flex-col border border-border-subtle">
+<!-- Header Section -->
+<header class="pt-8 px-8 pb-6 flex justify-between items-start">
+<div class="max-w-[80%]">
+<h1 class="font-heading-xl text-heading-xl text-on-surface leading-tight">Kyoto House Blend</h1>
+<p class="font-body-md text-body-md text-on-surface-variant mt-2">
+                    Selected coffee beans, milk, aren syrup, biscoff cream, biscoff crumble.
+                </p>
+</div>
+<button class="w-12 h-12 flex items-center justify-center rounded-full bg-surface-container-lowest text-on-surface-variant shadow-sm touch-ripple">
+<span class="material-symbols-outlined">close</span>
+</button>
+</header>
+<div class="w-full h-px bg-border-subtle mx-8 w-[calc(100%-64px)]"></div>
+<!-- Scrollable Content -->
+<div class="flex-1 overflow-y-auto px-8 py-6 space-y-10 pb-40">
+<!-- Variant Section -->
+<section>
+<h2 class="font-heading-md text-heading-md text-on-surface mb-4 uppercase tracking-wider text-[14px]">Variant</h2>
+<div class="grid grid-cols-2 gap-4">
+<!-- Option Active -->
+<button class="bg-primary-container text-on-primary border-transparent h-[84px] rounded-2xl flex flex-col items-center justify-center p-4 shadow-sm touch-ripple text-center">
+<span class="font-bold text-body-lg">Hot, Small</span>
+<span class="text-[12px] opacity-80 mt-1">Base</span>
+</button>
+<!-- Option Inactive -->
+<button class="bg-bg-card border border-border-subtle text-on-surface h-[84px] rounded-2xl flex flex-col items-center justify-center p-4 touch-ripple text-center hover:bg-surface-container-low">
+<span class="font-bold text-body-lg">Ice, Small</span>
+<span class="text-[12px] text-on-surface-variant mt-1">+Rp 2.000</span>
+</button>
+<button class="bg-bg-card border border-border-subtle text-on-surface h-[84px] rounded-2xl flex flex-col items-center justify-center p-4 touch-ripple text-center hover:bg-surface-container-low">
+<span class="font-bold text-body-lg">Hot, Big</span>
+<span class="text-[12px] text-on-surface-variant mt-1">+Rp 6.000</span>
+</button>
+<button class="bg-bg-card border border-border-subtle text-on-surface h-[84px] rounded-2xl flex flex-col items-center justify-center p-4 touch-ripple text-center hover:bg-surface-container-low">
+<span class="font-bold text-body-lg">Ice, Big</span>
+<span class="text-[12px] text-on-surface-variant mt-1">+Rp 8.000</span>
+</button>
+</div>
+</section>
+<!-- Sugar Level Section -->
+<section>
+<h2 class="font-heading-md text-heading-md text-on-surface mb-4 uppercase tracking-wider text-[14px]">Sugar Level</h2>
+<div class="grid grid-cols-2 gap-4">
+<button class="bg-bg-card border border-border-subtle text-on-surface h-[84px] rounded-2xl flex flex-col items-center justify-center p-4 touch-ripple text-center hover:bg-surface-container-low">
+<span class="font-bold text-body-lg">No Sugar</span>
+<span class="text-[12px] text-on-surface-variant mt-1">Tanpa gula/syrup</span>
+</button>
+<button class="bg-bg-card border border-border-subtle text-on-surface h-[84px] rounded-2xl flex flex-col items-center justify-center p-4 touch-ripple text-center hover:bg-surface-container-low">
+<span class="font-bold text-body-lg">Less Sugar</span>
+<span class="text-[12px] text-on-surface-variant mt-1">gula 70%</span>
+</button>
+<button class="bg-primary-container text-on-primary border-transparent h-[84px] rounded-2xl flex flex-col items-center justify-center p-4 shadow-sm touch-ripple text-center col-span-2">
+<span class="font-bold text-body-lg">Normal Sugar</span>
+<span class="text-[12px] opacity-80 mt-1">Standar penyajian</span>
+</button>
+</div>
+</section>
+<!-- Milk Choice Section -->
+<section>
+<h2 class="font-heading-md text-heading-md text-on-surface mb-4 uppercase tracking-wider text-[14px]">Milk Choice</h2>
+<div class="grid grid-cols-2 gap-4">
+<button class="bg-primary-container text-on-primary border-transparent h-[84px] rounded-2xl flex flex-col items-center justify-center p-4 shadow-sm touch-ripple text-center">
+<span class="font-bold text-body-lg">Dairy Milk</span>
+<span class="text-[12px] opacity-80 mt-1">Susu standar</span>
+</button>
+<button class="bg-bg-card border border-border-subtle text-on-surface h-[84px] rounded-2xl flex flex-col items-center justify-center p-4 touch-ripple text-center hover:bg-surface-container-low">
+<span class="font-bold text-body-lg">Oat Milk</span>
+<span class="text-[12px] text-on-surface-variant mt-1">+Rp 6.000</span>
+</button>
+</div>
+</section>
+<!-- Quantity Stepper Section -->
+<section class="flex flex-col items-center pt-4">
+<h2 class="font-heading-md text-heading-md text-on-surface mb-6 uppercase tracking-wider text-[14px]">Quantity</h2>
+<div class="flex items-center gap-12">
+<button class="w-16 h-16 rounded-full bg-bg-card border border-border-subtle flex items-center justify-center text-on-surface shadow-sm touch-ripple" id="decrement">
+<span class="material-symbols-outlined text-3xl">remove</span>
+</button>
+<span class="font-heading-xl text-[48px] text-on-surface tabular-nums" id="quantity-val">1</span>
+<button class="w-16 h-16 rounded-full bg-primary-container flex items-center justify-center text-on-primary shadow-lg touch-ripple" id="increment" style="box-shadow: 0 10px 20px -5px rgba(159, 19, 30, 0.4);">
+<span class="material-symbols-outlined text-3xl">add</span>
+</button>
+</div>
+</section>
+</div>
+<!-- Sticky Footer CTA -->
+<footer class="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-bg-surface via-bg-surface to-transparent">
+<button class="w-full h-touch-target bg-primary-container rounded-full flex items-center justify-between px-8 text-on-primary shadow-xl touch-ripple overflow-hidden relative group" style="box-shadow: 0 20px 30px -10px rgba(159, 19, 30, 0.5);">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined">shopping_cart</span>
+<span class="font-heading-md text-body-lg font-bold">Add to Cart</span>
+</div>
+<div class="flex items-center gap-1">
+<span class="font-mono-sm text-[12px] opacity-80 uppercase">Rp</span>
+<span class="font-heading-md text-heading-md">48.000</span>
+</div>
+<!-- Shimmer effect overlay -->
+<div class="absolute inset-0 bg-white/10 opacity-0 group-active:opacity-100 transition-opacity pointer-events-none"></div>
+</button>
+</footer>
+</div>
+<!-- Background Decoration for Kiosk Look -->
+<div class="fixed -z-10 top-20 right-[-100px] w-[500px] h-[500px] rounded-full bg-accent-beige opacity-20 blur-[100px]"></div>
+<div class="fixed -z-10 bottom-20 left-[-100px] w-[600px] h-[600px] rounded-full bg-primary-fixed-dim opacity-10 blur-[120px]"></div>
+<script>
+        // Simple Interaction logic for Quantity
+        const decBtn = document.getElementById('decrement');
+        const incBtn = document.getElementById('increment');
+        const qtyVal = document.getElementById('quantity-val');
+        
+        let currentQty = 1;
+
+        decBtn.addEventListener('click', () => {
+            if (currentQty > 1) {
+                currentQty--;
+                qtyVal.innerText = currentQty;
+                // Add a small scale animation
+                qtyVal.classList.add('scale-110');
+                setTimeout(() => qtyVal.classList.remove('scale-110'), 100);
+            }
+        });
+
+        incBtn.addEventListener('click', () => {
+            currentQty++;
+            qtyVal.innerText = currentQty;
+            // Add a small scale animation
+            qtyVal.classList.add('scale-110');
+            setTimeout(() => qtyVal.classList.remove('scale-110'), 100);
+        });
+
+        // Toggle selection logic (Visual only)
+        const allOptionButtons = document.querySelectorAll('button.rounded-2xl');
+        allOptionButtons.forEach(btn => {
+            btn.addEventListener('click', function() {
+                // Get all sibling buttons in the same parent container
+                const parent = this.parentElement;
+                const siblings = parent.querySelectorAll('button');
+                
+                siblings.forEach(s => {
+                    s.classList.remove('bg-primary-container', 'text-on-primary', 'border-transparent', 'shadow-sm');
+                    s.classList.add('bg-bg-card', 'border', 'border-border-subtle', 'text-on-surface');
+                    
+                    // Update sub-text opacity/color
+                    const subText = s.querySelector('span:last-child');
+                    if(subText) {
+                        subText.classList.remove('opacity-80');
+                        subText.classList.add('text-on-surface-variant');
+                    }
+                });
+
+                // Set active state for clicked button
+                this.classList.remove('bg-bg-card', 'border', 'border-border-subtle', 'text-on-surface');
+                this.classList.add('bg-primary-container', 'text-on-primary', 'border-transparent', 'shadow-sm');
+                
+                const activeSubText = this.querySelector('span:last-child');
+                if(activeSubText) {
+                    activeSubText.classList.remove('text-on-surface-variant');
+                    activeSubText.classList.add('opacity-80');
+                }
+            });
+        });
+    </script>
+</body></html>

@@ -1,0 +1,327 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>RAKKEN COFFEE - Checkout</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@800&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@100..900&amp;display=swap" rel="stylesheet">
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .step-active { font-variation-settings: 'FILL' 1; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #998075; border-radius: 10px; }
+        @keyframes pulse-live {
+            0% { transform: scale(0.95); opacity: 0.5; }
+            50% { transform: scale(1.05); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.5; }
+        }
+        .live-pulse { animation: pulse-live 1.5s infinite; }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-container": "#9f131e",
+                        "tertiary-container": "#604b42",
+                        "on-primary-fixed": "#410004",
+                        "taupe": "#998075",
+                        "on-tertiary-fixed": "#281810",
+                        "primary-fixed-dim": "#ffb3ae",
+                        "surface-variant": "#f3e0be",
+                        "primary-fixed": "#ffdad7",
+                        "red-dark": "#7D0F18",
+                        "error-container": "#ffdad6",
+                        "secondary-fixed-dim": "#c2cc8d",
+                        "surface-container-lowest": "#ffffff",
+                        "inverse-surface": "#3a2f18",
+                        "on-surface": "#231a05",
+                        "secondary": "#5a632f",
+                        "outline-variant": "#e2bebb",
+                        "surface-tint": "#b4252b",
+                        "tertiary-fixed": "#fbdcd0",
+                        "on-tertiary": "#ffffff",
+                        "on-background": "#231a05",
+                        "surface": "#FFFFFF",
+                        "surface-container-high": "#f9e6c4",
+                        "surface-container-highest": "#f3e0be",
+                        "red-light": "#F5E6E8",
+                        "primary": "#78000f",
+                        "on-primary-fixed-variant": "#920416",
+                        "tertiary-fixed-dim": "#ddc1b4",
+                        "outline": "#8e706e",
+                        "on-tertiary-container": "#d9bcb0",
+                        "near-black": "#323131",
+                        "tertiary": "#47342c",
+                        "on-error-container": "#93000a",
+                        "on-secondary": "#ffffff",
+                        "inverse-on-surface": "#ffefd3",
+                        "on-primary": "#ffffff",
+                        "surface-container-low": "#fff2de",
+                        "background": "#fff8f2",
+                        "off-white": "#F5F5F5",
+                        "secondary-fixed": "#dee8a7",
+                        "surface-container": "#ffecc9",
+                        "error": "#ba1a1a",
+                        "on-secondary-fixed-variant": "#434b19",
+                        "on-surface-variant": "#5a403f",
+                        "on-primary-container": "#ffada7",
+                        "secondary-container": "#dce6a4",
+                        "on-error": "#ffffff",
+                        "on-secondary-fixed": "#191e00",
+                        "inverse-primary": "#ffb3ae",
+                        "on-tertiary-fixed-variant": "#574239",
+                        "surface-dim": "#ebd8b6",
+                        "surface-bright": "#fff8f2",
+                        "on-secondary-container": "#5e6732"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "section-item": "24px",
+                        "tight": "4px",
+                        "standard": "12px",
+                        "hero": "64px",
+                        "card-inner": "16px",
+                        "section-sep": "32px",
+                        "compact": "8px",
+                        "page-gutter": "48px"
+                    },
+                    "fontFamily": {
+                        "tag": ["Plus Jakarta Sans"],
+                        "body-md": ["Plus Jakarta Sans"],
+                        "h2": ["Plus Jakarta Sans"],
+                        "queue-no": ["JetBrains Mono"],
+                        "h3": ["Plus Jakarta Sans"],
+                        "body-lg": ["Plus Jakarta Sans"],
+                        "h1-mobile": ["Plus Jakarta Sans"],
+                        "price": ["Plus Jakarta Sans"],
+                        "h4": ["Plus Jakarta Sans"],
+                        "h1": ["Plus Jakarta Sans"],
+                        "caption": ["Plus Jakarta Sans"],
+                        "display": ["Plus Jakarta Sans"]
+                    },
+                    "fontSize": {
+                        "tag": ["13px", {"lineHeight": "1", "fontWeight": "500"}],
+                        "body-md": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                        "h2": ["28px", {"lineHeight": "1.3", "fontWeight": "700"}],
+                        "queue-no": ["64px", {"lineHeight": "1", "fontWeight": "800"}],
+                        "h3": ["22px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                        "body-lg": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "h1-mobile": ["28px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                        "price": ["24px", {"lineHeight": "1", "fontWeight": "700"}],
+                        "h4": ["18px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                        "h1": ["40px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                        "caption": ["12px", {"lineHeight": "1.4", "fontWeight": "400"}],
+                        "display": ["56px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "800"}]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-background font-body-md overflow-hidden">
+<!-- TopNavBar -->
+<header class="sticky top-0 z-50 flex justify-between items-center px-page-gutter py-standard w-full max-w-full bg-surface shadow-sm">
+<div class="flex items-center gap-standard">
+<button class="p-compact hover:bg-off-white rounded-full transition-colors active:scale-95 duration-150 ease-in-out">
+<span class="material-symbols-outlined text-primary">arrow_back</span>
+</button>
+<h1 class="font-display text-h3 font-extrabold text-primary tracking-tight">RAKKEN COFFEE</h1>
+</div>
+<div class="flex items-center gap-section-item">
+<div class="flex items-center gap-tight">
+<span class="w-2 h-2 rounded-full bg-secondary live-pulse"></span>
+<span class="font-tag text-tag text-secondary uppercase tracking-wider">Station 04 Online</span>
+</div>
+<div class="flex items-center gap-standard">
+<button class="p-compact hover:bg-off-white rounded-full transition-colors active:scale-95">
+<span class="material-symbols-outlined text-primary">shopping_bag</span>
+</button>
+<button class="p-compact hover:bg-off-white rounded-full transition-colors active:scale-95">
+<span class="material-symbols-outlined text-primary">person</span>
+</button>
+</div>
+</div>
+</header>
+<main class="h-[calc(100vh-76px)] flex">
+<!-- Left Section: Order Review (55%) -->
+<section class="w-[55%] h-full bg-background p-page-gutter flex flex-col overflow-y-auto">
+<div class="flex flex-col gap-standard mb-section-sep">
+<h2 class="font-h2 text-h2 text-near-black">Review Your Order</h2>
+<p class="font-body-lg text-body-lg text-taupe">Items will be prepared immediately after payment.</p>
+</div>
+<!-- Order List -->
+<div class="flex flex-col gap-standard mb-section-sep">
+<!-- Item 1 -->
+<div class="bg-surface p-card-inner rounded-xl border border-surface-variant flex gap-standard items-center shadow-sm">
+<img alt="Latte" class="w-20 h-20 object-cover rounded-lg" data-alt="A premium latte in a tall glass with beautiful micro-foam art on top. The lighting is warm and cinematic, highlighting the creamy texture against a dark, minimalist cafe background. The image evokes a sense of high-end coffee craftsmanship and sophisticated taste within the Rakken Coffee aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB0Xh0LwgfNPrFNELG-pky9vE5RaWUWckVDW22Gvo4_kkaqmwhUkC2GkK1iLWpAULuRuiBWqLW9l2-Owq6otghbr3j9A6hgr1P4x00UJzUdJKBzazC4PJCmH2cB174hbOnts4sUQXqvs0i899I-rIW7PyMGgB4oVbeUU_XnDuBQC-zPWJZv8T0nR6t8CdD5BF-MRfoz9AFxD0AXjQVUoirb5DHNSR3IgDFh1ppeKr2FBz13nHhbzrbUeaT7hKO6TO3-EzgsTSRP-rU">
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<h4 class="font-h4 text-h4 text-near-black">Rakken Signature Latte</h4>
+<span class="font-price text-body-lg text-primary">Rp 42.000</span>
+</div>
+<p class="font-caption text-caption text-taupe mt-tight">Large • Oat Milk • Less Sugar</p>
+<div class="flex items-center gap-standard mt-standard">
+<div class="flex items-center bg-off-white rounded-full px-standard py-tight border border-surface-variant">
+<button class="material-symbols-outlined text-primary text-lg active:scale-95">remove</button>
+<span class="mx-standard font-h4 text-body-md">1</span>
+<button class="material-symbols-outlined text-primary text-lg active:scale-95">add</button>
+</div>
+<button class="text-error font-tag text-tag">Remove</button>
+</div>
+</div>
+</div>
+<!-- Item 2 -->
+<div class="bg-surface p-card-inner rounded-xl border border-surface-variant flex gap-standard items-center shadow-sm">
+<img alt="Espresso" class="w-20 h-20 object-cover rounded-lg" data-alt="A classic dark espresso shot with a rich, hazelnut-colored crema. The photograph is a close-up with a shallow depth of field, emphasizing the oily sheen of the coffee beans nearby. The lighting is focused and dramatic, consistent with a premium utilitarian kiosk environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCSZPi7XuLvhrpbc20pWc6ic-qFqSZSF7JDVuDis6Aree8JSqtYSHjBBKEIlcenrTe7ncVcTs777Dk8KnJNeqYxAMwDHcuGULQwiD0cvoVEv_HEQiF-zGqz5DX68qR27mje7WY5JxqorAA2t7nVTvzmueesF3B_9v_a8uLhh7pHlMVWIpyNFmARZ1LBieL-Ese4Rm7EO7TyH1UybdS0BXNwIfasN3ACr-SkDEazrVhr0u711Htt9LBovq7jz93TE4WHEdJFhRDPBMo">
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<h4 class="font-h4 text-h4 text-near-black">Double Espresso</h4>
+<span class="font-price text-body-lg text-primary">Rp 28.000</span>
+</div>
+<p class="font-caption text-caption text-taupe mt-tight">Hot • Premium Arabica</p>
+<div class="flex items-center gap-standard mt-standard">
+<div class="flex items-center bg-off-white rounded-full px-standard py-tight border border-surface-variant">
+<button class="material-symbols-outlined text-primary text-lg active:scale-95">remove</button>
+<span class="mx-standard font-h4 text-body-md">1</span>
+<button class="material-symbols-outlined text-primary text-lg active:scale-95">add</button>
+</div>
+<button class="text-error font-tag text-tag">Remove</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Voucher Section -->
+<div class="mt-auto">
+<label class="font-tag text-tag text-taupe uppercase block mb-compact">Have a voucher?</label>
+<div class="flex gap-standard">
+<input class="flex-1 bg-surface border-1.5 border-surface-variant rounded-xl px-standard py-compact focus:ring-primary focus:border-primary placeholder-taupe" placeholder="Enter code (e.g. COFFEE20)" type="text">
+<button class="px-section-item py-compact bg-tertiary text-white font-h4 text-body-md rounded-xl transition-transform active:scale-95">Apply</button>
+</div>
+</div>
+</section>
+<!-- Right Section: Payment Summary (45%) -->
+<section class="w-[45%] h-full bg-surface p-page-gutter flex flex-col justify-center border-l border-surface-variant">
+<div class="max-w-[480px] mx-auto w-full space-y-section-sep">
+<!-- Payment Summary Card -->
+<div class="bg-background p-page-gutter rounded-3xl shadow-lg border border-surface-variant">
+<h3 class="font-h3 text-h3 text-near-black mb-standard">Payment Summary</h3>
+<div class="space-y-standard mb-section-item">
+<div class="flex justify-between text-body-lg text-taupe font-body-lg">
+<span>Subtotal</span>
+<span>Rp 70.000</span>
+</div>
+<div class="flex justify-between text-body-lg text-taupe font-body-lg">
+<span>Service Tax (10%)</span>
+<span>Rp 7.000</span>
+</div>
+<div class="pt-standard border-t border-surface-variant flex justify-between items-center">
+<span class="font-h2 text-h2 text-near-black">Total</span>
+<span class="font-display text-h1 text-primary">Rp 77.000</span>
+</div>
+</div>
+<!-- Payment Methods -->
+<div class="space-y-standard">
+<label class="font-tag text-tag text-taupe uppercase">Select Method</label>
+<!-- Online/QRIS -->
+<div class="payment-card cursor-pointer flex items-center justify-between p-standard bg-white border-2 border-primary rounded-2xl transition-all shadow-md" id="method-qris" onclick="selectPayment('qris')">
+<div class="flex items-center gap-standard">
+<div class="w-12 h-12 bg-primary-fixed rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">qr_code_2</span>
+</div>
+<div>
+<h4 class="font-h4 text-h4 text-near-black">Online / QRIS</h4>
+<p class="font-caption text-caption text-taupe">GoPay, OVO, ShopeePay</p>
+</div>
+</div>
+<div class="w-6 h-6 rounded-full border-2 border-primary flex items-center justify-center">
+<div class="w-3 h-3 bg-primary rounded-full"></div>
+</div>
+</div>
+<!-- EDC -->
+<div class="payment-card cursor-pointer flex items-center justify-between p-standard bg-white border-1.5 border-surface-variant rounded-2xl transition-all hover:bg-off-white" id="method-edc" onclick="selectPayment('edc')">
+<div class="flex items-center gap-standard">
+<div class="w-12 h-12 bg-surface-variant rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined text-near-black">contactless</span>
+</div>
+<div>
+<h4 class="font-h4 text-h4 text-near-black">Debit / Credit</h4>
+<p class="font-caption text-caption text-taupe">Insert card in EDC machine</p>
+</div>
+</div>
+<div class="w-6 h-6 rounded-full border-2 border-surface-variant"></div>
+</div>
+</div>
+<!-- Pay Button -->
+<button class="w-full mt-section-sep py-section-item bg-primary text-white font-display text-h3 rounded-2xl transition-all active:scale-95 shadow-lg shadow-primary/20 hover:bg-red-dark" onclick="triggerPayment()">
+                        Pay Rp 77.000
+                    </button>
+<p class="text-center mt-standard font-caption text-caption text-taupe">
+                        By paying, you agree to our Terms of Service
+                    </p>
+</div>
+<!-- Assistance / Info -->
+<div class="flex items-center justify-center gap-standard opacity-60">
+<span class="material-symbols-outlined text-taupe">help</span>
+<span class="font-tag text-tag text-taupe">Need help? Ask our Barista</span>
+</div>
+</div>
+</section>
+</main>
+<!-- Bottom Navigation Shell (Filter: Suppressed for Transactional screen per Mandate) -->
+<!-- The BottomNavBar is hidden here because the user is in a focused checkout journey -->
+<script>
+        function selectPayment(method) {
+            const qris = document.getElementById('method-qris');
+            const edc = document.getElementById('method-edc');
+            
+            if (method === 'qris') {
+                qris.classList.replace('border-1.5', 'border-2');
+                qris.classList.add('border-primary', 'shadow-md');
+                qris.querySelector('div:last-child div')?.classList.remove('hidden');
+                qris.querySelector('div:last-child').classList.add('border-primary');
+                
+                edc.classList.replace('border-2', 'border-1.5');
+                edc.classList.remove('border-primary', 'shadow-md');
+                edc.querySelector('div:last-child').classList.replace('border-primary', 'border-surface-variant');
+                if(!edc.querySelector('div:last-child div')) {
+                    const dot = document.createElement('div');
+                    dot.className = 'w-3 h-3 bg-primary rounded-full hidden';
+                    edc.querySelector('div:last-child').appendChild(dot);
+                } else {
+                    edc.querySelector('div:last-child div').classList.add('hidden');
+                }
+            } else {
+                edc.classList.replace('border-1.5', 'border-2');
+                edc.classList.add('border-primary', 'shadow-md');
+                edc.querySelector('div:last-child div')?.classList.remove('hidden');
+                edc.querySelector('div:last-child').classList.add('border-primary');
+
+                qris.classList.replace('border-2', 'border-1.5');
+                qris.classList.remove('border-primary', 'shadow-md');
+                qris.querySelector('div:last-child').classList.replace('border-primary', 'border-surface-variant');
+                qris.querySelector('div:last-child div')?.classList.add('hidden');
+            }
+        }
+
+        function triggerPayment() {
+            const btn = event.currentTarget;
+            btn.innerHTML = '<span class="inline-block animate-spin material-symbols-outlined mr-2">progress_activity</span> Processing...';
+            btn.classList.add('opacity-80', 'cursor-not-allowed');
+            setTimeout(() => {
+                alert('Payment Successful! Your queue number is #142');
+                window.location.reload();
+            }, 2000);
+        }
+    </script>
+</body></html>

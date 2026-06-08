@@ -237,7 +237,7 @@ export default function CartPage() {
               + Add More
             </button>
             <button
-              onClick={() => router.push('/checkout')}
+              onClick={() => router.push('/checkout-new')}
               disabled={!isNameValid}
               className={`btn-primary flex-2 ${!isNameValid ? 'opacity-50 cursor-not-allowed grayscale' : ''}`}
             >

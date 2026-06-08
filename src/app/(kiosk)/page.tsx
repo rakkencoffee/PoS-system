@@ -15,7 +15,7 @@ export default function WelcomePage() {
   return (
     <div
       className="min-h-screen flex flex-col items-center justify-center p-8 cursor-pointer select-none"
-      onClick={() => router.push('/menu')}
+      onClick={() => router.push('/menu-new')}
     >
       {/* Main content - Only CTA Button visible for now */}
       <div className="text-center max-w-xl">
