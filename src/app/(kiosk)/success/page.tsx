@@ -5,6 +5,31 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Receipt } from '@/components/pos/Receipt';
 import { type PrintReceiptData } from '@/lib/print-bridge';
 
+function buildReceiptData(
+  orderNo: string,
+  orderId: string | null,
+  queue: string,
+  orderData: any,
+  edcData: { approvalCode: string; cardNo: string } | null,
+): PrintReceiptData {
+  const displayOrderNo = (orderNo || orderData?.orderNo) || orderId || '';
+  return {
+    orderId: displayOrderNo,
+    dbOrderId: orderId || undefined,
+    queueNumber: queue,
+    customerName: orderData?.customerName || '',
+    items: orderData?.items || [],
+    total: orderData?.totalAmount || 0,
+    discount: orderData?.discount || 0,
+    paymentMethod: edcData ? 'Debit/Credit' : (orderData?.paymentMethod || 'E-Wallet'),
+    edcData: edcData ? {
+      approvalCode: edcData.approvalCode || '',
+      cardNo: edcData.cardNo || '',
+      refNo: orderId || '',
+    } : undefined,
+  };
+}
+
 function SuccessContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -34,25 +59,22 @@ function SuccessContent() {
 
   // Auto-verify payment & Fetch order detail for receipt
   useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
     if (orderId && !isOffline) {
-      console.log(`[Success] Starting order sync/fetch for ${orderId}...`);
-      
       let retryCount = 0;
-      const maxRetries = 8; // Increased retries
-      
+      const maxRetries = 8;
+
       const fetchOrder = async () => {
         try {
-          const res = await fetch(`/api/orders/${orderId}?refresh=true`); // Added refresh hint
+          const res = await fetch(`/api/orders/${orderId}?refresh=true`);
           const data = await res.json();
-          
+
           if (data.id && data.items && data.items.length > 0) {
-            console.log('[Success] Order data found with items:', data.id, 'orderNo:', data.orderNo);
             setOrderData(data);
           } else if (retryCount < maxRetries) {
             retryCount++;
-            const delay = retryCount * 1000; // Exponential-ish backoff
-            console.log(`[Success] Order items not ready yet, retrying in ${delay}ms... (${retryCount}/${maxRetries})`);
-            setTimeout(fetchOrder, delay);
+            timeoutId = setTimeout(fetchOrder, retryCount * 1000);
           } else {
             console.warn('[Success] Order data still incomplete after retries.');
             if (data.id) setOrderData(data);
@@ -62,7 +84,6 @@ function SuccessContent() {
         }
       };
 
-      // Initial fetch
       fetchOrder();
 
       // Settlement logic
@@ -83,6 +104,8 @@ function SuccessContent() {
         cardNo: searchParams.get('card'),
       });
     }
+
+    return () => clearTimeout(timeoutId);
   }, [orderId, isOffline, searchParams, transactionStatus]);
 
   /**
@@ -145,7 +168,6 @@ function SuccessContent() {
   // Auto-print logic — uses Cloud Print Queue
   useEffect(() => {
     if (orderData && orderData.items?.length > 0 && !hasPrinted.current) {
-      console.log('[Success] Order items detected, initiating cloud print...');
       
       const triggerPrint = async () => {
         if (hasPrinted.current) return;
@@ -153,23 +175,7 @@ function SuccessContent() {
         setPrintStatus('printing');
 
         try {
-          const displayOrderNo = (orderNo || orderData?.orderNo) || orderId || '';
-          const receiptData: PrintReceiptData = {
-            orderId: displayOrderNo,
-            dbOrderId: orderId || undefined,
-            queueNumber: queue,
-            customerName: orderData.customerName || '',
-            items: orderData.items || [],
-            total: orderData.totalAmount || 0,
-            discount: orderData.discount || 0,
-            paymentMethod: edcData ? 'Debit/Credit' : (orderData.paymentMethod || 'E-Wallet'),
-            edcData: edcData ? {
-              approvalCode: edcData.approvalCode || '',
-              cardNo: edcData.cardNo || '',
-              refNo: orderId || ''
-            } : undefined
-          };
-
+          const receiptData = buildReceiptData(orderNo, orderId, queue, orderData, edcData);
           const result = await submitCloudPrintJob(receiptData);
 
           if (result === 'success') {
@@ -198,23 +204,7 @@ function SuccessContent() {
   const handlePrint = async () => {
     setPrintStatus('printing');
     try {
-      const displayOrderNo = (orderNo || orderData?.orderNo) || orderId || '';
-      const receiptData: PrintReceiptData = {
-        orderId: displayOrderNo,
-        dbOrderId: orderId || undefined,
-        queueNumber: queue,
-        customerName: orderData?.customerName || '',
-        items: orderData?.items || [],
-        total: orderData?.totalAmount || 0,
-        discount: orderData?.discount || 0,
-        paymentMethod: edcData ? 'Debit/Credit' : (orderData?.paymentMethod || 'E-Wallet'),
-        edcData: edcData ? {
-          approvalCode: edcData.approvalCode || '',
-          cardNo: edcData.cardNo || '',
-          refNo: orderId || ''
-        } : undefined
-      };
-
+      const receiptData = buildReceiptData(orderNo, orderId, queue, orderData, edcData);
       const result = await submitCloudPrintJob(receiptData);
       if (result === 'success') {
         setPrintStatus('success');

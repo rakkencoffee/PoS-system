@@ -16,6 +16,13 @@ function calculateTotal(items: CartItem[]): number {
   return items.reduce((sum, item) => sum + item.subtotal, 0);
 }
 
+function deriveCartMeta(items: CartItem[]) {
+  return {
+    totalAmount: calculateTotal(items),
+    itemCount: items.reduce((sum, item) => sum + item.quantity, 0),
+  };
+}
+
 export const useCartStore = create<CartStore>()(
   persist(
     (set, get) => ({
@@ -54,17 +61,13 @@ export const useCartStore = create<CartStore>()(
           newItems = [...items, newItem];
         }
 
-        const totalAmount = calculateTotal(newItems);
-        const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0);
-        set({ items: newItems, totalAmount, itemCount });
+        set({ items: newItems, ...deriveCartMeta(newItems) });
       },
 
       removeItem: (id: string) => {
         const { items } = get();
         const newItems = items.filter((item) => item.id !== id);
-        const totalAmount = calculateTotal(newItems);
-        const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0);
-        set({ items: newItems, totalAmount, itemCount });
+        set({ items: newItems, ...deriveCartMeta(newItems) });
       },
 
       updateItem: (id: string, updatedItem: CartItem) => {
@@ -72,36 +75,26 @@ export const useCartStore = create<CartStore>()(
         const newItems = items.map((item) =>
           item.id === id ? { ...updatedItem, id } : item
         );
-        const totalAmount = calculateTotal(newItems);
-        const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0);
-        set({ items: newItems, totalAmount, itemCount });
+        set({ items: newItems, ...deriveCartMeta(newItems) });
       },
 
       updateQuantity: (id: string, quantity: number) => {
         const { items } = get();
         if (quantity <= 0) {
           const newItems = items.filter((item) => item.id !== id);
-          const totalAmount = calculateTotal(newItems);
-          const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0);
-          set({ items: newItems, totalAmount, itemCount });
+          set({ items: newItems, ...deriveCartMeta(newItems) });
           return;
         }
 
         const newItems = items.map((item) => {
           if (item.id === id) {
             const unitPrice = item.subtotal / item.quantity;
-            return {
-              ...item,
-              quantity,
-              subtotal: unitPrice * quantity,
-            };
+            return { ...item, quantity, subtotal: unitPrice * quantity };
           }
           return item;
         });
 
-        const totalAmount = calculateTotal(newItems);
-        const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0);
-        set({ items: newItems, totalAmount, itemCount });
+        set({ items: newItems, ...deriveCartMeta(newItems) });
       },
 
       setCustomerName: (name: string) => {

@@ -38,6 +38,12 @@
     "zod": "^4.3.6",
     "zustand": "^5.0.12"
   },
+  "browserslist": [
+    "chrome >= 93",
+    "firefox >= 90",
+    "safari >= 15",
+    "edge >= 93"
+  ],
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",

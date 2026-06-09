@@ -6,7 +6,26 @@ import { useCartStore } from '@/stores/useCartStore';
 import { useCreateOrder, useValidateVoucher, usePaymentConfig } from '@/hooks/useOrders';
 import { db, encryptPendingOrder } from '@/lib/dexie';
 import { payWithEDC } from '@/lib/print-bridge';
+import { CartItem } from '@/lib/types';
 import * as Sentry from "@sentry/nextjs";
+
+function buildOrderItems(items: CartItem[]) {
+  return items.map((item) => ({
+    productId: String(item.menuItemId),
+    name: item.name,
+    price: item.subtotal / item.quantity,
+    quantity: item.quantity,
+    variantId: item.olseraVariantId ? String(item.olseraVariantId) : undefined,
+    notes: item.notes,
+    options: {
+      size: item.size,
+      sugarLevel: item.sugarLevel,
+      iceLevel: item.iceLevel,
+      extraShot: item.extraShot,
+      toppings: item.toppings.map(t => t.id),
+    },
+  }));
+}
 
 declare global {
   interface Window {
@@ -85,7 +104,7 @@ export default function CheckoutNewPage() {
     loadSnapScript();
   }, [loadSnapScript]);
 
-  const triggerSnapPopup = (token: string, id: string, queueNumber: number, redirectPath?: string) => {
+  const triggerSnapPopup = (token: string, id: string, queueNumber: number, orderNo?: string, redirectPath?: string) => {
     setPaymentStatus('Opening payment...');
     if (window.snap) {
       window.snap.pay(token, {
@@ -93,7 +112,7 @@ export default function CheckoutNewPage() {
           setPaymentStatus('Payment successful!');
           clearCart();
           const queueNum = queueNumber.toString();
-          const orderNoParam = (window as any).__lastOrderNo ? `&orderNo=${(window as any).__lastOrderNo}` : '';
+          const orderNoParam = orderNo ? `&orderNo=${orderNo}` : '';
           router.push(`/success?orderId=${id}&queue=${queueNum}${orderNoParam}`);
         },
         onPending: () => {
@@ -125,30 +144,15 @@ export default function CheckoutNewPage() {
 
     try {
       const data = await createOrderMutation.mutateAsync({
-        items: items.map((item) => ({
-          productId: String(item.menuItemId),
-          name: item.name,
-          price: item.subtotal / item.quantity,
-          quantity: item.quantity,
-          variantId: item.olseraVariantId ? String(item.olseraVariantId) : undefined,
-          notes: item.notes,
-          options: {
-            size: item.size,
-            sugarLevel: item.sugarLevel,
-            iceLevel: item.iceLevel,
-            extraShot: item.extraShot,
-            toppings: item.toppings.map(t => t.id)
-          }
-        })),
+        items: buildOrderItems(items),
         totalAmount: subtotal,
         discountAmount: appliedDiscount,
         customerName: customerName,
-        voucherCode: appliedDiscount > 0 ? voucherCode : undefined
+        voucherCode: appliedDiscount > 0 ? voucherCode : undefined,
       });
 
       if (data.snapToken) {
-        if (data.orderNo) (window as any).__lastOrderNo = data.orderNo;
-        triggerSnapPopup(data.snapToken, data.orderId, data.queueNumber || 0, data.redirectUrl);
+        triggerSnapPopup(data.snapToken, data.orderId, data.queueNumber || 0, data.orderNo, data.redirectUrl);
       } else {
         throw new Error('No payment token received');
       }
@@ -164,26 +168,12 @@ export default function CheckoutNewPage() {
 
     try {
       const data = await createOrderMutation.mutateAsync({
-        items: items.map((item) => ({
-          productId: String(item.menuItemId),
-          name: item.name,
-          price: item.subtotal / item.quantity,
-          quantity: item.quantity,
-          variantId: item.olseraVariantId ? String(item.olseraVariantId) : undefined,
-          notes: item.notes,
-          options: {
-            size: item.size,
-            sugarLevel: item.sugarLevel,
-            iceLevel: item.iceLevel,
-            extraShot: item.extraShot,
-            toppings: item.toppings.map(t => t.id)
-          }
-        })),
+        items: buildOrderItems(items),
         totalAmount: subtotal,
         discountAmount: appliedDiscount,
         customerName: customerName,
         voucherCode: appliedDiscount > 0 ? voucherCode : undefined,
-        paymentMethod: 'EDC'
+        paymentMethod: 'EDC',
       });
 
       setPaymentStatus('Please tap/swipe card on EDC terminal...');
@@ -214,21 +204,7 @@ export default function CheckoutNewPage() {
       try {
         const orderPayload = {
           orderId: `OFFLINE-${Date.now()}`,
-          items: items.map((item) => ({
-            productId: String(item.menuItemId),
-            name: item.name,
-            price: item.subtotal / item.quantity,
-            quantity: item.quantity,
-            variantId: item.olseraVariantId ? String(item.olseraVariantId) : undefined,
-            notes: item.notes,
-            options: {
-              size: item.size,
-              sugarLevel: item.sugarLevel,
-              iceLevel: item.iceLevel,
-              extraShot: item.extraShot,
-              toppings: item.toppings.map(t => t.id)
-            }
-          })),
+          items: buildOrderItems(items),
           customerName: customerName,
           totalAmount: total,
           createdAt: new Date().toISOString(),

@@ -21,7 +21,7 @@ export interface MenuItem {
   isBestSeller: boolean;
   isRecommended: boolean;
   type: string;
-  toppings: any[];
+  toppings: { id: number; name: string; price: number }[];
   sizes: {
     id?: number;
     size: string;
@@ -39,13 +39,11 @@ export function useCategories() {
         if (!res.ok) throw new Error('Failed to fetch categories');
         const data = await res.json();
         
-        // Sync to Dexie in background
-        db.categories.clear().then(() => {
-          db.categories.bulkPut(data.map((c: any) => ({
-            ...c,
-            order: c.order || 0
-          })));
-        });
+        // Sync to Dexie atomically — clear+bulkPut in one transaction to avoid empty cache on partial failure
+        db.transaction('rw', db.categories, async () => {
+          await db.categories.clear();
+          await db.categories.bulkPut(data.map((c: any) => ({ ...c, order: c.order || 0 })));
+        }).catch(() => {});
         
         return data;
       } catch (error) {
@@ -72,12 +70,11 @@ export function useMenuItems(categorySlug?: string) {
         if (!res.ok) throw new Error('Failed to fetch menu');
         const data = await res.json();
 
-        // Sync to Dexie
-        // We only clear and bulkPut all items if it's the 'all' fetch to avoid partial sync issues
         if (!categorySlug || categorySlug === 'all') {
-          db.menuItems.clear().then(() => {
-            db.menuItems.bulkPut(data);
-          });
+          db.transaction('rw', db.menuItems, async () => {
+            await db.menuItems.clear();
+            await db.menuItems.bulkPut(data);
+          }).catch(() => {});
         }
 
         return data;
