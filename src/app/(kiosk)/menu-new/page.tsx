@@ -337,6 +337,7 @@ export default function MenuNewPage() {
             >
               <span className="material-symbols-outlined text-[#78000f]">arrow_back</span>
             </button>
+            <img src="/rakken-icon.svg" alt="Rakken Coffee" className="h-8 w-8 object-contain" />
             <h1 className="text-[22px] font-extrabold text-[#78000f] tracking-tight" style={JKT}>
               RAKKEN COFFEE
             </h1>
@@ -492,6 +493,7 @@ export default function MenuNewPage() {
             >
               <span className="material-symbols-outlined text-[#78000f]" style={{ fontSize: '20px' }}>arrow_back</span>
             </button>
+            <img src="/rakken-icon.svg" alt="Rakken Coffee" className="h-6 w-6 object-contain" />
             <span className="text-[17px] font-extrabold text-[#78000f] tracking-tight" style={JKT}>
               RAKKEN COFFEE
             </span>

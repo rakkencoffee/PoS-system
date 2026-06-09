@@ -263,7 +263,7 @@ export default function CartNewPage() {
         {/* Header */}
         <nav className="sticky top-0 z-50 flex justify-between items-center px-12 py-3 bg-white shadow-sm border-b border-[#f3e0be]/40">
           <div className="flex items-center gap-3">
-            <span className="material-symbols-outlined text-[#78000f]" style={{ fontVariationSettings: "'FILL' 1" }}>coffee</span>
+            <img src="/rakken-icon.svg" alt="Rakken Coffee" className="h-8 w-8 object-contain" />
             <h1 className="text-[22px] font-extrabold text-[#78000f] tracking-tight" style={JKT}>RAKKEN COFFEE</h1>
           </div>
 
@@ -425,6 +425,7 @@ export default function CartNewPage() {
             >
               <span className="material-symbols-outlined text-[#78000f]">arrow_back</span>
             </button>
+            <img src="/rakken-icon.svg" alt="Rakken Coffee" className="h-6 w-6 object-contain" />
             <h1 className="text-[17px] font-extrabold text-[#78000f] tracking-tight" style={JKT}>RAKKEN COFFEE</h1>
           </div>
           <div className="flex items-center gap-1">

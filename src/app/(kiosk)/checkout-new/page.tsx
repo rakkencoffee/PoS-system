@@ -324,6 +324,7 @@ export default function CheckoutNewPage() {
             >
               <span className="material-symbols-outlined text-primary">arrow_back</span>
             </button>
+            <img src="/rakken-icon.svg" alt="Rakken Coffee" className="h-8 w-8 object-contain" />
             <h1 className="font-display text-h3 font-extrabold text-primary tracking-tight">RAKKEN COFFEE</h1>
           </div>
           <div className="flex items-center gap-section-item">
@@ -597,6 +598,7 @@ export default function CheckoutNewPage() {
             >
               <span className="material-symbols-outlined text-primary">arrow_back</span>
             </button>
+            <img src="/rakken-icon.svg" alt="Rakken Coffee" className="h-6 w-6 object-contain" />
             <h1 className="font-display text-h4 text-primary font-extrabold tracking-tight">RAKKEN COFFEE</h1>
           </div>
           <div className="flex gap-standard">
