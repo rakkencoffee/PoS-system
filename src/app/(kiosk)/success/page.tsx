@@ -13,12 +13,41 @@ function buildReceiptData(
   edcData: { approvalCode: string; cardNo: string } | null,
 ): PrintReceiptData {
   const displayOrderNo = (orderNo || orderData?.orderNo) || orderId || '';
+
+  // Enrich API items with sessionStorage data saved by checkout-new before cart was cleared.
+  // This covers the race condition where the Prisma background mirror hasn't finished yet
+  // when the receipt is built (~2s), causing empty notes.
+  let items = orderData?.items || [];
+  if (typeof window !== 'undefined' && orderId) {
+    try {
+      const cached = sessionStorage.getItem(`print_${orderId}`);
+      if (cached) {
+        const cachedItems: { name: string; quantity: number; price: number; notes: string; size: string }[] = JSON.parse(cached);
+        const remaining = [...cachedItems];
+        items = items.map((item: any) => {
+          const name = (item.menuItem?.name || item.name || '').toLowerCase();
+          const matchIdx = remaining.findIndex(c => c.name.toLowerCase() === name);
+          if (matchIdx !== -1) {
+            const match = remaining.splice(matchIdx, 1)[0];
+            return {
+              ...item,
+              notes: item.notes || match.notes,
+              size: (item.size && item.size !== '-') ? item.size : (match.size !== '-' ? match.size : item.size),
+            };
+          }
+          return item;
+        });
+        sessionStorage.removeItem(`print_${orderId}`);
+      }
+    } catch (_) {}
+  }
+
   return {
     orderId: displayOrderNo,
     dbOrderId: orderId || undefined,
     queueNumber: queue,
     customerName: orderData?.customerName || '',
-    items: orderData?.items || [],
+    items,
     total: orderData?.totalAmount || 0,
     discount: orderData?.discount || 0,
     paymentMethod: edcData ? 'Debit/Credit' : (orderData?.paymentMethod || 'E-Wallet'),
@@ -181,9 +210,7 @@ function SuccessContent() {
           if (result === 'success') {
             setPrintStatus('success');
           } else if (result === 'timeout') {
-            // Daemon mungkin offline, fallback ke browser print
-            console.warn('[Success] Cloud print timed out, falling back to browser print');
-            if (typeof window !== 'undefined') window.print();
+            console.warn('[Success] Cloud print timed out. Daemon may be offline.');
             setPrintStatus('fallback');
           } else {
             setPrintStatus('error');
@@ -209,12 +236,10 @@ function SuccessContent() {
       if (result === 'success') {
         setPrintStatus('success');
       } else {
-        window.print();
         setPrintStatus('fallback');
       }
     } catch {
-      window.print();
-      setPrintStatus('fallback');
+      setPrintStatus('error');
     }
   };
 

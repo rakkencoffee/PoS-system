@@ -27,6 +27,40 @@ function buildOrderItems(items: CartItem[]) {
   }));
 }
 
+const TOPPING_NAMES: Record<string, string> = {
+  '9001': 'Almond Milk', '9002': 'Espresso Shot', '9003': 'Whip Cream',
+  '9004': 'Sea Salt Cream', '9005': 'Cheese Cream',
+  'milk-skim': 'Skim Milk', 'milk-oat': 'Oat Milk',
+  'beans-png-signature': 'PNG Signature',
+  'shot-extra-1': 'Extra 1 Shot', 'shot-extra-2': 'Extra 2 Shots',
+};
+
+function formatItemNotes(item: CartItem): string {
+  const parts: string[] = [];
+  if (item.size && item.size !== '-') parts.push(`Size: ${item.size}`);
+  if (item.sugarLevel && item.sugarLevel !== '-') parts.push(`${item.sugarLevel} Sugar`);
+  if (item.iceLevel && item.iceLevel !== '-') parts.push(`${item.iceLevel} Ice`);
+  if (item.extraShot) parts.push('Extra Shot');
+  for (const t of item.toppings || []) {
+    const name = TOPPING_NAMES[String(t.id)] || String(t.id);
+    if (name) parts.push(name);
+  }
+  return parts.join(', ');
+}
+
+function savePrintData(cartItems: CartItem[], orderId: string) {
+  try {
+    const data = cartItems.map(item => ({
+      name: item.name,
+      quantity: item.quantity,
+      price: item.subtotal / item.quantity,
+      notes: formatItemNotes(item),
+      size: item.size || '-',
+    }));
+    sessionStorage.setItem(`print_${orderId}`, JSON.stringify(data));
+  } catch (_) {}
+}
+
 declare global {
   interface Window {
     snap?: {
@@ -110,6 +144,7 @@ export default function CheckoutNewPage() {
       window.snap.pay(token, {
         onSuccess: async () => {
           setPaymentStatus('Payment successful!');
+          savePrintData(items, id);
           clearCart();
           const queueNum = queueNumber.toString();
           const orderNoParam = orderNo ? `&orderNo=${orderNo}` : '';
@@ -181,6 +216,7 @@ export default function CheckoutNewPage() {
 
       if (edcResult.success) {
         setPaymentStatus('Payment Approved!');
+        savePrintData(items, data.orderId);
         clearCart();
         const queueNum = (data.queueNumber || 0).toString();
         const orderNoParam = data.orderNo ? `&orderNo=${data.orderNo}` : '';

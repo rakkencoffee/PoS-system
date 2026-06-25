@@ -1,0 +1,1275 @@
+{
+  "info": {
+    "name": "Rakken Coffee POS — Full API",
+    "description": "Dokumentasi lengkap seluruh API project Web POS Rakken Coffee.\n\nCara pakai:\n1. Import file ini ke Postman\n2. Set Collection Variable: baseUrl = http://localhost:3000\n3. Set apiKey = nilai NEXT_PUBLIC_PRINT_BRIDGE_API_KEY dari .env\n4. Langsung tekan Send — semua body sudah terisi\n\nBase URL default: http://localhost:3000",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "rakken-pos-api-v2"
+  },
+  "variable": [
+    { "key": "baseUrl",    "value": "http://localhost:3000",       "type": "string" },
+    { "key": "apiKey",     "value": "your-print-bridge-api-key",   "type": "string" },
+    { "key": "orderId",    "value": "OLSERA-1346938419",           "type": "string" },
+    { "key": "orderNo",    "value": "OL26060900000287",            "type": "string" },
+    { "key": "printJobId", "value": "cmq64cejx0001vq88j36e0vzr",  "type": "string" }
+  ],
+  "item": [
+
+    {
+      "name": "1 — Menu & Categories",
+      "item": [
+        {
+          "name": "GET /api/menu — Semua item",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/menu",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "menu"]
+            },
+            "description": "Mengembalikan semua menu item yang tersedia dari Olsera. Response di-cache 60 detik."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "[\n  {\n    \"id\": \"114791366\",\n    \"name\": \"Matchakura Cloud Latte\",\n    \"description\": \"Matcha latte dengan cloud foam yang creamy\",\n    \"price\": 42000,\n    \"image\": \"https://cdn.example.com/matchakura.jpg\",\n    \"isAvailable\": true,\n    \"isBestSeller\": true,\n    \"isRecommended\": false,\n    \"type\": \"drink\",\n    \"categoryId\": \"1\",\n    \"categoryName\": \"Rakken Signature\",\n    \"categorySlug\": \"rakken-signature\",\n    \"category\": { \"name\": \"Rakken Signature\" },\n    \"sizes\": [\n      { \"size\": \"Small\",  \"priceAdjustment\": 0 },\n      { \"size\": \"Medium\", \"priceAdjustment\": 5000 },\n      { \"size\": \"Big\",    \"priceAdjustment\": 10000 }\n    ],\n    \"olseraProductId\": 114791366,\n    \"olseraVariants\": [\n      { \"id\": 63351928, \"name\": \"Small\",  \"price\": 42000 },\n      { \"id\": 63351929, \"name\": \"Medium\", \"price\": 47000 },\n      { \"id\": 63351930, \"name\": \"Big\",    \"price\": 52000 }\n    ]\n  },\n  {\n    \"id\": \"114800750\",\n    \"name\": \"Yuzu Coffee\",\n    \"description\": \"Cold brew dengan perasan yuzu segar\",\n    \"price\": 55000,\n    \"image\": \"https://cdn.example.com/yuzu.jpg\",\n    \"isAvailable\": true,\n    \"isBestSeller\": false,\n    \"isRecommended\": true,\n    \"type\": \"drink\",\n    \"categoryId\": \"1\",\n    \"categoryName\": \"Rakken Signature\",\n    \"categorySlug\": \"rakken-signature\",\n    \"category\": { \"name\": \"Rakken Signature\" },\n    \"sizes\": [\n      { \"size\": \"Small\",  \"priceAdjustment\": 0 },\n      { \"size\": \"Big\",    \"priceAdjustment\": 6000 }\n    ],\n    \"olseraProductId\": 114800750,\n    \"olseraVariants\": [\n      { \"id\": 63357628, \"name\": \"Small\", \"price\": 55000 },\n      { \"id\": 63357629, \"name\": \"Big\",   \"price\": 61000 }\n    ]\n  }\n]"
+            }
+          ]
+        },
+        {
+          "name": "GET /api/menu?category=rakken-signature",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/menu?category=rakken-signature",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "menu"],
+              "query": [
+                { "key": "category", "value": "rakken-signature", "description": "Slug kategori: rakken-signature | rakken-style | non-coffee | refreshment | dessert | bites" }
+              ]
+            },
+            "description": "Filter menu berdasarkan category slug."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/menu?filter=best-seller",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/menu?filter=best-seller",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "menu"],
+              "query": [
+                { "key": "filter", "value": "best-seller" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/menu?search=matcha",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/menu?search=matcha",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "menu"],
+              "query": [
+                { "key": "search", "value": "matcha" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/menu/:id — DEPRECATED (501)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/menu/114791366",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "menu", "114791366"]
+            },
+            "description": "⚠️ DEPRECATED — endpoint ini selalu mengembalikan 501. Data item ada di GET /api/menu (list semua)."
+          },
+          "response": [
+            {
+              "name": "501 Not Implemented",
+              "status": "Not Implemented",
+              "code": 501,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{ \"error\": \"GET /api/menu/[id] is deprecated.\" }"
+            }
+          ]
+        },
+        {
+          "name": "GET /api/categories",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "categories"]
+            },
+            "description": "Mengembalikan semua kategori produk dari Olsera product groups."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "[\n  { \"id\": \"1\", \"name\": \"Rakken Signature\", \"slug\": \"rakken-signature\", \"icon\": \"☕\" },\n  { \"id\": \"2\", \"name\": \"Rakken Style\",     \"slug\": \"rakken-style\",     \"icon\": \"☕\" },\n  { \"id\": \"3\", \"name\": \"Non Coffee\",       \"slug\": \"non-coffee\",       \"icon\": \"🧋\" },\n  { \"id\": \"4\", \"name\": \"Refreshment\",      \"slug\": \"refreshment\",      \"icon\": \"🍹\" },\n  { \"id\": \"5\", \"name\": \"Dessert\",          \"slug\": \"dessert\",          \"icon\": \"🧁\" },\n  { \"id\": \"6\", \"name\": \"Bites\",            \"slug\": \"bites\",            \"icon\": \"🥐\" }\n]"
+            }
+          ]
+        },
+        {
+          "name": "GET /api/toppings — Selalu mengembalikan []",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/toppings",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "toppings"]
+            },
+            "description": "Selalu mengembalikan array kosong — toppings dikelola via Olsera variants/groups, bukan endpoint ini."
+          },
+          "response": [
+            {
+              "name": "200 OK — Selalu []",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "[]"
+            }
+          ]
+        },
+        {
+          "name": "GET /api/products — Cache produk (admin/internal)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products"]
+            },
+            "description": "Endpoint internal untuk mengambil produk dari cache/DB. Dipakai admin dashboard."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "[\n  {\n    \"id\": \"114791366\",\n    \"name\": \"Matchakura Cloud Latte\",\n    \"price\": 42000,\n    \"categorySlug\": \"rakken-signature\",\n    \"isAvailable\": true\n  }\n]"
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "2 — Orders",
+      "item": [
+        {
+          "name": "GET /api/orders — KDS feed hari ini",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders?today=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders"],
+              "query": [
+                { "key": "today",  "value": "true",    "description": "Hanya order hari ini" },
+                { "key": "status", "value": "PENDING", "description": "Filter: PENDING | PREPARING | COMPLETED", "disabled": true }
+              ]
+            },
+            "description": "Dipakai KDS (Kitchen Display System). Menggabungkan data Olsera + Prisma local."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "[\n  {\n    \"id\": \"OLSERA-1346938419\",\n    \"orderNo\": \"OL26060900000287\",\n    \"queueNumber\": 287,\n    \"status\": \"PENDING\",\n    \"baristaStatus\": \"PENDING\",\n    \"kitchenStatus\": \"COMPLETED\",\n    \"totalAmount\": 42000,\n    \"discount\": 0,\n    \"paymentMethod\": \"QRIS\",\n    \"customerName\": \"Jeky1107\",\n    \"createdAt\": \"2026-06-09T04:06:47.000Z\",\n    \"items\": [\n      {\n        \"id\": 0,\n        \"menuItem\": { \"name\": \"Matchakura Cloud Latte\" },\n        \"quantity\": 1,\n        \"price\": 42000,\n        \"size\": \"Small\",\n        \"notes\": \"Size: Small, less Sugar, normal Ice\",\n        \"categorySlug\": \"rakken-signature\",\n        \"discount\": 0\n      }\n    ]\n  }\n]"
+            }
+          ]
+        },
+        {
+          "name": "GET /api/orders?status=COMPLETED&today=true",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders?status=COMPLETED&today=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders"],
+              "query": [
+                { "key": "status", "value": "COMPLETED" },
+                { "key": "today",  "value": "true" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/orders/:id — Detail order",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/{{orderId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "{{orderId}}"]
+            },
+            "description": "Ambil detail order dari Olsera + enrichment notes dari Prisma local mirror."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": \"OLSERA-1346938419\",\n  \"orderNo\": \"OL26060900000287\",\n  \"queueNumber\": 287,\n  \"status\": \"PREPARING\",\n  \"totalAmount\": 42000,\n  \"discount\": 0,\n  \"customerName\": \"Jeky1107\",\n  \"createdAt\": \"2026-06-09T04:06:47.000Z\",\n  \"items\": [\n    {\n      \"id\": 0,\n      \"menuItem\": { \"name\": \"Matchakura Cloud Latte\" },\n      \"quantity\": 1,\n      \"price\": 42000,\n      \"size\": \"Small\",\n      \"notes\": \"Size: Small, less Sugar, normal Ice\",\n      \"categorySlug\": \"rakken-signature\",\n      \"discount\": 0\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "GET /api/orders/:id?refresh=true — Force refresh dari Olsera",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/{{orderId}}?refresh=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "{{orderId}}"],
+              "query": [
+                { "key": "refresh", "value": "true", "description": "Bypass cache, paksa fetch ulang dari Olsera API" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /api/orders/:id — Barista mulai proses (PREPARING)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stationType\": \"barista\",\n  \"status\": \"PREPARING\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/{{orderId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "{{orderId}}"]
+            },
+            "description": "Dipakai KDS barista ketika menekan tombol 'Mulai Buat'. Mengupdate status Olsera ke 'A' (Preparing)."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": \"OLSERA-1346938419\",\n  \"orderNo\": \"OL26060900000287\",\n  \"status\": \"PREPARING\",\n  \"baristaStatus\": \"PREPARING\",\n  \"kitchenStatus\": \"PENDING\",\n  \"totalAmount\": 42000,\n  \"customerName\": \"Jeky1107\",\n  \"createdAt\": \"2026-06-09T04:06:47.000Z\",\n  \"items\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "PATCH /api/orders/:id — Kitchen mulai proses (PREPARING)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stationType\": \"kitchen\",\n  \"status\": \"PREPARING\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/{{orderId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "{{orderId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /api/orders/:id — Barista selesai (COMPLETED)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stationType\": \"barista\",\n  \"status\": \"COMPLETED\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/{{orderId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "{{orderId}}"]
+            },
+            "description": "Barista selesai membuat minuman. Jika kitchen juga COMPLETED, order otomatis selesai dan Olsera diupdate ke 'Z'."
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /api/orders/:id — Selesai semua (COMPLETED, tanpa stationType)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"COMPLETED\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/{{orderId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "{{orderId}}"]
+            },
+            "description": "Langsung mark order sebagai COMPLETED dari semua station sekaligus."
+          },
+          "response": []
+        }
+      ]
+    },
+
+    {
+      "name": "3 — Payment",
+      "item": [
+        {
+          "name": "GET /api/payment/config",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/payment/config",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payment", "config"]
+            },
+            "description": "Mengembalikan Midtrans client key dan URL Snap.js. Dipakai kiosk frontend untuk inisialisasi Snap.js."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"clientKey\": \"SB-Mid-client-xxxxxxxxxxxxxxxxxxxx\",\n  \"isProduction\": false,\n  \"snapUrl\": \"https://app.sandbox.midtrans.com/snap/snap.js\",\n  \"olseraEnabled\": true\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST /api/payment/create — QRIS, 1 item tanpa topping",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"productId\": \"114791366\",\n      \"variantId\": \"63351928\",\n      \"quantity\": 1,\n      \"name\": \"Matchakura Cloud Latte\",\n      \"price\": 42000,\n      \"options\": {\n        \"size\": \"Small\",\n        \"sugarLevel\": \"less\",\n        \"iceLevel\": \"normal\",\n        \"extraShot\": false,\n        \"toppings\": []\n      }\n    }\n  ],\n  \"totalAmount\": 42000,\n  \"customerName\": \"Jeky1107\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/payment/create",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payment", "create"]
+            },
+            "description": "Membuat order di Olsera (background) lalu generate Midtrans Snap token."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"snapToken\": \"abc123-snap-token-from-midtrans\",\n  \"redirectUrl\": \"https://app.sandbox.midtrans.com/snap/v2/vtweb/abc123\",\n  \"orderId\": \"OLSERA-1346938419\",\n  \"orderNo\": \"OL26060900000287\",\n  \"queueNumber\": 287\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST /api/payment/create — QRIS, 2 item + topping",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"productId\": \"114800750\",\n      \"variantId\": \"63357629\",\n      \"quantity\": 1,\n      \"name\": \"Yuzu Coffee\",\n      \"price\": 61000,\n      \"options\": {\n        \"size\": \"Big\",\n        \"sugarLevel\": \"more\",\n        \"iceLevel\": \"more\",\n        \"extraShot\": false,\n        \"toppings\": [\"beans-png-signature\", \"shot-extra-1\"]\n      }\n    },\n    {\n      \"productId\": \"114791366\",\n      \"variantId\": \"63351928\",\n      \"quantity\": 1,\n      \"name\": \"Matchakura Cloud Latte\",\n      \"price\": 42000,\n      \"options\": {\n        \"size\": \"Small\",\n        \"sugarLevel\": \"normal\",\n        \"iceLevel\": \"normal\",\n        \"extraShot\": false,\n        \"toppings\": []\n      }\n    }\n  ],\n  \"totalAmount\": 103000,\n  \"customerName\": \"Budi\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/payment/create",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payment", "create"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/payment/create — QRIS + voucher diskon",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"productId\": \"114791366\",\n      \"variantId\": \"63351928\",\n      \"quantity\": 2,\n      \"name\": \"Matchakura Cloud Latte\",\n      \"price\": 42000,\n      \"options\": {\n        \"size\": \"Small\",\n        \"sugarLevel\": \"normal\",\n        \"iceLevel\": \"normal\",\n        \"extraShot\": false,\n        \"toppings\": []\n      }\n    }\n  ],\n  \"totalAmount\": 74000,\n  \"customerName\": \"Siti\",\n  \"discountAmount\": 10000,\n  \"voucherCode\": \"RAKKEN10\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/payment/create",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payment", "create"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/payment/create — EDC (kartu debit/kredit)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"productId\": \"114791366\",\n      \"variantId\": \"63351928\",\n      \"quantity\": 1,\n      \"name\": \"Matchakura Cloud Latte\",\n      \"price\": 42000,\n      \"options\": {\n        \"size\": \"Small\",\n        \"sugarLevel\": \"less\",\n        \"iceLevel\": \"normal\",\n        \"extraShot\": false,\n        \"toppings\": []\n      }\n    }\n  ],\n  \"totalAmount\": 42000,\n  \"customerName\": \"Andi\",\n  \"paymentMethod\": \"EDC\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/payment/create",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payment", "create"]
+            },
+            "description": "Sama seperti QRIS tapi dengan paymentMethod: EDC. Setelah ini frontend memanggil payWithEDC() ke print-bridge daemon."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"snapToken\": null,\n  \"redirectUrl\": null,\n  \"orderId\": \"OLSERA-1346938420\",\n  \"orderNo\": \"OL26060900000288\",\n  \"queueNumber\": 288\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST /api/payment/validate-voucher",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"RAKKEN10\",\n  \"totalAmount\": 84000,\n  \"items\": [\n    {\n      \"id\": \"114791366\",\n      \"productId\": \"114791366\",\n      \"name\": \"Matchakura Cloud Latte\",\n      \"price\": 42000,\n      \"quantity\": 2,\n      \"category\": \"rakken-signature\"\n    }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/payment/validate-voucher",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payment", "validate-voucher"]
+            },
+            "description": "Validasi kode voucher ke Olsera dan hitung diskon per item."
+          },
+          "response": [
+            {
+              "name": "200 OK — Voucher valid",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"valid\": true,\n  \"message\": \"Voucher applied\",\n  \"discountAmount\": 10000,\n  \"itemDiscounts\": {\n    \"114791366\": 10000\n  },\n  \"code\": \"RAKKEN10\"\n}"
+            },
+            {
+              "name": "400 Bad Request — Voucher tidak valid / expired",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{ \"error\": \"Voucher expired or not found\" }"
+            }
+          ]
+        },
+        {
+          "name": "POST /api/payment/verify — Cek status transaksi ke Midtrans",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/payment/verify?orderId={{orderId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payment", "verify"],
+              "query": [
+                { "key": "orderId", "value": "{{orderId}}", "description": "Format: OLSERA-xxxxxxxxxx" }
+              ]
+            },
+            "description": "Fallback untuk dev environment — langsung tanya ke Midtrans apakah payment sudah settle."
+          },
+          "response": [
+            {
+              "name": "200 OK — Settlement",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": \"success\",\n  \"midtrans_status\": \"settlement\",\n  \"orderId\": \"OLSERA-1346938419\"\n}"
+            },
+            {
+              "name": "200 OK — Masih pending",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": \"pending\",\n  \"midtrans_status\": \"pending\",\n  \"orderId\": \"OLSERA-1346938419\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST /api/payment/webhook — Midtrans settlement (simulate)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": \"OLSERA-1346938419\",\n  \"transaction_status\": \"settlement\",\n  \"status_code\": \"200\",\n  \"gross_amount\": \"42000.00\",\n  \"signature_key\": \"<sha512(order_id+status_code+gross_amount+server_key)>\",\n  \"payment_type\": \"qris\",\n  \"fraud_status\": \"accept\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/payment/webhook",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payment", "webhook"]
+            },
+            "description": "⚠️ Signature wajib valid — signature_key = SHA512(order_id + status_code + gross_amount + MIDTRANS_SERVER_KEY). Di production ini dipanggil Midtrans secara otomatis."
+          },
+          "response": [
+            {
+              "name": "200 OK — Settlement berhasil",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{ \"status\": \"ok\" }"
+            },
+            {
+              "name": "403 Forbidden — Signature tidak cocok",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{ \"error\": \"Invalid signature\" }"
+            }
+          ]
+        },
+        {
+          "name": "POST /api/payment/webhook — Midtrans expire (simulate)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": \"OLSERA-1346938419\",\n  \"transaction_status\": \"expire\",\n  \"status_code\": \"407\",\n  \"gross_amount\": \"42000.00\",\n  \"signature_key\": \"<sha512(order_id+status_code+gross_amount+server_key)>\",\n  \"payment_type\": \"qris\",\n  \"fraud_status\": \"accept\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/payment/webhook",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payment", "webhook"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+
+    {
+      "name": "4 — Print Jobs",
+      "item": [
+        {
+          "name": "POST /api/print-jobs — Buat print job baru",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"OL26060900000287\",\n  \"dbOrderId\": \"OLSERA-1346938419\",\n  \"queueNumber\": \"287\",\n  \"customerName\": \"Jeky1107\",\n  \"items\": [\n    {\n      \"id\": 0,\n      \"menuItem\": { \"name\": \"Matchakura Cloud Latte\" },\n      \"quantity\": 1,\n      \"price\": 42000,\n      \"notes\": \"Size: Small, less Sugar, normal Ice\",\n      \"size\": \"Small\",\n      \"categorySlug\": \"rakken-signature\"\n    }\n  ],\n  \"total\": 42000,\n  \"discount\": 0,\n  \"paymentMethod\": \"E-Wallet\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/print-jobs",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "print-jobs"]
+            },
+            "description": "Dipanggil kiosk success page setelah pembayaran berhasil. Menyimpan job ke DB untuk diambil daemon."
+          },
+          "response": [
+            {
+              "name": "201 Created — Job baru dibuat",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"jobId\": \"cmq64cejx0001vq88j36e0vzr\",\n  \"status\": \"PENDING\"\n}"
+            },
+            {
+              "name": "200 OK — Job sudah ada (duplicate, tidak dibuat ulang)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"jobId\": \"cmq64cejx0001vq88j36e0vzr\",\n  \"status\": \"PENDING\",\n  \"message\": \"Print job already exists for this order\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST /api/print-jobs — Dengan EDC data",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"OL26060900000288\",\n  \"dbOrderId\": \"OLSERA-1346938420\",\n  \"queueNumber\": \"288\",\n  \"customerName\": \"Andi\",\n  \"items\": [\n    {\n      \"id\": 0,\n      \"menuItem\": { \"name\": \"Yuzu Coffee\" },\n      \"quantity\": 1,\n      \"price\": 61000,\n      \"notes\": \"Size: Big, more Sugar, more Ice, PNG Signature, Extra 1 Shot\",\n      \"size\": \"Big\",\n      \"categorySlug\": \"rakken-signature\"\n    }\n  ],\n  \"total\": 61000,\n  \"discount\": 0,\n  \"paymentMethod\": \"Debit/Credit\",\n  \"edcData\": {\n    \"approvalCode\": \"123456\",\n    \"cardNo\": \"************1234\",\n    \"refNo\": \"OLSERA-1346938420\"\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/print-jobs",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "print-jobs"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/print-jobs — Ambil pending jobs (Print Bridge daemon)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "x-api-key", "value": "{{apiKey}}", "description": "Wajib — nilai dari NEXT_PUBLIC_PRINT_BRIDGE_API_KEY" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/print-jobs?status=PENDING&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "print-jobs"],
+              "query": [
+                { "key": "status", "value": "PENDING", "description": "PENDING | PRINTING | PRINTED | FAILED" },
+                { "key": "limit",  "value": "10" }
+              ]
+            },
+            "description": "Dipanggil Print Bridge daemon setiap beberapa detik (polling). Butuh x-api-key header."
+          },
+          "response": [
+            {
+              "name": "200 OK — Ada jobs pending",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"jobs\": [\n    {\n      \"id\": \"cmq64cejx0001vq88j36e0vzr\",\n      \"orderId\": \"OLSERA-1346938419\",\n      \"payload\": {\n        \"orderId\": \"OL26060900000287\",\n        \"dbOrderId\": \"OLSERA-1346938419\",\n        \"queueNumber\": \"287\",\n        \"customerName\": \"Jeky1107\",\n        \"items\": [\n          {\n            \"id\": 0,\n            \"menuItem\": { \"name\": \"Matchakura Cloud Latte\" },\n            \"quantity\": 1,\n            \"price\": 42000,\n            \"notes\": \"Size: Small, less Sugar, normal Ice\",\n            \"size\": \"Small\",\n            \"categorySlug\": \"rakken-signature\"\n          }\n        ],\n        \"total\": 42000,\n        \"discount\": 0,\n        \"paymentMethod\": \"E-Wallet\"\n      },\n      \"status\": \"PENDING\",\n      \"attempts\": 0,\n      \"errorMessage\": null,\n      \"createdAt\": \"2026-06-09T11:07:00.000Z\",\n      \"updatedAt\": \"2026-06-09T11:07:00.000Z\"\n    }\n  ]\n}"
+            },
+            {
+              "name": "401 Unauthorized — x-api-key salah atau tidak ada",
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{ \"error\": \"Unauthorized\" }"
+            }
+          ]
+        },
+        {
+          "name": "GET /api/print-jobs/status — Poll status by orderId",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/print-jobs/status?orderId={{orderNo}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "print-jobs", "status"],
+              "query": [
+                { "key": "orderId", "value": "{{orderNo}}", "description": "Bisa pakai orderNo (OL26060900000287) atau orderId (OLSERA-1346938419)" }
+              ]
+            },
+            "description": "Dipanggil kiosk success page untuk polling apakah struk sudah dicetak daemon."
+          },
+          "response": [
+            {
+              "name": "200 OK — Job masih pending",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"jobId\": \"cmq64cejx0001vq88j36e0vzr\",\n  \"status\": \"PENDING\",\n  \"attempts\": 0,\n  \"errorMessage\": null,\n  \"createdAt\": \"2026-06-09T11:07:00.000Z\",\n  \"updatedAt\": \"2026-06-09T11:07:00.000Z\"\n}"
+            },
+            {
+              "name": "200 OK — Sudah dicetak (PRINTED)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"jobId\": \"cmq64cejx0001vq88j36e0vzr\",\n  \"status\": \"PRINTED\",\n  \"attempts\": 1,\n  \"errorMessage\": null,\n  \"createdAt\": \"2026-06-09T11:07:00.000Z\",\n  \"updatedAt\": \"2026-06-09T11:07:05.000Z\"\n}"
+            },
+            {
+              "name": "200 OK — Gagal cetak (FAILED)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"jobId\": \"cmq64cejx0001vq88j36e0vzr\",\n  \"status\": \"FAILED\",\n  \"attempts\": 3,\n  \"errorMessage\": \"Printer offline or paper out\",\n  \"createdAt\": \"2026-06-09T11:07:00.000Z\",\n  \"updatedAt\": \"2026-06-09T11:07:15.000Z\"\n}"
+            },
+            {
+              "name": "200 OK — Job tidak ditemukan",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{ \"status\": \"NOT_FOUND\" }"
+            }
+          ]
+        },
+        {
+          "name": "PATCH /api/print-jobs/:id — Mark PRINTED (daemon callback)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-api-key",     "value": "{{apiKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"PRINTED\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/print-jobs/{{printJobId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "print-jobs", "{{printJobId}}"]
+            },
+            "description": "Dipanggil Print Bridge daemon setelah berhasil mencetak struk."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": \"cmq64cejx0001vq88j36e0vzr\",\n  \"status\": \"PRINTED\",\n  \"attempts\": 1\n}"
+            }
+          ]
+        },
+        {
+          "name": "PATCH /api/print-jobs/:id — Mark PRINTING (daemon sedang proses)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-api-key",     "value": "{{apiKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"PRINTING\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/print-jobs/{{printJobId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "print-jobs", "{{printJobId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /api/print-jobs/:id — Mark FAILED (printer error)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-api-key",     "value": "{{apiKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"FAILED\",\n  \"errorMessage\": \"Printer offline or paper out\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/print-jobs/{{printJobId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "print-jobs", "{{printJobId}}"]
+            },
+            "description": "Dipanggil daemon ketika gagal mencetak. Field attempts akan di-increment otomatis."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": \"cmq64cejx0001vq88j36e0vzr\",\n  \"status\": \"FAILED\",\n  \"attempts\": 1\n}"
+            },
+            {
+              "name": "404 Not Found — Job ID tidak ada",
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{ \"error\": \"Print job not found\" }"
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "5 — Admin",
+      "item": [
+        {
+          "name": "GET /api/admin/menu — Semua item termasuk unavailable",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/menu",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "menu"]
+            },
+            "description": "Sama seperti GET /api/menu tapi mengembalikan SEMUA item termasuk yang isAvailable=false."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "[\n  {\n    \"id\": \"114791366\",\n    \"name\": \"Matchakura Cloud Latte\",\n    \"price\": 42000,\n    \"categorySlug\": \"rakken-signature\",\n    \"isAvailable\": true\n  },\n  {\n    \"id\": \"114791399\",\n    \"name\": \"Seasonal Special (unavailable)\",\n    \"price\": 55000,\n    \"categorySlug\": \"rakken-signature\",\n    \"isAvailable\": false\n  }\n]"
+            }
+          ]
+        },
+        {
+          "name": "GET /api/admin/reports/sales?period=today",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/reports/sales?period=today",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "reports", "sales"],
+              "query": [
+                { "key": "period", "value": "today", "description": "today | yesterday" }
+              ]
+            },
+            "description": "⚠️ Butuh session ADMIN aktif (NextAuth cookie). Mengembalikan total penjualan, top produk, dan sales per jam."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"totalRevenue\": 1260000,\n  \"totalOrders\": 30,\n  \"topProducts\": [\n    { \"name\": \"Matchakura Cloud Latte\", \"quantity\": 12, \"revenue\": 504000 },\n    { \"name\": \"Yuzu Coffee\",            \"quantity\": 8,  \"revenue\": 488000 },\n    { \"name\": \"Americano\",             \"quantity\": 6,  \"revenue\": 174000 }\n  ],\n  \"hourlySales\": [\n    { \"hour\": 9,  \"total\": 120000, \"count\": 3 },\n    { \"hour\": 10, \"total\": 210000, \"count\": 5 },\n    { \"hour\": 11, \"total\": 340000, \"count\": 8 },\n    { \"hour\": 12, \"total\": 590000, \"count\": 14 }\n  ],\n  \"lastUpdated\": \"2026-06-09T12:00:00.000Z\"\n}"
+            },
+            {
+              "name": "401 Unauthorized — Bukan ADMIN / belum login",
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{ \"error\": \"Unauthorized\" }"
+            }
+          ]
+        },
+        {
+          "name": "GET /api/admin/reports/sales?period=yesterday",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/reports/sales?period=yesterday",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "reports", "sales"],
+              "query": [
+                { "key": "period", "value": "yesterday" }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+
+    {
+      "name": "6 — Auth (NextAuth)",
+      "item": [
+        {
+          "name": "GET /api/auth/csrf — Ambil CSRF token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/csrf",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "csrf"]
+            },
+            "description": "Langkah 1 sebelum login — ambil csrfToken lalu pakai di body POST /api/auth/signin."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{ \"csrfToken\": \"abc123def456ghi789\" }"
+            }
+          ]
+        },
+        {
+          "name": "POST /api/auth/signin — Login credentials",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@rakkencoffee.com\",\n  \"password\": \"your-password-here\",\n  \"csrfToken\": \"<token-dari-GET-/api/auth/csrf>\",\n  \"callbackUrl\": \"/dashboard\",\n  \"json\": true\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/signin/credentials",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "signin", "credentials"]
+            },
+            "description": "⚠️ NextAuth lebih mudah ditest via browser. Di Postman harus manage cookies manual."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/auth/session — Cek sesi aktif",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/session",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "session"]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK — Sudah login",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"user\": {\n    \"name\": \"Admin Rakken\",\n    \"email\": \"admin@rakkencoffee.com\",\n    \"role\": \"ADMIN\"\n  },\n  \"expires\": \"2026-07-09T00:00:00.000Z\"\n}"
+            },
+            {
+              "name": "200 OK — Belum login / tidak ada sesi",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{}"
+            }
+          ]
+        },
+        {
+          "name": "POST /api/auth/signout — Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"csrfToken\": \"<token-dari-GET-/api/auth/csrf>\",\n  \"callbackUrl\": \"/\",\n  \"json\": true\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/signout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "signout"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+
+    {
+      "name": "7 — Webhooks",
+      "item": [
+        {
+          "name": "POST /api/webhooks/olsera — Order status → PREPARING (A)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type",       "value": "application/json" },
+              { "key": "x-olsera-event",     "value": "openOrderUpdateStatus" },
+              { "key": "x-olsera-signature", "value": "<hmac-sha256(body, OLSERA_WEBHOOK_SECRET)>" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"openorder_id\": 1346938419,\n  \"order_id\": 1346938419,\n  \"status\": \"A\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/webhooks/olsera",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "webhooks", "olsera"]
+            },
+            "description": "Olsera mengirim webhook ini ketika status order berubah di backoffice.\n\nStatus map: P=PENDING, A=PREPARING, Z=COMPLETED, C/X=CANCELLED.\n\n⚠️ Signature wajib valid kecuali OLSERA_WEBHOOK_SECRET tidak di-set di .env (bypass otomatis)."
+          },
+          "response": [
+            {
+              "name": "200 OK — Event diproses",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Event processed\",\n  \"receivedAt\": \"2026-06-09T11:07:00.000Z\"\n}"
+            },
+            {
+              "name": "401 Unauthorized — Signature tidak valid",
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{ \"error\": \"Unauthorized: Invalid signature\" }"
+            }
+          ]
+        },
+        {
+          "name": "POST /api/webhooks/olsera — Order status → COMPLETED (Z)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type",       "value": "application/json" },
+              { "key": "x-olsera-event",     "value": "openOrderUpdateStatus" },
+              { "key": "x-olsera-signature", "value": "<hmac-sha256(body, OLSERA_WEBHOOK_SECRET)>" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"openorder_id\": 1346938419,\n  \"order_id\": 1346938419,\n  \"status\": \"Z\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/webhooks/olsera",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "webhooks", "olsera"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/webhooks/olsera — Product update (menu refresh)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type",       "value": "application/json" },
+              { "key": "x-olsera-event",     "value": "product_updated" },
+              { "key": "x-olsera-signature", "value": "<hmac-sha256(body, OLSERA_WEBHOOK_SECRET)>" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"product_updated\",\n  \"product_id\": 114791366,\n  \"name\": \"Matchakura Cloud Latte\",\n  \"price\": 45000,\n  \"is_available\": true\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/webhooks/olsera",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "webhooks", "olsera"]
+            },
+            "description": "Dikirim Olsera ketika produk diupdate di backoffice. Trigger invalidasi menu cache."
+          },
+          "response": []
+        }
+      ]
+    },
+
+    {
+      "name": "8 — Jobs (QStash / Cron)",
+      "item": [
+        {
+          "name": "POST /api/jobs/sync-products — Sync produk dari Olsera",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type",      "value": "application/json" },
+              { "key": "upstash-signature", "value": "<qstash-signature-header>", "description": "Diisi otomatis oleh QStash. Kosongkan untuk test manual di dev." }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs/sync-products",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "jobs", "sync-products"]
+            },
+            "description": "Dijadwalkan QStash setiap 5 menit. Menarik produk terbaru dari Olsera dan update cache local. Di dev environment, signature verification mungkin di-bypass."
+          },
+          "response": [
+            {
+              "name": "200 OK — Sync berhasil",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Sync completed: 46 products processed\"\n}"
+            },
+            {
+              "name": "500 Internal Server Error — Sync gagal",
+              "status": "Internal Server Error",
+              "code": 500,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": false,\n  \"error\": \"Failed to fetch products from Olsera\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "9 — Testing & Debug",
+      "item": [
+        {
+          "name": "POST /api/test-settle — Force settle order (TEST_MODE only)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{orderId}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/test-settle",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "test-settle"]
+            },
+            "description": "⚠️ Hanya aktif ketika NEXT_PUBLIC_TEST_MODE=true di .env. Memaksa Olsera order ke status PAID tanpa melalui Midtrans webhook. Dipakai E2E testing dan demo."
+          },
+          "response": [
+            {
+              "name": "200 OK — Order berhasil di-settle",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Test-mode auto settlement for OLSERA-1346938419 executed successfully\"\n}"
+            },
+            {
+              "name": "403 Forbidden — Bukan TEST_MODE",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{ \"error\": \"Forbidden: Endpoint is only available in Test Mode.\" }"
+            }
+          ]
+        },
+        {
+          "name": "GET /api/test-olsera — Test notes handling Olsera",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/test-olsera",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "test-olsera"]
+            },
+            "description": "Membuat test order di Olsera dengan notes array dan mengecek apakah notes tersimpan dengan benar. Berguna untuk debugging Olsera API notes behavior."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{ \"targetNote\": \"Sugar: ARRAY;\" }"
+            }
+          ]
+        },
+        {
+          "name": "GET /api/test-sentry — Trigger error ke Sentry (intentional)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/test-sentry",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "test-sentry"]
+            },
+            "description": "Sengaja throw error untuk verifikasi Sentry error tracking berfungsi."
+          },
+          "response": [
+            {
+              "name": "500 Internal Server Error — Intentional",
+              "status": "Internal Server Error",
+              "code": 500,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{ \"error\": \"Test Sentry error\" }"
+            }
+          ]
+        }
+      ]
+    }
+
+  ]
+}

@@ -204,13 +204,6 @@ function CategoryPills({ categories, selected, onSelect, compact = false }: Cate
 
   return (
     <div className={`flex gap-3 overflow-x-auto hide-scrollbar ${compact ? 'px-4 py-2' : 'px-12 pb-1'}`}>
-      <button
-        onClick={() => onSelect('')}
-        className={`whitespace-nowrap ${base} rounded-full font-[500] transition-all active:scale-95 ${!selected ? active : inactive}`}
-        style={JKT}
-      >
-        {compact ? 'Semua' : 'All Menu'}
-      </button>
       {categories.map((cat) => (
         <button
           key={cat.slug}
@@ -371,17 +364,18 @@ export default function MenuNewPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => router.push('/cart-new')}
-              className="relative p-2 hover:bg-[#F5F5F5] rounded-full transition-colors active:scale-95"
+              className="relative flex items-center gap-2 px-4 py-2 rounded-xl border border-[#e5e5e5] bg-white hover:bg-[#F5F5F5] transition-colors active:scale-95 text-[#323131] font-[500] text-[14px]"
+              style={JKT}
             >
-              <span className="material-symbols-outlined text-[#78000f]">shopping_bag</span>
+              <svg className="w-5 h-5" style={{ color: '#78000f' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
+              </svg>
+              Cart
               {itemCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 bg-[#78000f] text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full" style={JKT}>
+                <span className="bg-[#78000f] text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full" style={JKT}>
                   {itemCount}
                 </span>
               )}
-            </button>
-            <button className="p-2 hover:bg-[#F5F5F5] rounded-full transition-colors">
-              <span className="material-symbols-outlined text-[#78000f]">person</span>
             </button>
           </div>
         </header>
@@ -512,9 +506,6 @@ export default function MenuNewPage() {
                   {itemCount}
                 </span>
               )}
-            </button>
-            <button className="p-1.5 hover:bg-[#F5F5F5] rounded-full transition-colors">
-              <span className="material-symbols-outlined text-[#78000f]" style={{ fontSize: '22px' }}>person</span>
             </button>
           </div>
         </header>

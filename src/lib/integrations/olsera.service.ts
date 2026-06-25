@@ -602,7 +602,7 @@ export async function addItemToOrder(
   });
 
   const resData = await response.json();
-  console.log(`[Olsera API] addItemToOrder response for ${productId}:`, JSON.stringify(resData));
+  console.log(`[Olsera API] addItemToOrder result for ${productId}: status=${resData.status ?? response.status}, order_no=${resData.data?.order_no}, total=${resData.data?.total_amount}`);
 
   if (!response.ok || (resData.status !== 'success' && resData.error)) {
     throw new Error(`Olsera Add Item Error: ${resData.error || response.statusText}`);
@@ -643,7 +643,7 @@ export async function updateOrderItemDetail(
   });
 
   const resData = await response.json();
-  console.log(`[Olsera API] updateOrderItemDetail response:`, JSON.stringify(resData));
+  console.log(`[Olsera API] updateOrderItemDetail result: status=${resData.status ?? response.status}, order_no=${resData.data?.order_no}, total=${resData.data?.total_amount}`);
 
   if (!response.ok || (resData.status !== 'success' && resData.error)) {
     throw new Error(`Olsera Update Detail Error: ${resData.error || response.statusText}`);

@@ -46,3 +46,7 @@ next-env.d.ts
 # IDE and tool settings
 .vscode/
 .claude/
+
+# credentials testing files
+test_env_fetch.mjs
+test_olsera_fetch.mjs
