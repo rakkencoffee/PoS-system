@@ -6,13 +6,38 @@ import { OrderData } from '@/lib/types';
 
 function PublicBoard() {
   const [orders, setOrders] = useState<OrderData[]>([]);
-  
-  useEffect(() => {
+
+  const fetchBoard = useCallback(() => {
     fetch('/api/orders?today=true')
       .then(res => res.json())
       .then(data => setOrders(Array.isArray(data) ? data : []))
       .catch(console.error);
   }, []);
+
+  useEffect(() => {
+    fetchBoard();
+  }, [fetchBoard]);
+
+  // Realtime refresh via Pusher (no polling): refetch on new/updated orders.
+  useEffect(() => {
+    let channel: any = null;
+    (async () => {
+      const { getPusherClient } = await import('@/lib/pusher');
+      const pusher = getPusherClient();
+      channel = pusher.subscribe('kitchen');
+      channel.bind('ORDER_CREATED', fetchBoard);
+      channel.bind('ORDER_UPDATED', fetchBoard);
+      pusher.connection.bind('state_change', (s: { current: string }) => {
+        if (s.current === 'connected') fetchBoard();
+      });
+    })();
+    return () => {
+      if (channel) {
+        channel.unbind_all();
+        channel.unsubscribe();
+      }
+    };
+  }, [fetchBoard]);
 
   const pending = orders.filter(o => o.status === 'PENDING');
   const preparing = orders.filter(o => o.status === 'PREPARING');
@@ -47,7 +72,6 @@ function StatusContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get('orderId');
   const [order, setOrder] = useState<OrderData | null>(null);
-  const [usePolling, setUsePolling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -79,42 +103,41 @@ function StatusContent() {
     fetchOrder();
   }, [fetchOrder]);
 
-  // Listen for SSE updates
+  // Realtime updates via Pusher (replaces the dead SSE endpoint + 5s polling).
+  // Subscribes to the same `kitchen` channel the KDS and the Olsera webhook
+  // broadcast on, then merges updates for THIS order only.
   useEffect(() => {
-    if (usePolling) return; // If SSE failed, skip
-    
-    const eventSource = new EventSource('/api/orders/stream');
+    if (!orderId) return;
+    let channel: any = null;
 
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === 'ORDER_UPDATED' && String(data.order?.id) === orderId) {
-          setOrder(data.order);
+    (async () => {
+      const { getPusherClient } = await import('@/lib/pusher');
+      const pusher = getPusherClient();
+      channel = pusher.subscribe('kitchen');
+
+      channel.bind('ORDER_UPDATED', (data: { order?: any }) => {
+        if (data?.order && String(data.order.id) === orderId) {
+          setOrder((prev) =>
+            prev
+              ? { ...prev, ...data.order, items: data.order.items?.length ? data.order.items : prev.items }
+              : data.order
+          );
         }
-      } catch {
-        // Ignore parse errors
+      });
+
+      // On (re)connect, refetch once to catch updates missed while disconnected.
+      pusher.connection.bind('state_change', (states: { current: string }) => {
+        if (states.current === 'connected') fetchOrder();
+      });
+    })();
+
+    return () => {
+      if (channel) {
+        channel.unbind_all();
+        channel.unsubscribe();
       }
     };
-
-    eventSource.onerror = () => {
-      console.warn('SSE Connection failed. Falling back to polling mode for TestSprite tunnel resilience.');
-      eventSource.close();
-      setUsePolling(true);
-    };
-
-    return () => eventSource.close();
-  }, [orderId, usePolling]);
-  
-  // Polling fallback mechanism
-  useEffect(() => {
-    if (!usePolling) return;
-    
-    const interval = setInterval(() => {
-      fetchOrder();
-    }, 5000);
-    
-    return () => clearInterval(interval);
-  }, [usePolling, fetchOrder]);
+  }, [orderId, fetchOrder]);
 
   const statusConfig: Record<string, { label: string; color: string; icon: string; desc: string }> = {
     PENDING: { label: 'Pending', color: 'from-yellow-500 to-amber-500', icon: '⏳', desc: 'Your order is in the queue' },

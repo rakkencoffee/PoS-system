@@ -67,6 +67,17 @@ export default function AdminDashboard() {
     refetchInterval: 300000, // Auto-refetch every 5 mins as fallback
   });
 
+  // F4: sales figures straight from Olsera (source of truth)
+  const { data: olsera, isFetching: olseraFetching } = useQuery({
+    queryKey: ['admin', 'reports', 'olsera'],
+    queryFn: async () => {
+      const res = await fetch('/api/admin/reports/olsera');
+      if (!res.ok) throw new Error('Failed to fetch Olsera reports');
+      return res.json();
+    },
+    refetchInterval: 300000,
+  });
+
   // Pusher Real-time Listener
   useEffect(() => {
     let channel: any = null;
@@ -79,6 +90,7 @@ export default function AdminDashboard() {
       channel.bind('SALES_UPDATED', () => {
         console.log('[Dashboard] Sales updated, refetching...');
         queryClient.invalidateQueries({ queryKey: ['admin', 'reports', 'sales'] });
+        queryClient.invalidateQueries({ queryKey: ['admin', 'reports', 'olsera'] });
       });
     }
 
@@ -245,6 +257,97 @@ export default function AdminDashboard() {
         </div>
       </div>
       
+      {/* ── Olsera: Source of Truth (F4) ── */}
+      <div className="glass-card p-8 space-y-6">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+              Olsera — Source of Truth
+              <span className="text-[10px] text-emerald-400 uppercase font-bold tracking-widest bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                {olseraFetching ? 'Syncing…' : 'Live'}
+              </span>
+            </h3>
+            <p className="text-white/40 text-xs mt-1">
+              Angka langsung dari pesanan ter-settle di Olsera (closed orders) — pembanding data lokal.
+            </p>
+          </div>
+        </div>
+
+        {/* Olsera stat tiles */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+            <p className="text-xs font-medium text-white/50">REVENUE (OLSERA)</p>
+            <h4 className="text-2xl font-black text-white mt-1">
+              Rp {(olsera?.revenue ?? 0).toLocaleString('id-ID')}
+            </h4>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+            <p className="text-xs font-medium text-white/50">ORDERS (OLSERA)</p>
+            <h4 className="text-2xl font-black text-white mt-1">{olsera?.orders ?? 0}</h4>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+            <p className="text-xs font-medium text-white/50">AVG ORDER (OLSERA)</p>
+            <h4 className="text-2xl font-black text-white mt-1">
+              Rp {(olsera?.avgOrderValue ?? 0).toLocaleString('id-ID')}
+            </h4>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Sales per category */}
+          <div>
+            <h4 className="text-sm font-bold text-white/80 mb-4">Penjualan per Kategori</h4>
+            {olsera?.byGroup?.length ? (
+              <div className="space-y-4">
+                {olsera.byGroup.map((g: any, idx: number) => {
+                  const max = Math.max(...olsera.byGroup.map((x: any) => x.total || 0), 1);
+                  return (
+                    <div key={idx}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-sm text-white/80">{g.name}</span>
+                        <span className="text-xs font-bold text-white/40">
+                          {g.qty} item · Rp {(g.total || 0).toLocaleString('id-ID')}
+                        </span>
+                      </div>
+                      <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                        <div className="h-full bg-emerald-500 rounded-full transition-all duration-1000" style={{ width: `${((g.total || 0) / max) * 100}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-white/20 text-sm py-10 text-center">Data per kategori belum tersedia dari Olsera.</p>
+            )}
+          </div>
+
+          {/* Top SKU */}
+          <div>
+            <h4 className="text-sm font-bold text-white/80 mb-4">Best Sellers (Olsera)</h4>
+            {olsera?.topSku?.length ? (
+              <div className="space-y-4">
+                {olsera.topSku.map((p: any, idx: number) => {
+                  const max = olsera.topSku[0]?.qty || 1;
+                  return (
+                    <div key={idx}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-sm text-white/80">{p.name}</span>
+                        <span className="text-xs font-bold text-white/40">{p.qty} sold</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                        <div className="h-full bg-brand-500 rounded-full transition-all duration-1000" style={{ width: `${((p.qty || 0) / max) * 100}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-white/20 text-sm py-10 text-center">Data SKU belum tersedia dari Olsera.</p>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Footer Info */}
       <div className="flex justify-center pt-8 border-t border-white/5">
         <p className="text-[10px] text-white/10 uppercase tracking-[0.3em]">

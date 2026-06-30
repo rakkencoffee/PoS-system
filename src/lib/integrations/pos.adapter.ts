@@ -334,10 +334,29 @@ export async function createOrder(
   customerName?: string,
   discountAmount: number = 0,
   voucherCode?: string,
+  customerPhone?: string,
 ): Promise<{ orderId: string; olseraOrderId?: number; orderNo?: string; queueNumber?: number }> {
   if (USE_OLSERA) {
+    // CRM (F5): if the customer left a phone number, try to match an existing
+    // Olsera customer so the order is linked to their profile/history.
+    let matchedCustomer: { id: number | string; name: string } | null = null;
+    if (customerPhone && customerPhone.replace(/\D/g, '').length >= 8) {
+      try {
+        matchedCustomer = await olsera.findCustomerByPhone(customerPhone);
+        if (matchedCustomer) {
+          console.log(`[CRM] Matched existing customer #${matchedCustomer.id} (${matchedCustomer.name}) by phone`);
+        }
+      } catch (crmErr) {
+        console.warn('[CRM] Customer lookup failed (non-blocking):', crmErr);
+      }
+    }
+
     // 1. Create open order (Header only) - VERY FAST (<500ms)
-    const order = await olsera.createOrder([], { customer_name: customerName });
+    const order = await olsera.createOrder([], {
+      customer_name: matchedCustomer?.name || customerName,
+      customer_phone: customerPhone,
+      customer_id: matchedCustomer?.id,
+    });
     const orderId = (order.id || order.order_id) as number;
     const orderNo = (order.order_no as string) || '';
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCartStore } from '@/stores/useCartStore';
 import { useMenuItems, MenuItem } from '@/hooks/useMenu';
@@ -222,14 +222,44 @@ export default function CartNewPage() {
     totalAmount,
     setCustomerName,
     customerName,
+    setCustomerPhone,
+    customerPhone,
   } = useCartStore();
 
   const { data: allMenuItems = [] } = useMenuItems('all');
 
   const [editingCartItem, setEditingCartItem] = useState<CartItem | null>(null);
   const [editingMenuItem, setEditingMenuItem] = useState<MenuItem | null>(null);
+  const [returningName, setReturningName] = useState<string | null>(null);
 
   const isNameValid = customerName.trim().length >= 2;
+
+  // CRM (F5): when a (valid) phone is entered, greet returning customers.
+  // Debounced + non-blocking; failures are silently ignored.
+  useEffect(() => {
+    const digits = customerPhone.replace(/\D/g, '');
+    if (digits.length < 8) {
+      setReturningName(null);
+      return;
+    }
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/customers/lookup?phone=${encodeURIComponent(digits)}`);
+        const data = await res.json();
+        if (data?.found && data.name) {
+          setReturningName(data.name);
+          // Pre-fill the name for the customer if they haven't typed one.
+          if (!customerName.trim()) setCustomerName(data.name);
+        } else {
+          setReturningName(null);
+        }
+      } catch {
+        setReturningName(null);
+      }
+    }, 600);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customerPhone]);
 
   const handleEdit = (cartItem: CartItem) => {
     const menuItem = allMenuItems.find(
@@ -363,6 +393,28 @@ export default function CartNewPage() {
                     )}
                   </div>
 
+                  {/* Phone (optional, CRM) */}
+                  <div className="mb-6">
+                    <label className="block text-[13px] font-[500] text-[#998075] mb-1 uppercase tracking-widest" style={JKT}>
+                      No. HP <span className="normal-case tracking-normal text-[#bbab93]">(opsional)</span>
+                    </label>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      className="w-full bg-[#F5F5F5] rounded-lg px-4 py-3 text-[14px] text-[#231a05] outline-none transition-all focus:ring-2 focus:bg-white border border-[#f3e0be] focus:ring-[#78000f]/20 focus:border-[#78000f]"
+                      style={JKT}
+                      placeholder="Untuk kumpulkan poin / member"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value.replace(/[^\d+]/g, ''))}
+                    />
+                    {returningName && (
+                      <p className="text-[12px] text-[#0f7d3b] mt-1.5 flex items-center gap-1" style={JKT}>
+                        <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>waving_hand</span>
+                        Selamat datang kembali, {returningName}!
+                      </p>
+                    )}
+                  </div>
+
                   {/* Price Breakdown */}
                   <div className="space-y-2 border-t border-[#f3e0be] pt-4 mb-6">
                     <div className="flex justify-between items-center">
@@ -459,6 +511,28 @@ export default function CartNewPage() {
                 />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-[#998075]" style={{ fontSize: '20px' }}>edit</span>
               </div>
+            </section>
+
+            {/* Phone (optional, CRM) */}
+            <section>
+              <label className="block text-[12px] font-[500] text-[#998075] mb-2 uppercase tracking-widest" style={JKT}>
+                No. HP <span className="normal-case tracking-normal text-[#bbab93]">(opsional)</span>
+              </label>
+              <input
+                type="tel"
+                inputMode="numeric"
+                className="w-full bg-white border-[1.5px] border-[#f3e0be] rounded-xl px-4 py-3 text-[15px] text-[#231a05] focus:outline-none focus:border-[#78000f] focus:ring-1 focus:ring-[#78000f] transition-all"
+                style={JKT}
+                placeholder="Untuk kumpulkan poin / member"
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value.replace(/[^\d+]/g, ''))}
+              />
+              {returningName && (
+                <p className="text-[12px] text-[#0f7d3b] mt-1.5 flex items-center gap-1" style={JKT}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>waving_hand</span>
+                  Selamat datang kembali, {returningName}!
+                </p>
+              )}
             </section>
 
             {/* Item List */}

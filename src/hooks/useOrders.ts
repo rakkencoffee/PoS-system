@@ -9,7 +9,7 @@ export function useKitchenOrders() {
       const data = await res.json();
       return Array.isArray(data) ? data.filter((o: any) => o.status !== 'COMPLETED') : [];
     },
-    refetchInterval: 10000, // 10 detik polling backup
+    refetchInterval: 30000, // Safety-net only — Pusher (realtime) is the primary update path
     refetchOnWindowFocus: false, // JANGAN refetch otomatis saat browser/window focus
     staleTime: 5000, // Anggap data fresh selama 5 detik
   });

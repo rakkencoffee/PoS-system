@@ -22,6 +22,7 @@ export interface CartState {
   items: CartItem[];
   totalAmount: number;
   customerName: string;
+  customerPhone: string;
 }
 
 export type OrderStatus = 'PENDING' | 'PREPARING' | 'READY' | 'COMPLETED';

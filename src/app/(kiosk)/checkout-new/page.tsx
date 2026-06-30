@@ -94,7 +94,7 @@ function formatCurrency(amount: number): string {
 
 export default function CheckoutNewPage() {
   const router = useRouter();
-  const { items, totalAmount, clearCart, itemCount, customerName, updateQuantity, removeItem } = useCartStore();
+  const { items, totalAmount, clearCart, itemCount, customerName, customerPhone, updateQuantity, removeItem } = useCartStore();
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<string>('');
@@ -183,6 +183,7 @@ export default function CheckoutNewPage() {
         totalAmount: subtotal,
         discountAmount: appliedDiscount,
         customerName: customerName,
+        customerPhone: customerPhone,
         voucherCode: appliedDiscount > 0 ? voucherCode : undefined,
       });
 
@@ -207,6 +208,7 @@ export default function CheckoutNewPage() {
         totalAmount: subtotal,
         discountAmount: appliedDiscount,
         customerName: customerName,
+        customerPhone: customerPhone,
         voucherCode: appliedDiscount > 0 ? voucherCode : undefined,
         paymentMethod: 'EDC',
       });

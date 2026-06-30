@@ -521,26 +521,41 @@ export async function updateOrderStatus(orderId: number, status: 'P' | 'A' | 'S'
  */
 export async function createOrder(
   items: { productId: string; variantId?: string; quantity: number; price?: number; note?: string }[] = [],
-  options: { currencyId?: string | number; customer_name?: string; notes?: string } = {}
+  options: { currencyId?: string | number; customer_name?: string; customer_phone?: string; customer_id?: string | number; notes?: string } = {}
 ): Promise<{ id: number; order_id?: number; [key: string]: unknown }> {
-  const { currencyId = 'IDR', customer_name, notes } = options;
+  const { currencyId = 'IDR', customer_name, customer_phone, customer_id, notes } = options;
   const formData = new URLSearchParams();
   formData.append('order_date', new Date().toISOString().split('T')[0]);
   formData.append('currency_id', String(currencyId));
   formData.append('is_funding', '0'); // Required by Olsera Open API (boolean: 1/0)
-  
+
+  // If we matched an existing Olsera customer (CRM), attach by id so the order
+  // is linked to their profile/history in the backoffice.
+  if (customer_id) {
+    formData.append('customer_id', String(customer_id));
+  }
+
+  const realPhoneDigits = (customer_phone || '').replace(/\D/g, '');
+  const hasRealPhone = realPhoneDigits.length >= 8;
+
   if (customer_name) {
     formData.append('customer_name', customer_name);
-    // Guest profile requires email, phone, and customer_type_id to avoid 406 errors
-    const uniqueId = Date.now().toString().slice(-6);
-    formData.append('customer_email', `${customer_name.replace(/\s+/g, '').toLowerCase()}${uniqueId}@rakkencoffee.com`);
-    formData.append('customer_phone', `08123${uniqueId}`);
+    if (hasRealPhone) {
+      // Use the customer's REAL phone so the order is tied to a real profile (CRM).
+      formData.append('customer_phone', realPhoneDigits);
+      formData.append('customer_email', `${realPhoneDigits}@guest.rakkencoffee.com`);
+    } else {
+      // Guest profile requires email, phone, and customer_type_id to avoid 406 errors
+      const uniqueId = Date.now().toString().slice(-6);
+      formData.append('customer_email', `${customer_name.replace(/\s+/g, '').toLowerCase()}${uniqueId}@rakkencoffee.com`);
+      formData.append('customer_phone', `08123${uniqueId}`);
+    }
     formData.append('customer_type_id', '0'); // Guest type ID found from API
   } else {
     const uniqueId = Date.now().toString().slice(-6);
     formData.append('customer_name', 'Guest');
     formData.append('customer_email', `guest${uniqueId}@rakkencoffee.com`);
-    formData.append('customer_phone', `08100${uniqueId}`);
+    formData.append('customer_phone', hasRealPhone ? realPhoneDigits : `08100${uniqueId}`);
     formData.append('customer_type_id', '0');
   }
 
@@ -952,6 +967,162 @@ export async function validateVoucherRemote(code: string, totalAmount: number): 
   };
 }
 
+// ──────────────────────────────
+// Customer / CRM (F5)
+// ──────────────────────────────
+
+/**
+ * Find an existing Olsera customer by phone number.
+ * GET /customersupplier/customer?search=<phone>
+ * Returns the matched customer (or null). Defensive: never throws.
+ */
+export async function findCustomerByPhone(
+  phone: string
+): Promise<{ id: number | string; name: string; phone?: string } | null> {
+  const digits = (phone || '').replace(/\D/g, '');
+  if (digits.length < 8) return null;
+
+  try {
+    const res = await olseraFetch(
+      `/customersupplier/customer?search=${encodeURIComponent(digits)}`,
+      { silent: true }
+    );
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    const list = data.data || data || [];
+    if (!Array.isArray(list) || list.length === 0) return null;
+
+    const norm = (p: unknown) => String(p ?? '').replace(/\D/g, '');
+    const match =
+      list.find((c: any) => {
+        const cp = norm(c.phone || c.mobile_phone || c.hp || c.telp || c.phone_number);
+        // Tolerate 08xxx vs 628xxx prefixes by matching on the trailing digits.
+        return cp && (cp === digits || cp.endsWith(digits) || digits.endsWith(cp));
+      }) || null;
+
+    if (!match) return null;
+    return {
+      id: match.id ?? match.customer_id,
+      name: match.name || match.customer_name || '',
+      phone: match.phone || match.mobile_phone || '',
+    };
+  } catch (err) {
+    console.warn('[Olsera API] findCustomerByPhone failed:', (err as Error)?.message);
+    return null;
+  }
+}
+
+// ──────────────────────────────
+// Sales Reports — Olsera as Source of Truth (F4)
+// ──────────────────────────────
+
+/** Today's date in WIB (GMT+7) as YYYY-MM-DD. */
+function wibDateString(): string {
+  const now = new Date();
+  const wib = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+  return wib.toISOString().split('T')[0];
+}
+
+/**
+ * Revenue + order count for a given day, derived from CLOSED orders
+ * (closed orders are settled/paid in Olsera). Reliable source of truth.
+ */
+export async function getOlseraSalesSummary(
+  date?: string
+): Promise<{ revenue: number; orders: number; date: string }> {
+  const day = date || wibDateString();
+  let revenue = 0;
+  let orders = 0;
+
+  try {
+    const res = await olseraFetch(
+      `/order/closeorder?per_page=200&start_date=${day}&end_date=${day}`,
+      { silent: true }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      const list = data.data || data || [];
+      if (Array.isArray(list)) {
+        for (const o of list) {
+          const dt = String(o.order_date || o.created_at || '').slice(0, 10);
+          if (dt && dt !== day) continue; // guard against API ignoring date filter
+          revenue += parseFloat(o.grand_total || o.total || o.total_amount || '0') || 0;
+          orders += 1;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[Olsera API] getOlseraSalesSummary failed:', (err as Error)?.message);
+  }
+
+  return { revenue: Math.round(revenue), orders, date: day };
+}
+
+/**
+ * Sales grouped by product group/category for a date range.
+ * GET /report/salesitemspergroup — best effort, returns [] on failure.
+ */
+export async function getSalesByGroup(
+  startDate?: string,
+  endDate?: string
+): Promise<{ name: string; qty: number; total: number }[]> {
+  const start = startDate || wibDateString();
+  const end = endDate || start;
+  try {
+    const res = await olseraFetch(
+      `/report/salesitemspergroup?start_date=${start}&end_date=${end}`,
+      { silent: true }
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    const list = data.data || data || [];
+    if (!Array.isArray(list)) return [];
+    return list.map((r: any) => ({
+      name: r.product_group_name || r.group_name || r.name || 'Lainnya',
+      qty: Number(r.qty || r.quantity || r.total_qty || 0),
+      total: parseFloat(r.total || r.total_amount || r.subtotal || '0') || 0,
+    }));
+  } catch (err) {
+    console.warn('[Olsera API] getSalesByGroup failed:', (err as Error)?.message);
+    return [];
+  }
+}
+
+/**
+ * Best-selling products by SKU for a date range.
+ * GET /report/productsalesbysku — best effort, returns [] on failure.
+ */
+export async function getProductSalesBySku(
+  startDate?: string,
+  endDate?: string,
+  limit = 5
+): Promise<{ name: string; qty: number; total: number }[]> {
+  const start = startDate || wibDateString();
+  const end = endDate || start;
+  try {
+    const res = await olseraFetch(
+      `/report/productsalesbysku?start_date=${start}&end_date=${end}`,
+      { silent: true }
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    const list = data.data || data || [];
+    if (!Array.isArray(list)) return [];
+    return list
+      .map((r: any) => ({
+        name: r.product_name || r.name || r.sku || 'Item',
+        qty: Number(r.qty || r.quantity || r.total_qty || 0),
+        total: parseFloat(r.total || r.total_amount || r.subtotal || '0') || 0,
+      }))
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, limit);
+  } catch (err) {
+    console.warn('[Olsera API] getProductSalesBySku failed:', (err as Error)?.message);
+    return [];
+  }
+}
+
 /**
  * Convenience API Object (Drop-in replacement for olsera.ts)
  */
@@ -967,5 +1138,9 @@ export const olseraApi = {
   getVoucherByCode,
   getVoucherDetail,
   validateVoucherRemote,
+  findCustomerByPhone,
+  getOlseraSalesSummary,
+  getSalesByGroup,
+  getProductSalesBySku,
   olseraFetch // Included for internal use if needed
 };

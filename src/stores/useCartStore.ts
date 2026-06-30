@@ -8,6 +8,7 @@ interface CartStore extends CartState {
   updateItem: (id: string, updatedItem: CartItem) => void;
   updateQuantity: (id: string, quantity: number) => void;
   setCustomerName: (name: string) => void;
+  setCustomerPhone: (phone: string) => void;
   clearCart: () => void;
   itemCount: number;
 }
@@ -29,6 +30,7 @@ export const useCartStore = create<CartStore>()(
       items: [],
       totalAmount: 0,
       customerName: '',
+      customerPhone: '',
       itemCount: 0,
 
       addItem: (newItem: CartItem) => {
@@ -101,8 +103,12 @@ export const useCartStore = create<CartStore>()(
         set({ customerName: name });
       },
 
+      setCustomerPhone: (phone: string) => {
+        set({ customerPhone: phone });
+      },
+
       clearCart: () => {
-        set({ items: [], totalAmount: 0, itemCount: 0, customerName: '' });
+        set({ items: [], totalAmount: 0, itemCount: 0, customerName: '', customerPhone: '' });
       },
     }),
     {
