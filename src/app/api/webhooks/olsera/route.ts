@@ -118,24 +118,38 @@ export async function POST(req: Request) {
       if (newStatus && orderId) {
         const localOrderId = `OLSERA-${orderId}`;
 
-        // Map a global Olsera status to our per-station KDS statuses so the
-        // KDS columns stay consistent when the change originates in Olsera POS.
+        // Read the current record first so we can map the GLOBAL Olsera status
+        // onto the per-station KDS statuses (KDS columns key off barista/kitchen
+        // status, NOT the global status) WITHOUT downgrading a station that has
+        // already been completed (e.g. a station auto-completed for having no items).
+        let existing: any = null;
+        try {
+          existing = await prisma.order.findUnique({ where: { id: localOrderId } });
+        } catch (_) {}
+
+        const WEIGHT: Record<string, number> = { PENDING: 1, PREPARING: 2, READY: 2, COMPLETED: 3 };
+        const upgradeOnly = (current: string | undefined, target: string) =>
+          (WEIGHT[current || 'PENDING'] || 0) < (WEIGHT[target] || 0) ? target : current;
+
         const updateData: Record<string, any> = { status: newStatus };
-        if (newStatus === 'COMPLETED') {
-          updateData.baristaStatus = 'COMPLETED';
-          updateData.kitchenStatus = 'COMPLETED';
-        } else if (newStatus === 'PREPARING') {
-          updateData.status = 'PREPARING';
+        if (newStatus === 'COMPLETED' || newStatus === 'CANCELLED') {
+          // Terminal states apply to both stations.
+          updateData.baristaStatus = newStatus;
+          updateData.kitchenStatus = newStatus;
+        } else if (newStatus === 'PREPARING' || newStatus === 'READY') {
+          // Move pending stations forward, but never downgrade a completed one.
+          updateData.baristaStatus = upgradeOnly(existing?.baristaStatus, 'PREPARING');
+          updateData.kitchenStatus = upgradeOnly(existing?.kitchenStatus, 'PREPARING');
         }
 
         // 1. Update local database (and read back the canonical record)
-        let localOrder: any = null;
+        let localOrder: any = existing;
         try {
           localOrder = await prisma.order.update({
             where: { id: localOrderId },
             data: updateData,
           });
-          console.log(`[Olsera Webhook] Local order ${localOrderId} synced to ${newStatus}`);
+          console.log(`[Olsera Webhook] Local order ${localOrderId} synced to ${newStatus} (barista=${localOrder.baristaStatus}, kitchen=${localOrder.kitchenStatus})`);
         } catch (dbErr) {
           console.warn(`[Olsera Webhook] Order ${localOrderId} not found in local DB, broadcasting minimal payload.`);
         }
