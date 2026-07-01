@@ -62,6 +62,10 @@ export async function POST(req: Request) {
   try {
     const rawBody = await req.text();
 
+    // TEMP DEBUG: capture the exact payload Olsera sends so we can confirm
+    // whether `openorder_id` is the internal numeric id or the order_no (OL...).
+    console.log(`[Olsera Webhook] [${timestamp}] raw body:`, rawBody?.slice(0, 1500));
+
     let body: any = {};
     try {
       body = JSON.parse(rawBody || '{}');
