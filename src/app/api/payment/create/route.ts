@@ -97,19 +97,33 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    const finalOrderId = dbOrderId ? String(dbOrderId) : orderId;
+
+    // Voucher discount fully covers the order — Midtrans rejects gross_amount <= 0,
+    // so skip payment gateway entirely and mark the order paid directly.
+    if (finalGrossAmount < 1) {
+      const posAdapter = await import("@/lib/integrations/pos.adapter");
+      await posAdapter.updateOrderPaymentStatus(finalOrderId, "paid", 0);
+
+      return NextResponse.json({
+        freeOrder: true,
+        orderId: finalOrderId,
+        orderNo: dbOrderNo || '',
+        queueNumber: dbQueueNumber || 0,
+      });
+    }
+
     // 3. Create Midtrans Snap token
     const snapResult = await createSnapTransaction({
-      orderId: dbOrderId ? String(dbOrderId) : orderId,
+      orderId: finalOrderId,
       grossAmount: finalGrossAmount,
       items: midtransItems,
     });
 
-
-
     return NextResponse.json({
       snapToken: snapResult.token,
       redirectUrl: snapResult.redirect_url,
-      orderId: dbOrderId ? String(dbOrderId) : orderId,
+      orderId: finalOrderId,
       orderNo: dbOrderNo || '',
       queueNumber: dbQueueNumber || 0,
     });

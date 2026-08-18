@@ -133,7 +133,10 @@ export function useCreateOrder() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(orderData),
       });
-      if (!res.ok) throw new Error('Failed to create order');
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.details || error.error || 'Failed to create order');
+      }
       return res.json();
     },
     onSuccess: () => {

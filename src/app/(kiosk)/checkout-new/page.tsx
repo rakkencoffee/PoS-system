@@ -187,7 +187,15 @@ export default function CheckoutNewPage() {
         voucherCode: appliedDiscount > 0 ? voucherCode : undefined,
       });
 
-      if (data.snapToken) {
+      if (data.freeOrder) {
+        // Voucher covered the full amount — order already marked paid server-side, no Snap popup needed.
+        setPaymentStatus('Payment successful!');
+        savePrintData(items, data.orderId);
+        clearCart();
+        const queueNum = (data.queueNumber || 0).toString();
+        const orderNoParam = data.orderNo ? `&orderNo=${data.orderNo}` : '';
+        router.push(`/success?orderId=${data.orderId}&queue=${queueNum}${orderNoParam}`);
+      } else if (data.snapToken) {
         triggerSnapPopup(data.snapToken, data.orderId, data.queueNumber || 0, data.orderNo, data.redirectUrl);
       } else {
         throw new Error('No payment token received');
@@ -543,28 +551,6 @@ export default function CheckoutNewPage() {
                     </div>
                   </div>
 
-                  {/* EDC */}
-                  <div 
-                    onClick={() => { if(!isProcessing) setPaymentMethod('edc'); }}
-                    className={`payment-card cursor-pointer flex items-center justify-between p-standard bg-white border rounded-2xl transition-all ${
-                      paymentMethod === 'edc' ? 'active-payment border-2 border-primary shadow-md' : 'border-surface-variant border-1.5 hover:bg-off-white'
-                    }`}
-                  >
-                    <div className="flex items-center gap-standard">
-                      <div className="w-12 h-12 bg-surface-variant rounded-full flex items-center justify-center">
-                        <span className="material-symbols-outlined text-near-black">contactless</span>
-                      </div>
-                      <div>
-                        <h4 className="font-h4 text-h4 text-near-black font-semibold">Debit / Credit</h4>
-                        <p className="font-caption text-caption text-taupe">Insert card in EDC machine</p>
-                      </div>
-                    </div>
-                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                      paymentMethod === 'edc' ? 'border-primary' : 'border-surface-variant'
-                    }`}>
-                      {paymentMethod === 'edc' && <div className="w-3 h-3 bg-primary rounded-full"></div>}
-                    </div>
-                  </div>
                 </div>
 
                 {/* Pay Button */}
@@ -783,31 +769,6 @@ export default function CheckoutNewPage() {
                     paymentMethod === 'online' ? 'border-primary' : 'border-surface-variant'
                   }`}>
                     {paymentMethod === 'online' && <div className="w-3 h-3 rounded-full bg-primary"></div>}
-                  </div>
-                </div>
-              </div>
-
-              {/* Debit/Credit card */}
-              <div 
-                onClick={() => { if(!isProcessing) setPaymentMethod('edc'); }}
-                className={`payment-card cursor-pointer bg-surface rounded-xl p-card-inner border shadow-sm transition-all duration-200 ${
-                  paymentMethod === 'edc' ? 'active-payment border-primary' : 'border-surface-variant'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-standard">
-                    <div className="w-10 h-10 flex items-center justify-center bg-off-white rounded-lg">
-                      <span className="material-symbols-outlined text-primary">credit_card</span>
-                    </div>
-                    <div>
-                      <h4 className="font-h4 text-h4 text-on-surface font-semibold">Kartu Kredit/Debit</h4>
-                      <p className="font-caption text-caption text-taupe">Visa, Mastercard, JCB (EDC)</p>
-                    </div>
-                  </div>
-                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                    paymentMethod === 'edc' ? 'border-primary' : 'border-surface-variant'
-                  }`}>
-                    {paymentMethod === 'edc' && <div className="w-3 h-3 rounded-full bg-primary"></div>}
                   </div>
                 </div>
               </div>
