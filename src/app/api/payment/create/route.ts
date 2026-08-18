@@ -102,8 +102,14 @@ export async function POST(request: NextRequest) {
     // Voucher discount fully covers the order — Midtrans rejects gross_amount <= 0,
     // so skip payment gateway entirely and mark the order paid directly.
     if (finalGrossAmount < 1) {
-      const posAdapter = await import("@/lib/integrations/pos.adapter");
-      await posAdapter.updateOrderPaymentStatus(finalOrderId, "paid", 0);
+      // Defer to run after the response, same as createOrder's own background sync —
+      // the local Prisma mirror row it depends on is written by that same background
+      // step, so this can't run (or retry) synchronously within this request.
+      const { after } = await import("next/server");
+      after(async () => {
+        const posAdapter = await import("@/lib/integrations/pos.adapter");
+        await posAdapter.updateOrderPaymentStatus(finalOrderId, "paid", 0);
+      });
 
       return NextResponse.json({
         freeOrder: true,

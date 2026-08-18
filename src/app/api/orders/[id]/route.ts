@@ -122,7 +122,7 @@ export async function GET(
 
         // Determine base data from Olsera
         const olseraItems = Array.isArray(orderDetail.items) ? orderDetail.items : [];
-        let totalAmount = localOrder?.total || parseFloat(orderDetail.total || orderDetail.grand_total || '0');
+        let totalAmount = localOrder?.total ?? parseFloat(orderDetail.total || orderDetail.grand_total || '0');
         let finalItems = olseraItems.map((item: any, idx: number) => {
           const name = item.product_name || item.name || 'Item';
           return {
@@ -209,8 +209,11 @@ export async function GET(
         let discount = finalItems.reduce((sum: number, item: any) => sum + (item.discount || 0), 0);
         
         if (discount === 0) {
-          if (orderDetail && orderDetail.discount_amount) {
-            discount = parseFloat(orderDetail.discount_amount);
+          // Olsera's discount_amount can be a truthy string like "0", which would
+          // otherwise short-circuit past the (more reliable) local calculation below.
+          const olseraDiscount = orderDetail?.discount_amount ? parseFloat(orderDetail.discount_amount) : 0;
+          if (olseraDiscount > 0) {
+            discount = olseraDiscount;
           } else if (localOrder) {
             const baseTotal = localOrder.items.reduce((acc: number, item: any) => acc + item.price * item.quantity, 0);
             discount = Math.max(0, baseTotal - localOrder.total);
@@ -285,8 +288,9 @@ export async function GET(
             let closedDiscount = finalClosedItems.reduce((sum: number, item: any) => sum + (item.discount || 0), 0);
             
             if (closedDiscount === 0) {
-              if (closedOrder && closedOrder.discount_amount) {
-                closedDiscount = parseFloat(closedOrder.discount_amount);
+              const olseraClosedDiscount = closedOrder?.discount_amount ? parseFloat(closedOrder.discount_amount) : 0;
+              if (olseraClosedDiscount > 0) {
+                closedDiscount = olseraClosedDiscount;
               } else if (localOrder) {
                 const baseTotal = localOrder.items.reduce((acc: number, item: any) => acc + item.price * item.quantity, 0);
                 closedDiscount = Math.max(0, baseTotal - localOrder.total);

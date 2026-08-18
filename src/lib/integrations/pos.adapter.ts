@@ -744,10 +744,26 @@ export async function updateOrderPaymentStatus(
         // Step 5: Update local Prisma status (Sprint 4)
         try {
           const { prisma } = await import("@/lib/db");
-          await prisma.order.update({
-            where: { id: orderId },
-            data: { status: "PAID" },
-          });
+
+          // The local mirror row is written by a separate background task (see
+          // createOrder's runInBackground) that can still be in flight here —
+          // retry briefly instead of failing outright when the row isn't there yet.
+          let updated = false;
+          const MAX_ATTEMPTS = 8;
+          for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            try {
+              await prisma.order.update({
+                where: { id: orderId },
+                data: { status: "PAID" },
+              });
+              updated = true;
+              break;
+            } catch (updateErr: any) {
+              if (updateErr?.code !== "P2025" || attempt === MAX_ATTEMPTS) throw updateErr;
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+            }
+          }
+          if (!updated) throw new Error(`Local order ${orderId} row never appeared`);
           console.log(`[Sync] Local order ${orderId} updated to PAID.`);
 
           // Step 6: Create Print Job in the Cloud Print Queue automatically
@@ -802,7 +818,10 @@ export async function updateOrderPaymentStatus(
               }) || [];
 
               const itemsSum = itemsPayload.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-              const finalTotal = localOrderFull?.total || actualOlseraTotal;
+              // Local Prisma total is authoritative (set at order creation from the actual
+              // discount) — `||` would wrongly fall back to actualOlseraTotal for legitimate
+              // Rp 0 orders since 0 is falsy.
+              const finalTotal = localOrderFull?.total ?? actualOlseraTotal;
               const calculatedDiscount = Math.max(0, itemsSum - finalTotal);
 
               const printPayload = {
