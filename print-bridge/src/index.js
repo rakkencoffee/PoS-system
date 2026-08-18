@@ -15,18 +15,6 @@ const net = require('net'); // Added for EDC socket communication
 const { formatReceipt, formatDrinkLabels } = require('./format-receipt');
 
 const app = express();
-const PORT = process.env.PORT || 3001;
-
-// ─── CONFIGURATION ──────────────────────────────────────────
-// Printer Config
-const PRINTER_PORT = process.env.PRINTER_PORT || 'COM7';
-const BAUD_RATE = parseInt(process.env.BAUD_RATE || '9600');
-
-// EDC Config (Verifone X990)
-const EDC_HOST = process.env.EDC_HOST || '192.168.1.100'; // Change to EDC static IP
-const EDC_PORT = parseInt(process.env.EDC_PORT || '7000');
-const EDC_TIMEOUT = 60000; // 60 seconds for customer to tap/swipe
-// ─────────────────────────────────────────────────────────────
 
 // Load environment variables
 const fs = require('fs');
@@ -41,6 +29,19 @@ if (fs.existsSync(envPath)) {
 } else {
   require('dotenv').config();
 }
+
+const PORT = process.env.PORT || 3001;
+
+// ─── CONFIGURATION ──────────────────────────────────────────
+// Printer Config
+const PRINTER_PORT = process.env.PRINTER_PORT || 'COM7';
+const BAUD_RATE = parseInt(process.env.BAUD_RATE || '9600');
+
+// EDC Config (Verifone X990)
+const EDC_HOST = process.env.EDC_HOST || '192.168.1.100'; // Change to EDC static IP
+const EDC_PORT = parseInt(process.env.EDC_PORT || '7000');
+const EDC_TIMEOUT = 60000; // 60 seconds for customer to tap/swipe
+// ─────────────────────────────────────────────────────────────
 
 const PRINT_BRIDGE_API_KEY = process.env.NEXT_PUBLIC_PRINT_BRIDGE_API_KEY || 'rakken-print-bridge-secret-key-123';
 
