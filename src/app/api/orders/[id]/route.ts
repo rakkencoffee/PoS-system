@@ -391,7 +391,19 @@ export async function PATCH(
 
         // 1. Get or Create local order record in Prisma
         localOrder = await prisma.order.findUnique({ where: { id } });
-        
+
+        // checkout's createOrder() mirrors the order to Prisma in the
+        // background (with items, queueNumber, etc.) — if a barista/kitchen
+        // action lands before that write finishes, give it a couple seconds
+        // to show up instead of immediately self-healing with a skeleton
+        // record. Self-healing that early loses the real items/queueNumber
+        // permanently (the background write later fails on the duplicate id
+        // and gives up), which also skips print-job creation entirely.
+        for (let attempt = 0; !localOrder && attempt < 2; attempt++) {
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+          localOrder = await prisma.order.findUnique({ where: { id } });
+        }
+
         if (!localOrder) {
           console.log(`[Sync] Creating local record for Olsera order ${id}`);
           detail = await olsera.getOrderDetail(olseraOrderId);

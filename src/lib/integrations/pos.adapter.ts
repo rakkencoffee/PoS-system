@@ -662,19 +662,22 @@ export async function updateOrderPaymentStatus(
           ? parseFloat(String(orderDetail.total))
           : paymentAmount || 0;
 
-        // Skip if already paid in Olsera to avoid duplicate settlement errors
-        if (
+        // Already paid in Olsera (e.g. a duplicate webhook/verify race) — skip
+        // re-settling payment there, but STILL fall through to broadcast the
+        // local status update and create the print job below. Returning early
+        // here used to silently skip both, which is how a paid order could
+        // end up with no print job at all when two settlement triggers race.
+        const alreadyPaidInOlsera =
           orderDetail.is_paid === true ||
           orderDetail.is_paid === 1 ||
-          orderDetail.is_paid === "1"
-        ) {
+          orderDetail.is_paid === "1";
+        if (alreadyPaidInOlsera) {
           console.log(
-            `[Auto-Settlement] Order ${orderId} already marked as PAID in Olsera. Skipping settlement.`,
+            `[Auto-Settlement] Order ${orderId} already marked as PAID in Olsera. Skipping Olsera settlement, still syncing local state.`,
           );
-          return;
         }
 
-        if (actualOlseraTotal > 0 && paymentModeId) {
+        if (!alreadyPaidInOlsera && actualOlseraTotal > 0 && paymentModeId) {
           try {
             console.log(
               `[Auto-Settlement] Initializing settlement for Olsera order ${orderId} with amount: ${actualOlseraTotal}`,
