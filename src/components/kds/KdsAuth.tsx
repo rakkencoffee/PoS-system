@@ -22,15 +22,15 @@ export function KdsAuth({ children, title }: KdsAuthProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Simple password check (can be moved to env/server later)
-    // For now using 'rakken123' as requested/default
-    const correctPassword = process.env.NEXT_PUBLIC_KDS_PASSWORD || 'rakken123';
-    
-    if (password === correctPassword) {
+    // Single shared PIN for all staff (not per-person) — set NEXT_PUBLIC_KDS_PIN
+    // in production; this default is for local dev only.
+    const correctPin = process.env.NEXT_PUBLIC_KDS_PIN || '123456';
+
+    if (password === correctPin) {
       setIsAuthenticated(true);
       sessionStorage.setItem('kds_auth', 'true');
     } else {
-      setError('Password salah. Silakan coba lagi.');
+      setError('PIN salah. Silakan coba lagi.');
       setPassword('');
     }
   };
@@ -47,17 +47,20 @@ export function KdsAuth({ children, title }: KdsAuthProps) {
             <span className="text-4xl">🔐</span>
           </div>
           <h1 className="text-2xl font-bold text-white mb-2">{title}</h1>
-          <p className="text-zinc-400 text-sm">Masukkan password untuk mengakses KDS</p>
+          <p className="text-zinc-400 text-sm">Masukkan PIN staff untuk mengakses KDS</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <input
               type="password"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={6}
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Password"
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-5 py-4 text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#A8131E] transition-all text-center text-xl tracking-widest"
+              onChange={(e) => setPassword(e.target.value.replace(/\D/g, ''))}
+              placeholder="PIN"
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-5 py-4 text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#A8131E] transition-all text-center text-3xl tracking-[0.5em]"
               autoFocus
             />
             {error && <p className="text-red-500 text-xs mt-2 text-center">{error}</p>}
