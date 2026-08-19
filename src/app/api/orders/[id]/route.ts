@@ -6,6 +6,10 @@ import { logOrderStatusChange } from '@/lib/order-status-log';
 
 const USE_OLSERA = process.env.USE_OLSERA === 'true';
 
+// PATCH can wait up to ~9s for the checkout background sync to land before
+// self-healing — stay well clear of the platform's default function timeout.
+export const maxDuration = 30;
+
 function isNonCoffeeItem(category: string, name: string): boolean {
   const cat = String(category || '').toLowerCase().trim();
   const itemName = String(name || '').toLowerCase().trim();
@@ -393,13 +397,15 @@ export async function PATCH(
         localOrder = await prisma.order.findUnique({ where: { id } });
 
         // checkout's createOrder() mirrors the order to Prisma in the
-        // background (with items, queueNumber, etc.) — if a barista/kitchen
-        // action lands before that write finishes, give it a couple seconds
-        // to show up instead of immediately self-healing with a skeleton
-        // record. Self-healing that early loses the real items/queueNumber
-        // permanently (the background write later fails on the duplicate id
-        // and gives up), which also skips print-job creation entirely.
-        for (let attempt = 0; !localOrder && attempt < 2; attempt++) {
+        // background (with items, queueNumber, etc.) — but only AFTER
+        // syncing items to Olsera first, which alone retries for up to
+        // ~5.5s. If a barista/kitchen action lands before that write
+        // finishes, give it real time to show up instead of immediately
+        // self-healing with a skeleton record. Self-healing that early
+        // loses the real items/queueNumber permanently (the background
+        // write later fails on the duplicate id and gives up), which also
+        // skips print-job creation entirely.
+        for (let attempt = 0; !localOrder && attempt < 6; attempt++) {
           await new Promise((resolve) => setTimeout(resolve, 1500));
           localOrder = await prisma.order.findUnique({ where: { id } });
         }
