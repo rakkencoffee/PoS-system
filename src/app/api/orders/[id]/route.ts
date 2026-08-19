@@ -3,6 +3,7 @@ import { pusherServer } from '@/lib/pusher';
 import { prisma } from '@/lib/db';
 import { getMenuItems } from '@/lib/integrations/pos.adapter';
 import { logOrderStatusChange } from '@/lib/order-status-log';
+import { auth } from '@/lib/auth';
 
 const USE_OLSERA = process.env.USE_OLSERA === 'true';
 
@@ -369,6 +370,8 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
+    const session = await auth();
+    const actorId = session?.user ? (session.user as any).id : undefined;
 
     // Olsera orders: update state locally and emit SSE event
     if (id.startsWith('OLSERA-')) {
@@ -484,13 +487,13 @@ export async function PATCH(
           await logOrderStatusChange({
             orderId: id, statusField: 'barista',
             fromStatus: prevBaristaStatus, toStatus: localOrder.baristaStatus,
-            source: 'kds_manual', metadata: { stationType },
+            source: 'kds_manual', actorId, metadata: { stationType },
           });
         } else if (stationType === 'kitchen' && prevKitchenStatus !== localOrder.kitchenStatus) {
           await logOrderStatusChange({
             orderId: id, statusField: 'kitchen',
             fromStatus: prevKitchenStatus, toStatus: localOrder.kitchenStatus,
-            source: 'kds_manual', metadata: { stationType },
+            source: 'kds_manual', actorId, metadata: { stationType },
           });
         }
 
@@ -525,7 +528,7 @@ export async function PATCH(
           await logOrderStatusChange({
             orderId: id, statusField: 'order',
             fromStatus: prevOverallStatus, toStatus: localStatus,
-            source: 'kds_manual', metadata: { stationType },
+            source: 'kds_manual', actorId, metadata: { stationType },
           });
         }
 
