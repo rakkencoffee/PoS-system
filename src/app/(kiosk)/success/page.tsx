@@ -116,11 +116,14 @@ function SuccessContent() {
       fetchOrder();
 
       // Webhooks from Midtrans can't reach `localhost` in local dev, so the
-      // order never gets settled to PAID there. Force a manual verify against
-      // Midtrans directly (same effect as the webhook) whenever we redirected
-      // here without Midtrans's own `transaction_status` query param — i.e.
-      // via our own router.push after Snap's onSuccess callback.
-      if (process.env.NEXT_PUBLIC_TEST_MODE === 'true' || !transactionStatus) {
+      // order never gets settled to PAID there — force a manual verify as a
+      // stand-in for the webhook. ONLY do this in test mode: in every real
+      // deployment (including preview/production) the webhook genuinely
+      // reaches Midtrans, so firing this unconditionally (it used to also
+      // trigger whenever `transactionStatus` was absent, which is ALWAYS —
+      // our own router.push redirect never carries it) raced with the real
+      // webhook and caused duplicate settlement/print jobs.
+      if (process.env.NEXT_PUBLIC_TEST_MODE === 'true') {
         fetch(`/api/payment/verify?orderId=${orderId}`, { method: 'POST' }).catch((e) => {
           console.warn('[Success] Manual payment verify failed (non-blocking):', e);
         });
