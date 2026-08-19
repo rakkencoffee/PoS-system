@@ -150,7 +150,7 @@ function StatusContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-dvh flex items-center justify-center">
         <div className="w-12 h-12 border-4 border-[#A8131E] border-t-transparent rounded-full animate-spin" />
       </div>
     );
@@ -160,7 +160,7 @@ function StatusContent() {
     if (!orderId) {
       // Public Board Mode
       return (
-        <div className="min-h-screen p-8">
+        <div className="min-h-dvh p-8">
           <div className="max-w-4xl mx-auto">
             <h1 className="text-3xl font-bold text-gradient mb-8 text-center">Public Status Board</h1>
             <PublicBoard />
@@ -170,7 +170,7 @@ function StatusContent() {
     }
     
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center">
+      <div className="min-h-dvh flex flex-col items-center justify-center p-8 text-center">
         <span className="text-6xl mb-6">🔍</span>
         <h2 className="text-2xl font-bold text-(--text-primary) mb-2">Order Not Found</h2>
         <p className="text-(--text-muted) mb-8 max-w-xs">
@@ -186,7 +186,7 @@ function StatusContent() {
   const status = statusConfig[order.status] || statusConfig.PENDING;
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-8">
+    <div className="min-h-dvh flex flex-col items-center justify-center p-8">
       <div className="text-center max-w-md w-full">
         {/* Status Icon */}
         <div className="mb-8 animate-scale-in">
@@ -262,7 +262,7 @@ function StatusContent() {
 export default function StatusPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-dvh flex items-center justify-center">
         <div className="w-12 h-12 border-4 border-[#A8131E] border-t-transparent rounded-full animate-spin" />
       </div>
     }>

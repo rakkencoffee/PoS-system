@@ -52,12 +52,14 @@ export async function POST(request: NextRequest) {
     // Update order in POS (with auto-settlement for Olsera)
     const amount = gross_amount ? parseFloat(String(gross_amount)) : undefined;
 
+    const webhookMetadata = { transactionStatus: transaction_status, paymentType: payment_type, fraudStatus: fraud_status };
+
     if (status === 'success') {
-      await updateOrderPaymentStatus(order_id, 'paid', amount);
+      await updateOrderPaymentStatus(order_id, 'paid', amount, 'midtrans_webhook', webhookMetadata);
     } else if (status === 'failed') {
-      await updateOrderPaymentStatus(order_id, 'failed');
+      await updateOrderPaymentStatus(order_id, 'failed', undefined, 'midtrans_webhook', webhookMetadata);
     } else if (status === 'expired') {
-      await updateOrderPaymentStatus(order_id, 'expired');
+      await updateOrderPaymentStatus(order_id, 'expired', undefined, 'midtrans_webhook', webhookMetadata);
     }
     // 'pending' → no action needed, wait for final status
 

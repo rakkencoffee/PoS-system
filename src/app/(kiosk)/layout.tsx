@@ -12,13 +12,12 @@ export default function KioskLayout({
 
   return (
     <div
-      className="min-h-screen relative"
+      className="min-h-dvh relative"
       style={{
         backgroundImage: isLandingPage ? "url('/images/landing.webp')" : "url('/images/bg-putih.webp')",
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
-        backgroundAttachment: 'fixed',
       }}
     >
       <div className="relative z-10">

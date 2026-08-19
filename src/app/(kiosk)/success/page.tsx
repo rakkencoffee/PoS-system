@@ -14,7 +14,7 @@ function buildReceiptData(
 ): PrintReceiptData {
   const displayOrderNo = (orderNo || orderData?.orderNo) || orderId || '';
 
-  // Enrich API items with sessionStorage data saved by checkout-new before cart was cleared.
+  // Enrich API items with sessionStorage data saved by checkout before cart was cleared.
   // This covers the race condition where the Prisma background mirror hasn't finished yet
   // when the receipt is built (~2s), causing empty notes.
   let items = orderData?.items || [];
@@ -115,14 +115,15 @@ function SuccessContent() {
 
       fetchOrder();
 
-      // Settlement logic
+      // Webhooks from Midtrans can't reach `localhost` in local dev, so the
+      // order never gets settled to PAID there. Force a manual verify against
+      // Midtrans directly (same effect as the webhook) whenever we redirected
+      // here without Midtrans's own `transaction_status` query param — i.e.
+      // via our own router.push after Snap's onSuccess callback.
       if (process.env.NEXT_PUBLIC_TEST_MODE === 'true' || !transactionStatus) {
-        // Force settlement in test mode or if direct visit
-        fetch('/api/test-settle', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ orderId }),
-        }).catch(() => {});
+        fetch(`/api/payment/verify?orderId=${orderId}`, { method: 'POST' }).catch((e) => {
+          console.warn('[Success] Manual payment verify failed (non-blocking):', e);
+        });
       }
     }
 
@@ -257,7 +258,7 @@ function SuccessContent() {
   }, [countdown, router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-8">
+    <div className="min-h-dvh flex items-center justify-center p-8">
       <div className="text-center max-w-md">
         {/* Success Animation */}
         <div className="mb-8 animate-scale-in">
@@ -398,7 +399,7 @@ function SuccessContent() {
 export default function SuccessPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-dvh flex items-center justify-center">
         <div className="w-12 h-12 border-4 border-[#A8131E] border-t-transparent rounded-full animate-spin" />
       </div>
     }>

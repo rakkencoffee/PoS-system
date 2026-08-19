@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { pusherServer } from '@/lib/pusher';
 import crypto from 'crypto';
+import { logOrderStatusChange } from '@/lib/order-status-log';
 
 /**
  * Olsera Webhook Receiver
@@ -27,12 +28,18 @@ function safeEqual(a: string, b: string): boolean {
  * (OLSERA_WEBHOOK_SECRET). We accept a few common header names.
  * An HMAC `x-olsera-signature` is still accepted as a fallback if present.
  *
- * If OLSERA_WEBHOOK_SECRET is unset, we accept all requests (useful for the
- * very first connectivity test — set the secret before going to production).
+ * If OLSERA_WEBHOOK_SECRET is unset, we accept all requests in non-production
+ * environments (useful for the very first connectivity test). In production,
+ * a missing secret fails CLOSED — a forgotten env var must never silently
+ * open this endpoint to anyone who guesses the URL.
  */
 function isAuthorizedWebhook(req: Request, rawBody: string): boolean {
   const secret = process.env.OLSERA_WEBHOOK_SECRET;
   if (!secret) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[Olsera Webhook] OLSERA_WEBHOOK_SECRET not set in production — rejecting request.');
+      return false;
+    }
     console.warn('[Olsera Webhook] OLSERA_WEBHOOK_SECRET not set — accepting without auth (configure before production).');
     return true;
   }
@@ -154,6 +161,28 @@ export async function POST(req: Request) {
             data: updateData,
           });
           console.log(`[Olsera Webhook] Local order ${localOrderId} synced to ${newStatus} (barista=${localOrder.baristaStatus}, kitchen=${localOrder.kitchenStatus})`);
+
+          if (!existing || existing.status !== localOrder.status) {
+            await logOrderStatusChange({
+              orderId: localOrderId, statusField: 'order',
+              fromStatus: existing?.status ?? null, toStatus: localOrder.status,
+              source: 'olsera_webhook', metadata: { olseraRawStatus: olseraStatus, event },
+            });
+          }
+          if (!existing || existing.baristaStatus !== localOrder.baristaStatus) {
+            await logOrderStatusChange({
+              orderId: localOrderId, statusField: 'barista',
+              fromStatus: existing?.baristaStatus ?? null, toStatus: localOrder.baristaStatus,
+              source: 'olsera_webhook', metadata: { olseraRawStatus: olseraStatus, event },
+            });
+          }
+          if (!existing || existing.kitchenStatus !== localOrder.kitchenStatus) {
+            await logOrderStatusChange({
+              orderId: localOrderId, statusField: 'kitchen',
+              fromStatus: existing?.kitchenStatus ?? null, toStatus: localOrder.kitchenStatus,
+              source: 'olsera_webhook', metadata: { olseraRawStatus: olseraStatus, event },
+            });
+          }
         } catch (dbErr) {
           console.warn(`[Olsera Webhook] Order ${localOrderId} not found in local DB, broadcasting minimal payload.`);
         }

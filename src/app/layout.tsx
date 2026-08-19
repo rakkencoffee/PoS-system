@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -30,6 +30,15 @@ export const metadata: Metadata = {
     shortcut: '/rakken-icon.svg',
     apple: '/rakken-icon.svg',
   },
+};
+
+// Kiosk devices (tablets) shouldn't let customers pinch-zoom or accidentally
+// scale the layout mid-order.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 import QueryProvider from "@/providers/QueryProvider";

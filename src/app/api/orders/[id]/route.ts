@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { pusherServer } from '@/lib/pusher';
 import { prisma } from '@/lib/db';
 import { getMenuItems } from '@/lib/integrations/pos.adapter';
+import { logOrderStatusChange } from '@/lib/order-status-log';
 
 const USE_OLSERA = process.env.USE_OLSERA === 'true';
 
@@ -453,10 +454,27 @@ export async function PATCH(
         else if (stationType === 'kitchen') updateData.kitchenStatus = newKdsStatus;
         else updateData.status = newKdsStatus; // Fallback
 
+        const prevBaristaStatus = localOrder.baristaStatus;
+        const prevKitchenStatus = localOrder.kitchenStatus;
+
         localOrder = await (prisma.order as any).update({
           where: { id },
           data: updateData
         });
+
+        if (stationType === 'barista' && prevBaristaStatus !== localOrder.baristaStatus) {
+          await logOrderStatusChange({
+            orderId: id, statusField: 'barista',
+            fromStatus: prevBaristaStatus, toStatus: localOrder.baristaStatus,
+            source: 'kds_manual', metadata: { stationType },
+          });
+        } else if (stationType === 'kitchen' && prevKitchenStatus !== localOrder.kitchenStatus) {
+          await logOrderStatusChange({
+            orderId: id, statusField: 'kitchen',
+            fromStatus: prevKitchenStatus, toStatus: localOrder.kitchenStatus,
+            source: 'kds_manual', metadata: { stationType },
+          });
+        }
 
         // 3. Determine overall Olsera status
         let olseraStatus: 'P' | 'A' | 'S' | 'Z' | 'X' = 'P';
@@ -481,9 +499,15 @@ export async function PATCH(
 
         // Update overall local order status if changed
         if (localOrder.status !== localStatus) {
+          const prevOverallStatus = localOrder.status;
           localOrder = await prisma.order.update({
             where: { id },
             data: { status: localStatus }
+          });
+          await logOrderStatusChange({
+            orderId: id, statusField: 'order',
+            fromStatus: prevOverallStatus, toStatus: localStatus,
+            source: 'kds_manual', metadata: { stationType },
           });
         }
 

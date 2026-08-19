@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
       const { after } = await import("next/server");
       after(async () => {
         const posAdapter = await import("@/lib/integrations/pos.adapter");
-        await posAdapter.updateOrderPaymentStatus(finalOrderId, "paid", 0);
+        await posAdapter.updateOrderPaymentStatus(finalOrderId, "paid", 0, "system_voucher_100");
       });
 
       return NextResponse.json({

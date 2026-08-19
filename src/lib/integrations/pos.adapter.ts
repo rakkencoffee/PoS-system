@@ -11,6 +11,7 @@
 
 import * as olsera from "./olsera.service";
 import type { OlseraProduct, OlseraProductGroup } from "./olsera.service";
+import { logOrderStatusChange, type StatusLogSource } from "@/lib/order-status-log";
 
 const USE_OLSERA = process.env.USE_OLSERA === "true";
 
@@ -352,8 +353,12 @@ export async function createOrder(
     }
 
     // 1. Create open order (Header only) - VERY FAST (<500ms)
+    // The name typed at checkout always wins — matchedCustomer is only used
+    // to LINK order history (customer_id), never to override what the
+    // customer actually entered. Its name is a fallback purely for the case
+    // where no name was typed at all.
     const order = await olsera.createOrder([], {
-      customer_name: matchedCustomer?.name || customerName,
+      customer_name: customerName || matchedCustomer?.name,
       customer_phone: customerPhone,
       customer_id: matchedCustomer?.id,
     });
@@ -577,6 +582,15 @@ export async function createOrder(
           },
         });
         console.log(`[Sync] Order OLSERA-${orderId} (${orderNo}) Queue=#${String(queueNum).padStart(3, '0')} mirrored.`);
+
+        await logOrderStatusChange({
+          orderId: `OLSERA-${orderId}`,
+          statusField: "order",
+          fromStatus: null,
+          toStatus: "PENDING",
+          source: "order_created",
+          metadata: { olseraOrderId: orderId, orderNo, queueNumber: queueNum },
+        });
       } catch (dbErr) {
         console.warn(`[Sync] Failed to mirror order to local database:`, dbErr);
       }
@@ -603,6 +617,8 @@ export async function updateOrderPaymentStatus(
   orderId: string,
   status: "paid" | "failed" | "expired",
   paymentAmount?: number,
+  source: StatusLogSource = "olsera_settlement",
+  extraMetadata?: Record<string, unknown>,
 ): Promise<void> {
   if (USE_OLSERA && orderId.startsWith("OLSERA-")) {
     const olseraOrderId = parseInt(orderId.replace("OLSERA-", ""));
@@ -749,9 +765,15 @@ export async function updateOrderPaymentStatus(
           // createOrder's runInBackground) that can still be in flight here —
           // retry briefly instead of failing outright when the row isn't there yet.
           let updated = false;
+          let previousStatus: string | null = null;
           const MAX_ATTEMPTS = 8;
           for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             try {
+              const before = await prisma.order.findUnique({
+                where: { id: orderId },
+                select: { status: true },
+              });
+              previousStatus = before?.status ?? null;
               await prisma.order.update({
                 where: { id: orderId },
                 data: { status: "PAID" },
@@ -765,6 +787,15 @@ export async function updateOrderPaymentStatus(
           }
           if (!updated) throw new Error(`Local order ${orderId} row never appeared`);
           console.log(`[Sync] Local order ${orderId} updated to PAID.`);
+
+          await logOrderStatusChange({
+            orderId,
+            statusField: "order",
+            fromStatus: previousStatus,
+            toStatus: "PAID",
+            source,
+            metadata: { paymentAmount, olseraOrderId, ...extraMetadata },
+          });
 
           // Step 6: Create Print Job in the Cloud Print Queue automatically
           try {
@@ -861,8 +892,34 @@ export async function updateOrderPaymentStatus(
       }
     } else {
       console.log(
-        `[Olsera POS] Order ${orderId} status: ${status}. No Olsera action needed.`,
+        `[Olsera POS] Order ${orderId} status: ${status}. Marking local order as CANCELLED.`,
       );
+      try {
+        const { prisma } = await import("@/lib/db");
+        const before = await prisma.order.findUnique({
+          where: { id: orderId },
+          select: { status: true },
+        });
+        if (before && before.status !== "CANCELLED" && before.status !== "PAID") {
+          await prisma.order.update({
+            where: { id: orderId },
+            data: { status: "CANCELLED" },
+          });
+          await logOrderStatusChange({
+            orderId,
+            statusField: "order",
+            fromStatus: before.status,
+            toStatus: "CANCELLED",
+            source,
+            metadata: { midtransStatus: status, ...extraMetadata },
+          });
+        }
+      } catch (cancelErr) {
+        console.warn(
+          `[Auto-Settlement] Failed to mark order ${orderId} as CANCELLED (non-blocking):`,
+          cancelErr,
+        );
+      }
     }
     return;
   }
@@ -986,6 +1043,14 @@ export async function updateOrderPaymentStatus(
           },
         });
         console.log(`[Recovery] ✅ Local DB updated for ${orderId}`);
+        await logOrderStatusChange({
+          orderId,
+          statusField: "order",
+          fromStatus: existing.status,
+          toStatus: "PAID",
+          source: "system_recovery",
+          metadata: { recoveredOlseraId, originalOrderId: orderId },
+        });
       } else {
         // Buat record baru jika belum ada (checkout awal gagal total)
         await prisma.order.create({
@@ -1004,6 +1069,14 @@ export async function updateOrderPaymentStatus(
         console.log(
           `[Recovery] ✅ New local DB record created for ${recoveredOlseraId || orderId}`,
         );
+        await logOrderStatusChange({
+          orderId: recoveredOlseraId || orderId,
+          statusField: "order",
+          fromStatus: null,
+          toStatus: "PAID",
+          source: "system_recovery",
+          metadata: { recoveredOlseraId, originalOrderId: orderId },
+        });
       }
     } catch (dbErr: any) {
       console.warn(

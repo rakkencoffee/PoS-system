@@ -41,11 +41,34 @@ model Order {
   updatedAt           DateTime    @updatedAt
   cashier             User        @relation(fields: [cashierId], references: [id])
   items               OrderItem[]
+  statusLogs          OrderStatusLog[]
 
   @@index([stationId, createdAt])
   @@index([status])
   @@index([createdAt])
   @@index([olseraSynced])
+}
+
+// Jurnal/audit trail setiap perubahan status order (order/barista/kitchen),
+// mencatat sumber perubahan supaya bisa ditelusuri kapan/dari mana/kenapa.
+model OrderStatusLog {
+  id          String   @id @default(cuid())
+  orderId     String
+  statusField String   // "order" | "barista" | "kitchen"
+  fromStatus  String?  // null = entri pertama (order baru dibuat)
+  toStatus    String
+  source      String   // order_created | midtrans_webhook | midtrans_manual_verify |
+                        // system_voucher_100 | olsera_settlement | kds_manual |
+                        // olsera_webhook | system_recovery
+  actorId     String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([orderId, createdAt])
+  @@index([orderId, statusField])
+  @@index([source])
 }
 
 model OrderItem {

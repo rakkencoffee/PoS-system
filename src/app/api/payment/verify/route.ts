@@ -62,11 +62,11 @@ export async function POST(request: NextRequest) {
     const grossAmount = msData.gross_amount ? parseFloat(msData.gross_amount) : undefined;
     
     if (finalStatus === 'success') {
-      await updateOrderPaymentStatus(orderId, 'paid', grossAmount);
+      await updateOrderPaymentStatus(orderId, 'paid', grossAmount, 'midtrans_manual_verify', { midtransTxStatus: txStatus });
     } else if (finalStatus === 'failed') {
-      await updateOrderPaymentStatus(orderId, 'failed');
+      await updateOrderPaymentStatus(orderId, 'failed', undefined, 'midtrans_manual_verify', { midtransTxStatus: txStatus });
     } else if (finalStatus === 'expired') {
-      await updateOrderPaymentStatus(orderId, 'expired');
+      await updateOrderPaymentStatus(orderId, 'expired', undefined, 'midtrans_manual_verify', { midtransTxStatus: txStatus });
     }
 
     return NextResponse.json({ 
