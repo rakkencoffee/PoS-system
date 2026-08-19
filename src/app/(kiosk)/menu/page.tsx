@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCartStore } from '@/stores/useCartStore';
 import { useDebouncedCallback } from 'use-debounce';
@@ -222,7 +222,7 @@ function CategoryPills({ categories, selected, onSelect, compact = false }: Cate
 /* ─────────────────────────────────────────────
    Main Page
 ───────────────────────────────────────────── */
-export default function MenuNewPage() {
+function MenuPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { itemCount, totalAmount } = useCartStore();
@@ -593,5 +593,13 @@ export default function MenuNewPage() {
         <CustomizeModal item={selectedItem} onClose={() => setSelectedItem(null)} />
       )}
     </div>
+  );
+}
+
+export default function MenuPage() {
+  return (
+    <Suspense fallback={null}>
+      <MenuPageContent />
+    </Suspense>
   );
 }
