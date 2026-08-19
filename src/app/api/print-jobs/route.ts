@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
     try {
       const { pusherServer } = await import('@/lib/pusher');
       await pusherServer.trigger('print-queue', 'NEW_JOB', { jobId: job.id });
+      console.log(`[PrintQueue] NEW_JOB broadcast sent for job ${job.id}`);
     } catch (pusherErr) {
       console.warn('[PrintQueue] Failed to broadcast NEW_JOB (non-blocking):', pusherErr);
     }

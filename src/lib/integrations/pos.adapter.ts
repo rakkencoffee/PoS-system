@@ -882,6 +882,7 @@ export async function updateOrderPaymentStatus(
               try {
                 const { pusherServer } = await import("@/lib/pusher");
                 await pusherServer.trigger('print-queue', 'NEW_JOB', { jobId: createdJob.id });
+                console.log(`[Auto-Settlement] NEW_JOB broadcast sent for job ${createdJob.id}`);
               } catch (printPusherErr) {
                 console.warn('[Auto-Settlement] Failed to broadcast NEW_JOB (non-blocking):', printPusherErr);
               }
