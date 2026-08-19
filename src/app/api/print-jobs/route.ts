@@ -53,6 +53,16 @@ export async function POST(request: NextRequest) {
 
     console.log(`[PrintQueue] ✅ Job created: ${job.id} for order ${payload.orderId}`);
 
+    // Nudge the print-bridge daemon to check right away instead of waiting
+    // for its next poll tick. Non-fatal — the daemon's own polling loop is
+    // the safety net if this push never arrives.
+    try {
+      const { pusherServer } = await import('@/lib/pusher');
+      await pusherServer.trigger('print-queue', 'NEW_JOB', { jobId: job.id });
+    } catch (pusherErr) {
+      console.warn('[PrintQueue] Failed to broadcast NEW_JOB (non-blocking):', pusherErr);
+    }
+
     return NextResponse.json({
       jobId: job.id,
       status: job.status,

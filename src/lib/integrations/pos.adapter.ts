@@ -868,7 +868,7 @@ export async function updateOrderPaymentStatus(
                 paymentMethod: localOrderFull?.paymentMethod || 'E-Wallet',
               };
 
-              await prisma.printJob.create({
+              const createdJob = await prisma.printJob.create({
                 data: {
                   orderId: orderId,
                   payload: printPayload,
@@ -876,6 +876,15 @@ export async function updateOrderPaymentStatus(
                 }
               });
               console.log(`[Auto-Settlement] Cloud Print Job created for ${orderId} with ${itemsPayload.length} items.`);
+
+              // Nudge the print-bridge daemon instead of making it wait for
+              // its next poll tick.
+              try {
+                const { pusherServer } = await import("@/lib/pusher");
+                await pusherServer.trigger('print-queue', 'NEW_JOB', { jobId: createdJob.id });
+              } catch (printPusherErr) {
+                console.warn('[Auto-Settlement] Failed to broadcast NEW_JOB (non-blocking):', printPusherErr);
+              }
             }
           } catch (printJobErr) {
             console.warn(`[Auto-Settlement] Failed to automatically create cloud print job:`, printJobErr);

@@ -495,12 +495,38 @@ app.listen(PORT, () => {
   console.log(`  POST http://localhost:${PORT}/test     — Test print`);
   console.log('');
 
-  // Start polling if CLOUD_API_URL is configured
+  // Start polling if CLOUD_API_URL is configured. This stays on as the
+  // safety net even with Pusher below — if the push event never arrives
+  // (daemon reconnecting, Pusher hiccup), the job still gets picked up
+  // within one poll interval instead of sitting forever.
   if (CLOUD_API_URL) {
     console.log(`[Daemon] 🔄 Starting print queue poller pointing to ${CLOUD_API_URL} every ${CLOUD_POLLING_INTERVAL}ms`);
     setInterval(pollCloudPrintJobs, CLOUD_POLLING_INTERVAL);
   } else {
     console.log('[Daemon] ⚠️ CLOUD_API_URL not configured. Running in local-only mode.');
+  }
+
+  // Instant push notification for new print jobs, on top of the polling
+  // above — cuts the usual "wait up to one poll interval" delay down to
+  // near-zero. Non-fatal if it can't connect; polling alone still works.
+  const PUSHER_KEY = process.env.PUSHER_KEY;
+  const PUSHER_CLUSTER = process.env.PUSHER_CLUSTER;
+  if (CLOUD_API_URL && PUSHER_KEY && PUSHER_CLUSTER) {
+    try {
+      const Pusher = require('pusher-js');
+      const pusher = new Pusher(PUSHER_KEY, { cluster: PUSHER_CLUSTER });
+      const channel = pusher.subscribe('print-queue');
+      channel.bind('NEW_JOB', (data) => {
+        console.log(`[Daemon] ⚡ Instant notify for job ${data?.jobId || '?'} — checking queue now`);
+        pollCloudPrintJobs();
+      });
+      pusher.connection.bind('error', (err) => {
+        console.warn('[Daemon] ⚠️ Pusher connection error (polling still active):', err?.error?.data?.message || err);
+      });
+      console.log('[Daemon] ⚡ Instant print notifications enabled via Pusher');
+    } catch (pusherSetupErr) {
+      console.warn('[Daemon] ⚠️ Could not enable instant notifications, falling back to polling only:', pusherSetupErr.message);
+    }
   }
 
   // Auto-try connect to printer on startup
