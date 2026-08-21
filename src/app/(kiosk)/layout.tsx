@@ -1,6 +1,8 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
+import { useEffect } from 'react';
+import { captureStationFromUrl } from '@/lib/station';
 
 export default function KioskLayout({
   children,
@@ -9,6 +11,10 @@ export default function KioskLayout({
 }) {
   const pathname = usePathname();
   const isLandingPage = pathname === '/';
+
+  useEffect(() => {
+    captureStationFromUrl();
+  }, []);
 
   return (
     <div

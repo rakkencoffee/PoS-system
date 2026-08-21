@@ -8,6 +8,7 @@ import { db, encryptPendingOrder } from '@/lib/dexie';
 import { payWithEDC } from '@/lib/print-bridge';
 import { CartItem } from '@/lib/types';
 import { KioskHeader } from '@/components/kiosk/KioskHeader';
+import { getStation } from '@/lib/station';
 import * as Sentry from "@sentry/nextjs";
 
 function buildOrderItems(items: CartItem[]) {
@@ -188,6 +189,7 @@ export default function CheckoutNewPage() {
         customerName: customerName,
         customerPhone: customerPhone,
         voucherCode: appliedDiscount > 0 ? voucherCode : undefined,
+        station: getStation(),
       });
 
       if (data.freeOrder) {
@@ -222,6 +224,7 @@ export default function CheckoutNewPage() {
         customerPhone: customerPhone,
         voucherCode: appliedDiscount > 0 ? voucherCode : undefined,
         paymentMethod: 'EDC',
+        station: getStation(),
       });
 
       setPaymentStatus('Please tap/swipe card on EDC terminal...');

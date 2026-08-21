@@ -37,6 +37,33 @@ const PORT = process.env.PORT || 3001;
 const PRINTER_PORT = process.env.PRINTER_PORT || 'COM7';
 const BAUD_RATE = parseInt(process.env.BAUD_RATE || '9600');
 
+// Print output mode: 'serial' (default, Bluetooth QPOS produksi) atau 'tcp'
+// (raw network printing — dipakai buat validasi virtual-printer/printer WiFi baru)
+const PRINT_MODE = (process.env.PRINT_MODE || 'serial').toLowerCase();
+const PRINTER_TCP_HOST = process.env.PRINTER_TCP_HOST || '';
+const PRINTER_TCP_PORT = parseInt(process.env.PRINTER_TCP_PORT || '9100');
+
+// Routing per-station (multi tablet, tiap tablet punya printer sendiri).
+// Format .env: STATION_MAP={"A":{"mode":"serial"},"B":{"mode":"tcp","host":"192.168.1.102","port":9100}}
+// Catatan: cuma ada 1 koneksi serial (Bluetooth) yang didukung sekaligus — kalau
+// beberapa station butuh serial secara bersamaan, itu butuh refactor lebih lanjut.
+// Station yang gak ada di map (atau STATION_MAP gak di-set) fallback ke config global di atas.
+let STATION_MAP = {};
+if (process.env.STATION_MAP) {
+  try {
+    STATION_MAP = JSON.parse(process.env.STATION_MAP);
+  } catch (err) {
+    console.warn('[Print Bridge] STATION_MAP bukan JSON valid, diabaikan:', err.message);
+  }
+}
+
+function resolvePrinterConfig(station) {
+  if (station && STATION_MAP[station]) return STATION_MAP[station];
+  return PRINT_MODE === 'tcp'
+    ? { mode: 'tcp', host: PRINTER_TCP_HOST, port: PRINTER_TCP_PORT }
+    : { mode: 'serial' };
+}
+
 // EDC Config (Verifone X990)
 const EDC_HOST = process.env.EDC_HOST || '192.168.1.100'; // Change to EDC static IP
 const EDC_PORT = parseInt(process.env.EDC_PORT || '7000');
@@ -154,7 +181,7 @@ function stopReconnectLoop() {
   }
 }
 
-function writeToPrinter(buffer) {
+function writeToPrinterSerial(buffer) {
   return new Promise(async (resolve, reject) => {
     const timeout = setTimeout(() => {
       console.error('❌ Printer write/drain timeout (10 seconds) reached.');
@@ -180,6 +207,43 @@ function writeToPrinter(buffer) {
       reject(err);
     }
   });
+}
+
+// Kirim raw bytes langsung ke IP:port (raw network printing / virtual-printer test)
+function writeToPrinterTCP(buffer, host = PRINTER_TCP_HOST, port = PRINTER_TCP_PORT) {
+  return new Promise((resolve, reject) => {
+    if (!host) {
+      return reject(new Error('Mode tcp tapi host tujuan belum di-set (PRINTER_TCP_HOST atau STATION_MAP)'));
+    }
+
+    const socket = new net.Socket();
+    const timeout = setTimeout(() => {
+      socket.destroy();
+      reject(new Error(`TCP print timeout (10 detik) ke ${host}:${port}`));
+    }, 10000);
+
+    socket.connect(port, host, () => {
+      socket.write(buffer, () => socket.end());
+    });
+
+    socket.on('close', () => {
+      clearTimeout(timeout);
+      resolve();
+    });
+
+    socket.on('error', (err) => {
+      clearTimeout(timeout);
+      reject(err);
+    });
+  });
+}
+
+function writeToPrinter(buffer, station) {
+  const config = resolvePrinterConfig(station);
+  if (config.mode === 'tcp') {
+    return writeToPrinterTCP(buffer, config.host, config.port || 9100);
+  }
+  return writeToPrinterSerial(buffer);
 }
 
 // ─── ROUTES ─────────────────────────────────────────────────
@@ -241,8 +305,8 @@ app.post('/print', authMiddleware, async (req, res) => {
     const labelsBuffer = formatDrinkLabels(data);
     const finalBuffer = Buffer.concat([receiptBuffer, labelsBuffer]);
 
-    // Kirim ke printer
-    await writeToPrinter(finalBuffer);
+    // Kirim ke printer (routing per-station kalau di-body-nya ada `station`)
+    await writeToPrinter(finalBuffer, data.station);
 
     console.log(`✅ Receipt printed: ${data.orderId}`);
     res.json({ success: true, orderId: data.orderId });
@@ -437,10 +501,10 @@ async function pollCloudPrintJobs() {
           const labelsBuffer = formatDrinkLabels(data);
           const finalBuffer = Buffer.concat([receiptBuffer, labelsBuffer]);
 
-          // Write to printer
-          await writeToPrinter(finalBuffer);
+          // Write to printer (routing per-station kalau ada)
+          await writeToPrinter(finalBuffer, job.station);
 
-          console.log(`[Daemon] ✅ Successfully printed job ${job.id}`);
+          console.log(`[Daemon] ✅ Successfully printed job ${job.id}${job.station ? ` (station ${job.station})` : ''}`);
 
           // Update status in the cloud
           await fetchWithTimeout(`${CLOUD_API_URL}/api/print-jobs/${job.id}`, {
@@ -484,9 +548,22 @@ app.listen(PORT, () => {
   console.log('║   🖨️  RAKKEN Coffee — Print Bridge        ║');
   console.log('╠═══════════════════════════════════════════╣');
   console.log(`║   Server:  http://localhost:${PORT}          ║`);
-  console.log(`║   Printer: ${PRINTER_PORT.padEnd(30)}║`);
-  console.log(`║   Baud:    ${String(BAUD_RATE).padEnd(30)}║`);
+  if (PRINT_MODE === 'tcp') {
+    console.log(`║   Mode:    TCP (raw network print)          ║`);
+    console.log(`║   Target:  ${`${PRINTER_TCP_HOST}:${PRINTER_TCP_PORT}`.padEnd(30)}║`);
+  } else {
+    console.log(`║   Mode:    Serial (Bluetooth)               ║`);
+    console.log(`║   Printer: ${PRINTER_PORT.padEnd(30)}║`);
+    console.log(`║   Baud:    ${String(BAUD_RATE).padEnd(30)}║`);
+  }
   console.log('╚═══════════════════════════════════════════╝');
+  if (Object.keys(STATION_MAP).length > 0) {
+    console.log('Station routing (STATION_MAP):');
+    for (const [station, config] of Object.entries(STATION_MAP)) {
+      const target = config.mode === 'tcp' ? `${config.host}:${config.port || 9100}` : 'Serial (Bluetooth)';
+      console.log(`  Station ${station} -> ${config.mode} (${target})`);
+    }
+  }
   console.log('');
   console.log('Endpoints:');
   console.log(`  GET  http://localhost:${PORT}/health   — Status`);
@@ -529,10 +606,15 @@ app.listen(PORT, () => {
     }
   }
 
-  // Auto-try connect to printer on startup
-  openPrinter().catch(() => {
-    console.log(`⚠️  Printer not connected yet. Starting auto-reconnect loop...`);
-    console.log(`   (Bluetooth may still be initializing. Will keep trying every ${RECONNECT_INTERVAL / 1000}s)`);
-    startReconnectLoop();
-  });
+  // Auto-try connect to printer on startup — skip kalau gak ada satupun station/config
+  // yang butuh serial (semua tcp berarti gak ada perlunya buka COM port sama sekali)
+  const anyStationUsesSerial = Object.values(STATION_MAP).some(c => c.mode === 'serial');
+  const needsSerial = PRINT_MODE !== 'tcp' || anyStationUsesSerial;
+  if (needsSerial) {
+    openPrinter().catch(() => {
+      console.log(`⚠️  Printer not connected yet. Starting auto-reconnect loop...`);
+      console.log(`   (Bluetooth may still be initializing. Will keep trying every ${RECONNECT_INTERVAL / 1000}s)`);
+      startReconnectLoop();
+    });
+  }
 });

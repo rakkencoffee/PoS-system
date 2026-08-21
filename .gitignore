@@ -3,6 +3,7 @@
 # dependencies
 /node_modules
 print-bridge/node_modules
+print-bridge/printed-receipts
 /.pnp
 .pnp.*
 .yarn/*

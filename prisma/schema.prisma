@@ -23,6 +23,7 @@ model User {
 model Order {
   id                  String      @id
   stationId           String
+  printStation        String?     // A/B/C — tablet asal order, buat routing print job ke printer yang benar
   cashierId           String
   tableNumber         String?
   queueNumber         Int?        // Daily queue number (001, 002, ...) resets at 00:00 WIB
@@ -153,6 +154,7 @@ model PrintJob {
   orderId      String
   payload      Json     // PrintReceiptData (orderId, items, total, dll)
   status       String   @default("PENDING") // PENDING, PRINTING, PRINTED, FAILED
+  station      String?  // A/B/C — dipakai print-bridge buat routing ke printer yang benar
   attempts     Int      @default(0)
   errorMessage String?
   createdAt    DateTime @default(now())

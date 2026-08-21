@@ -336,6 +336,7 @@ export async function createOrder(
   discountAmount: number = 0,
   voucherCode?: string,
   customerPhone?: string,
+  station?: string | null,
 ): Promise<{ orderId: string; olseraOrderId?: number; orderNo?: string; queueNumber?: number }> {
   if (USE_OLSERA) {
     // CRM (F5): if the customer left a phone number, try to match an existing
@@ -556,6 +557,7 @@ export async function createOrder(
           data: {
             id: `OLSERA-${orderId}`,
             stationId: "KIOSK", // Kiosk self-service
+            printStation: station || null,
             cashierId: "cmo83g6140000vq5g10u03858", // Valid system user for Kiosk sync
             queueNumber: queueNum || null,
             total: finalTotal,
@@ -873,6 +875,7 @@ export async function updateOrderPaymentStatus(
                   orderId: orderId,
                   payload: printPayload,
                   status: 'PENDING',
+                  station: localOrderFull?.printStation || null,
                 }
               });
               console.log(`[Auto-Settlement] Cloud Print Job created for ${orderId} with ${itemsPayload.length} items.`);
