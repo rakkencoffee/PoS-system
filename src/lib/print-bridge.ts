@@ -40,6 +40,7 @@ export interface PrintReceiptData {
     cardNo: string;
     refNo: string;
   };
+  station?: string | null;
 }
 
 /**

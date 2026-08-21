@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Receipt } from '@/components/pos/Receipt';
 import { type PrintReceiptData } from '@/lib/print-bridge';
+import { getStation } from '@/lib/station';
 
 function buildReceiptData(
   orderNo: string,
@@ -56,6 +57,7 @@ function buildReceiptData(
       cardNo: edcData.cardNo || '',
       refNo: orderId || '',
     } : undefined,
+    station: getStation(),
   };
 }
 
