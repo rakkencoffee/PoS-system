@@ -42,6 +42,7 @@ export const viewport: Viewport = {
 };
 
 import QueryProvider from "@/providers/QueryProvider";
+import AuthSessionProvider from "@/providers/AuthSessionProvider";
 import SentryProvider from "@/components/SentryProvider";
 import OfflineSyncProvider from "@/components/OfflineSyncProvider";
 
@@ -85,11 +86,13 @@ export default function RootLayout({
       </head>
       <body className={`${inter.variable} ${plusJakartaSans.variable} ${jetbrainsMono.variable} font-sans`}>
         <SentryProvider>
-          <OfflineSyncProvider>
-            <QueryProvider>
-              {children}
-            </QueryProvider>
-          </OfflineSyncProvider>
+          <AuthSessionProvider>
+            <OfflineSyncProvider>
+              <QueryProvider>
+                {children}
+              </QueryProvider>
+            </OfflineSyncProvider>
+          </AuthSessionProvider>
         </SentryProvider>
       </body>
     </html>

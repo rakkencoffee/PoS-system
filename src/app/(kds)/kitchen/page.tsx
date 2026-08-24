@@ -1,5 +1,10 @@
 import { KdsView } from '@/components/kds/KdsView';
+import { KdsAuthGate } from '@/components/kds/KdsAuthGate';
 
 export default function KitchenPage() {
-  return <KdsView type="kitchen" title="Kitchen Station" />;
+  return (
+    <KdsAuthGate station="Kitchen">
+      <KdsView type="kitchen" title="Kitchen Station" />
+    </KdsAuthGate>
+  );
 }

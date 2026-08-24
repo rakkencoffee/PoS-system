@@ -25,50 +25,43 @@ export const authConfig = {
       const isLoggedIn = !!auth?.user;
       const { pathname } = nextUrl;
 
-      // Handle login redirection
-      if (pathname === '/login') {
-        if (isLoggedIn) {
-          return Response.redirect(new URL('/pos', nextUrl));
-        }
+      // /barista and /kitchen handle their own auth client-side (KdsAuthGate shows
+      // an inline login form when unauthenticated) — there's no standalone /login
+      // page to redirect to, so let the middleware pass these through untouched.
+      if (pathname.startsWith('/barista') || pathname.startsWith('/kitchen')) {
         return true;
       }
 
       // Protect all other routes
       if (!isLoggedIn) {
         // Allow public assets and auth APIs
-        const isPublic = 
-          pathname === '/' || 
-          pathname.startsWith('/_next') || 
-          pathname.startsWith('/api/auth') || 
-          pathname.startsWith('/api/webhooks') || 
-          pathname.startsWith('/api/jobs') || 
-          pathname.startsWith('/api/categories') || 
-          pathname.startsWith('/api/menu') || 
-          pathname.startsWith('/api/products') || 
-          pathname.startsWith('/api/payment') || 
-          pathname.startsWith('/menu') || 
-          pathname.startsWith('/cart') || 
-          pathname.startsWith('/checkout') || 
-          pathname.startsWith('/success') || 
-          pathname.startsWith('/status') || 
+        const isPublic =
+          pathname === '/' ||
+          pathname.startsWith('/_next') ||
+          pathname.startsWith('/api/auth') ||
+          pathname.startsWith('/api/webhooks') ||
+          pathname.startsWith('/api/jobs') ||
+          pathname.startsWith('/api/categories') ||
+          pathname.startsWith('/api/menu') ||
+          pathname.startsWith('/api/products') ||
+          pathname.startsWith('/api/payment') ||
+          pathname.startsWith('/menu') ||
+          pathname.startsWith('/cart') ||
+          pathname.startsWith('/checkout') ||
+          pathname.startsWith('/success') ||
+          pathname.startsWith('/status') ||
           pathname.startsWith('/favicon.ico');
 
         if (isPublic) return true;
-        return false; // Redirects to login
-      }
-
-      // Role check for KDS
-      if ((pathname.startsWith('/barista') || pathname.startsWith('/kitchen')) && 
-          !['KITCHEN', 'ADMIN'].includes((auth?.user as any)?.role)) {
-        return Response.redirect(new URL('/login', nextUrl));
+        return false; // Redirects to signIn page
       }
 
       return true;
     },
   },
   pages: {
-    signIn: '/login',
-    error: '/login',
+    signIn: '/kitchen',
+    error: '/kitchen',
   },
   session: {
     strategy: 'jwt',
