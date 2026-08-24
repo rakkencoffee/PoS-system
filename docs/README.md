@@ -13,6 +13,12 @@ docs/
 └── reference/          # Referensi tambahan
 ```
 
+## Product
+
+| Dokumen | Deskripsi |
+|---------|-----------|
+| [PRD.md](PRD.md) | Product Requirements Document: masalah, tujuan, persona, scope fitur, user flow, keputusan arsitektur printer, dan roadmap. |
+
 ## Architecture
 
 | Dokumen | Deskripsi |
