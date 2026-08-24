@@ -57,6 +57,16 @@ if (process.env.STATION_MAP) {
   }
 }
 
+// Optional safety scope for THIS daemon instance. Format .env:
+// DAEMON_STATIONS=A  (comma-separated, e.g. "A,B")
+// When set, jobs for any other station are left completely untouched (never
+// fetched into processing, never PATCHed) so another daemon elsewhere — e.g.
+// the real Bluetooth daemon at the outlet — can still claim them normally.
+// Leave unset to keep the old behaviour (process every station, as before).
+const DAEMON_STATIONS = process.env.DAEMON_STATIONS
+  ? process.env.DAEMON_STATIONS.split(',').map((s) => s.trim()).filter(Boolean)
+  : null;
+
 function resolvePrinterConfig(station) {
   if (station && STATION_MAP[station]) return STATION_MAP[station];
   return PRINT_MODE === 'tcp'
@@ -472,7 +482,20 @@ async function pollCloudPrintJobs() {
       return;
     }
 
-    const { jobs } = await res.json();
+    const { jobs: allJobs } = await res.json();
+
+    // Scope down to stations this daemon instance actually owns, if configured.
+    // Jobs for other stations are left alone entirely — no PATCH, no fetch of
+    // their payload — so a daemon elsewhere polling the same queue still sees
+    // them as PENDING and can claim them normally.
+    const jobs = DAEMON_STATIONS
+      ? allJobs.filter((j) => j.station && DAEMON_STATIONS.includes(j.station))
+      : allJobs;
+
+    if (DAEMON_STATIONS && allJobs.length > jobs.length) {
+      console.log(`[Daemon] Skipping ${allJobs.length - jobs.length} job(s) outside DAEMON_STATIONS=${DAEMON_STATIONS.join(',')}`);
+    }
+
     if (jobs && jobs.length > 0) {
       console.log(`[Daemon] 📥 Found ${jobs.length} pending print jobs...`);
 
