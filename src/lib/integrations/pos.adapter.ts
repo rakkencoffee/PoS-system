@@ -880,6 +880,18 @@ export async function updateOrderPaymentStatus(
               });
               console.log(`[Auto-Settlement] Cloud Print Job created for ${orderId} with ${itemsPayload.length} items.`);
 
+              // Stations configured in STATION_PRINTER_MAP skip the local
+              // daemon entirely — send straight from the server.
+              try {
+                const { tryDirectPrint } = await import("@/lib/print/direct-print");
+                const printed = await tryDirectPrint(createdJob.station, printPayload);
+                if (printed) {
+                  await prisma.printJob.update({ where: { id: createdJob.id }, data: { status: 'PRINTED' } });
+                }
+              } catch (directPrintErr) {
+                console.warn('[Auto-Settlement] Direct print attempt failed (non-blocking):', directPrintErr);
+              }
+
               // Nudge the print-bridge daemon instead of making it wait for
               // its next poll tick.
               try {
