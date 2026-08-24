@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { useKitchenOrders, useUpdateOrderStatus } from '@/hooks/useOrders';
+import { useKitchenOrders, useUpdateOrderStatus, getKdsLastSyncedAt } from '@/hooks/useOrders';
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useQueryClient } from '@tanstack/react-query';
 import { OrderData } from '@/lib/types';
 
@@ -14,8 +15,16 @@ export function KdsView({ type, title }: KdsViewProps) {
   const queryClient = useQueryClient();
   const { data: orders = [], isLoading: loading, refetch: fetchOrders, isFetching: refreshing } = useKitchenOrders();
   const updateStatusMutation = useUpdateOrderStatus();
-  
+  const isOnline = useOnlineStatus();
+
   const [searchQuery, setSearchQuery] = useState('');
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+
+  // Pull the last-known-good sync timestamp so the offline banner can say "as of HH:mm"
+  useEffect(() => {
+    if (isOnline) return;
+    getKdsLastSyncedAt().then(setLastSyncedAt).catch(() => {});
+  }, [isOnline]);
 
   // Listen for Pusher real-time updates
   useEffect(() => {
@@ -142,8 +151,12 @@ export function KdsView({ type, title }: KdsViewProps) {
   }, [filteredOrders, type]);
 
   const updateOrderStatus = (orderId: number | string, newStatus: string) => {
+    if (!isOnline) {
+      alert('Koneksi terputus — data yang ditampilkan mungkin basi, aksi dinonaktifkan sampai online kembali.');
+      return;
+    }
     console.log(`[KdsView - ${type}] updateOrderStatus called for ID: ${orderId}, target newStatus: ${newStatus}`);
-    updateStatusMutation.mutate({ 
+    updateStatusMutation.mutate({
       orderId, 
       status: newStatus,
       stationType: type
@@ -246,14 +259,16 @@ export function KdsView({ type, title }: KdsViewProps) {
           {displayStatus === 'PENDING' ? (
             <button
               onClick={() => updateOrderStatus(order.id, 'PREPARING')}
-              className="flex-1 py-3 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-500 active:scale-95 transition-all"
+              disabled={!isOnline}
+              className="flex-1 py-3 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-500 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
             >
               👨‍🍳 Start Making
             </button>
           ) : (
             <button
               onClick={() => updateOrderStatus(order.id, 'COMPLETED')}
-              className="flex-1 py-3 rounded-xl bg-green-600 text-white font-bold text-sm hover:bg-green-500 active:scale-95 transition-all"
+              disabled={!isOnline}
+              className="flex-1 py-3 rounded-xl bg-green-600 text-white font-bold text-sm hover:bg-green-500 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
             >
               🎉 Complete
             </button>
@@ -270,12 +285,26 @@ export function KdsView({ type, title }: KdsViewProps) {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-black tracking-tight text-white uppercase">{title}</h1>
-              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/20">
-                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                <span className="text-[10px] font-black text-green-500 uppercase tracking-widest">Live</span>
-              </div>
+              {isOnline ? (
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/20">
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                  <span className="text-[10px] font-black text-green-500 uppercase tracking-widest">Live</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20">
+                  <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                  <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">Offline</span>
+                </div>
+              )}
             </div>
             <p className="text-zinc-500 text-sm mt-1 font-medium">{filteredOrders.length} active orders filtered</p>
+            {!isOnline && (
+              <div className="mt-3 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-300 max-w-md">
+                Koneksi terputus. Menampilkan data terakhir
+                {lastSyncedAt ? ` jam ${new Date(lastSyncedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}` : ''}
+                — aksi status dinonaktifkan sampai koneksi kembali.
+              </div>
+            )}
           </div>
 
           {/* Search Bar */}

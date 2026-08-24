@@ -1,18 +1,40 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { db } from '@/lib/dexie';
 
 export function useKitchenOrders() {
   return useQuery({
     queryKey: ['orders', 'kitchen'],
     queryFn: async () => {
-      const res = await fetch('/api/orders?today=true');
-      if (!res.ok) throw new Error('Failed to fetch orders');
-      const data = await res.json();
-      return Array.isArray(data) ? data.filter((o: any) => o.status !== 'COMPLETED') : [];
+      try {
+        const res = await fetch('/api/orders?today=true');
+        if (!res.ok) throw new Error('Failed to fetch orders');
+        const data = await res.json();
+        const orders = Array.isArray(data) ? data.filter((o: any) => o.status !== 'COMPLETED') : [];
+
+        // Cache the last known-good order list so KDS still shows something if the network drops.
+        db.transaction('rw', db.kdsOrders, db.syncStatus, async () => {
+          await db.kdsOrders.clear();
+          await db.kdsOrders.bulkPut(orders);
+          await db.syncStatus.put({ id: 'kds-orders', lastSynced: new Date().toISOString() });
+        }).catch(() => {});
+
+        return orders;
+      } catch (error) {
+        console.warn('[useKitchenOrders] Offline mode: falling back to cached orders from Dexie');
+        const syncStatus = await db.syncStatus.get('kds-orders');
+        if (syncStatus) return await db.kdsOrders.toArray();
+        throw error;
+      }
     },
     refetchInterval: 30000, // Safety-net only — Pusher (realtime) is the primary update path
     refetchOnWindowFocus: false, // JANGAN refetch otomatis saat browser/window focus
     staleTime: 5000, // Anggap data fresh selama 5 detik
   });
+}
+
+export async function getKdsLastSyncedAt(): Promise<string | null> {
+  const status = await db.syncStatus.get('kds-orders');
+  return status?.lastSynced ?? null;
 }
 
 export function useUpdateOrderStatus() {

@@ -45,6 +45,7 @@ export class PosDatabase extends Dexie {
   menuItems!: Table<LocalMenuItem>;
   pendingOrders!: Table<PendingOrder>;
   syncStatus!: Table<SyncStatus>;
+  kdsOrders!: Table<any>;
 
   constructor() {
     super('PosDatabase');
@@ -53,6 +54,13 @@ export class PosDatabase extends Dexie {
       menuItems: '++id, categorySlug, name, isBestSeller, isRecommended',
       pendingOrders: '++id, orderId, status',
       syncStatus: 'id'
+    });
+    this.version(3).stores({
+      categories: '++id, slug, name',
+      menuItems: '++id, categorySlug, name, isBestSeller, isRecommended',
+      pendingOrders: '++id, orderId, status',
+      syncStatus: 'id',
+      kdsOrders: 'id'
     });
   }
 }
