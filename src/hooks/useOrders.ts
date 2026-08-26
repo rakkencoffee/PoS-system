@@ -26,7 +26,7 @@ export function useKitchenOrders() {
         throw error;
       }
     },
-    refetchInterval: 30000, // Safety-net only — Pusher (realtime) is the primary update path
+    refetchInterval: 60000, // Safety-net only — Pusher (realtime) is the primary update path
     refetchOnWindowFocus: false, // JANGAN refetch otomatis saat browser/window focus
     staleTime: 5000, // Anggap data fresh selama 5 detik
   });
