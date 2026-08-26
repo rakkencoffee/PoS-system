@@ -5,8 +5,11 @@ const SENTRY_DSN = process.env.NEXT_PUBLIC_SENTRY_DSN || "https://bedd9bc292ae7d
 Sentry.init({
   dsn: SENTRY_DSN,
 
-  // IMPORTANT: Set debug to true to see if Sentry fails to send data in your browser console
-  debug: true,
+  // Verbose Sentry internals logging — leave off in production, it dumps
+  // hundreds of console lines on every pageload and adds real main-thread
+  // overhead during page load. Flip to true locally if Sentry setup needs
+  // debugging again.
+  debug: false,
 
   // Kiosk polls several endpoints on tight intervals (KDS, print status) —
   // tracing 100% of that burns through Sentry quota on repetitive noise.

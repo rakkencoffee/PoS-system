@@ -56,7 +56,7 @@ export default function RootLayout({
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link rel="preload" href="/api/menu" as="fetch" crossOrigin="anonymous" />
+        <link rel="preload" href="/api/menu" as="fetch" fetchPriority="low" />
         <link rel="preload" href="https://api-dash.olsera.co.id/img/no_data_item.png" as="image" fetchPriority="high" />
         <script
           dangerouslySetInnerHTML={{
@@ -80,6 +80,7 @@ export default function RootLayout({
         </noscript>
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#A8131E" />
+        <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Rakken POS" />
