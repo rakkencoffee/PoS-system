@@ -162,6 +162,7 @@ model PrintJob {
 
   @@index([status])
   @@index([createdAt])
+  @@index([orderId])
 }
 
 // Daily queue counter — resets at 00:00 WIB each day
