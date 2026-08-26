@@ -47,23 +47,29 @@ export async function GET(request: NextRequest) {
         });
         const localMap = new Map(localOrders.map((lo: any) => [lo.id, lo]));
 
-        // 4. Fetch details for each active order sequentially with rate limit protection
-        const enrichedOrders = [];
-        for (const o of activeOrdersToEnrich) {
-          try {
-            const numericId = o.id || o.order_id;
-            const detail = await olsera.getOrderDetail(numericId);
-            enrichedOrders.push({ ...o, ...detail });
-            
-            // Add a small delay to respect Olsera's rate limits
-            await new Promise(resolve => setTimeout(resolve, 300));
-          } catch (err) {
-            console.error(`[API] Failed to fetch detail for order ${o.id}:`, err);
-            enrichedOrders.push({
-              ...o,
-              items: [{ product_name: 'Menu (Detail Loading...)', qty: 1, group_name: 'Other' }]
-            });
-          }
+        // 4. Fetch details for active orders in small concurrent batches.
+        // getOrderDetail() already has its own 429 detection + backoff retry,
+        // so a fixed per-call sleep here was redundant on top of that — this
+        // caps concurrency instead of either serializing everything or firing
+        // all requests at once.
+        const DETAIL_FETCH_CONCURRENCY = 5;
+        const enrichedOrders: any[] = [];
+        for (let i = 0; i < activeOrdersToEnrich.length; i += DETAIL_FETCH_CONCURRENCY) {
+          const batch = activeOrdersToEnrich.slice(i, i + DETAIL_FETCH_CONCURRENCY);
+          const batchResults = await Promise.all(batch.map(async (o) => {
+            try {
+              const numericId = o.id || o.order_id;
+              const detail = await olsera.getOrderDetail(numericId);
+              return { ...o, ...detail };
+            } catch (err) {
+              console.error(`[API] Failed to fetch detail for order ${o.id}:`, err);
+              return {
+                ...o,
+                items: [{ product_name: 'Menu (Detail Loading...)', qty: 1, group_name: 'Other' }]
+              };
+            }
+          }));
+          enrichedOrders.push(...batchResults);
         }
 
         // 4. Fetch master menu to map categories accurately based on product names
