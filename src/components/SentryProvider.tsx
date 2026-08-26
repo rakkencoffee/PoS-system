@@ -1,37 +1,8 @@
-'use client';
-
-import { useEffect } from 'react';
-import * as Sentry from "@sentry/nextjs";
-
+// Sentry is already initialized by sentry.client.config.ts (loaded
+// automatically by @sentry/nextjs) — this used to also call Sentry.init()
+// manually here with hardcoded debug:true/tracesSampleRate:1.0, which ran
+// AFTER the real config and silently overrode it back to full verbosity
+// and 100% tracing on every client mount.
 export default function SentryProvider({ children }: { children: React.ReactNode }) {
-  useEffect(() => {
-    // This only runs on the client
-    if (typeof window !== 'undefined') {
-      const dsn = "https://bedd9bc292ae7d644aae6d362677d8c6@o4511267465723904.ingest.us.sentry.io/4511267473719296";
-      
-      console.log('[Sentry Init] Initializing manually via SentryProvider');
-      
-      Sentry.init({
-        dsn: dsn,
-        debug: true,
-        tracesSampleRate: 1.0,
-        replaysOnErrorSampleRate: 0,
-        replaysSessionSampleRate: 0,
-        tunnel: "/sentry-tunnel",
-        enableLogs: true,
-        integrations: [
-          Sentry.consoleLoggingIntegration({ levels: ["log", "warn", "error"] }),
-        ],
-      });
-
-      // Pancingan: Kirim log pertama untuk membuka dashboard Sentry Logs
-      console.log('[Sentry] System check: Logging integration is now active.');
-      Sentry.logger.info('POS System Sentry Logs Activated', { 
-        log_source: 'sentry_init_pancingan',
-        environment: process.env.NODE_ENV 
-      });
-    }
-  }, []);
-
   return <>{children}</>;
 }
