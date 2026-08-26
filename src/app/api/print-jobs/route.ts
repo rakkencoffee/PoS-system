@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 
 const PRINT_BRIDGE_API_KEY = process.env.NEXT_PUBLIC_PRINT_BRIDGE_API_KEY || '';
@@ -43,14 +44,31 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const job = await prisma.printJob.create({
-      data: {
-        orderId: dbOrderId,
-        payload: payload, // Store entire PrintReceiptData as JSON
-        status: 'PENDING',
-        station: payload.station || null,
+    let job;
+    try {
+      job = await prisma.printJob.create({
+        data: {
+          orderId: dbOrderId,
+          payload: payload, // Store entire PrintReceiptData as JSON
+          status: 'PENDING',
+          station: payload.station || null,
+        }
+      });
+    } catch (createErr) {
+      // Race: the settlement webhook (pos.adapter.ts) created the job for
+      // this order between our dedup check above and this create call.
+      if (createErr instanceof Prisma.PrismaClientKnownRequestError && createErr.code === 'P2002') {
+        const raced = await prisma.printJob.findFirst({ where: { orderId: dbOrderId } });
+        if (raced) {
+          return NextResponse.json({
+            jobId: raced.id,
+            status: raced.status,
+            message: 'Print job already exists for this order'
+          });
+        }
       }
-    });
+      throw createErr;
+    }
 
     console.log(`[PrintQueue] ✅ Job created: ${job.id} for order ${payload.orderId}`);
 

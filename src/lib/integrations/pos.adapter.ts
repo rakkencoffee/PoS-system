@@ -12,6 +12,7 @@
 import * as olsera from "./olsera.service";
 import type { OlseraProduct, OlseraProductGroup } from "./olsera.service";
 import { logOrderStatusChange, type StatusLogSource } from "@/lib/order-status-log";
+import { Prisma } from "@prisma/client";
 
 const USE_OLSERA = process.env.USE_OLSERA === "true";
 
@@ -870,36 +871,51 @@ export async function updateOrderPaymentStatus(
                 paymentMethod: localOrderFull?.paymentMethod || 'E-Wallet',
               };
 
-              const createdJob = await prisma.printJob.create({
-                data: {
-                  orderId: orderId,
-                  payload: printPayload,
-                  status: 'PENDING',
-                  station: localOrderFull?.printStation || null,
-                }
-              });
-              console.log(`[Auto-Settlement] Cloud Print Job created for ${orderId} with ${itemsPayload.length} items.`);
-
-              // Stations configured in STATION_PRINTER_MAP skip the local
-              // daemon entirely — send straight from the server.
+              let createdJob;
               try {
-                const { tryDirectPrint } = await import("@/lib/print/direct-print");
-                const printed = await tryDirectPrint(createdJob.station, printPayload);
-                if (printed) {
-                  await prisma.printJob.update({ where: { id: createdJob.id }, data: { status: 'PRINTED' } });
+                createdJob = await prisma.printJob.create({
+                  data: {
+                    orderId: orderId,
+                    payload: printPayload,
+                    status: 'PENDING',
+                    station: localOrderFull?.printStation || null,
+                  }
+                });
+              } catch (createErr) {
+                // Race: the client-side POST (print-jobs/route.ts, fired from
+                // success/page.tsx) created the job for this order between
+                // our dedup check above and this create call.
+                if (createErr instanceof Prisma.PrismaClientKnownRequestError && createErr.code === 'P2002') {
+                  console.log(`[Auto-Settlement] Print job for ${orderId} already exists (race with client-side create), skipping.`);
+                } else {
+                  throw createErr;
                 }
-              } catch (directPrintErr) {
-                console.warn('[Auto-Settlement] Direct print attempt failed (non-blocking):', directPrintErr);
               }
 
-              // Nudge the print-bridge daemon instead of making it wait for
-              // its next poll tick.
-              try {
-                const { pusherServer } = await import("@/lib/pusher");
-                await pusherServer.trigger('print-queue', 'NEW_JOB', { jobId: createdJob.id });
-                console.log(`[Auto-Settlement] NEW_JOB broadcast sent for job ${createdJob.id}`);
-              } catch (printPusherErr) {
-                console.warn('[Auto-Settlement] Failed to broadcast NEW_JOB (non-blocking):', printPusherErr);
+              if (createdJob) {
+                console.log(`[Auto-Settlement] Cloud Print Job created for ${orderId} with ${itemsPayload.length} items.`);
+
+                // Stations configured in STATION_PRINTER_MAP skip the local
+                // daemon entirely — send straight from the server.
+                try {
+                  const { tryDirectPrint } = await import("@/lib/print/direct-print");
+                  const printed = await tryDirectPrint(createdJob.station, printPayload);
+                  if (printed) {
+                    await prisma.printJob.update({ where: { id: createdJob.id }, data: { status: 'PRINTED' } });
+                  }
+                } catch (directPrintErr) {
+                  console.warn('[Auto-Settlement] Direct print attempt failed (non-blocking):', directPrintErr);
+                }
+
+                // Nudge the print-bridge daemon instead of making it wait for
+                // its next poll tick.
+                try {
+                  const { pusherServer } = await import("@/lib/pusher");
+                  await pusherServer.trigger('print-queue', 'NEW_JOB', { jobId: createdJob.id });
+                  console.log(`[Auto-Settlement] NEW_JOB broadcast sent for job ${createdJob.id}`);
+                } catch (printPusherErr) {
+                  console.warn('[Auto-Settlement] Failed to broadcast NEW_JOB (non-blocking):', printPusherErr);
+                }
               }
             }
           } catch (printJobErr) {
