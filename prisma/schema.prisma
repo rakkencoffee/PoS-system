@@ -151,7 +151,7 @@ enum OrderStatus {
 // Cloud Print Queue — struk dikirim dari tablet via cloud, ditarik oleh daemon lokal
 model PrintJob {
   id           String   @id @default(cuid())
-  orderId      String
+  orderId      String   @unique // one print job per order, ever — enforces the dedup that both create paths (client checkout, server settlement) only check advisorily
   payload      Json     // PrintReceiptData (orderId, items, total, dll)
   status       String   @default("PENDING") // PENDING, PRINTING, PRINTED, FAILED
   station      String?  // A/B/C — dipakai print-bridge buat routing ke printer yang benar
@@ -162,7 +162,6 @@ model PrintJob {
 
   @@index([status])
   @@index([createdAt])
-  @@index([orderId])
 }
 
 // Daily queue counter — resets at 00:00 WIB each day
