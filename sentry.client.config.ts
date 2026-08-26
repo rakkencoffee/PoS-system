@@ -8,7 +8,9 @@ Sentry.init({
   // IMPORTANT: Set debug to true to see if Sentry fails to send data in your browser console
   debug: true,
 
-  tracesSampleRate: 1.0,
+  // Kiosk polls several endpoints on tight intervals (KDS, print status) —
+  // tracing 100% of that burns through Sentry quota on repetitive noise.
+  tracesSampleRate: 0.1,
 
   // Enable Logs for better debug visibility
   enableLogs: true,
