@@ -6,9 +6,22 @@
  * Kept as a close mirror of the print-bridge version so both stay easy to compare.
  */
 
+import { RAKKEN_LOGO_576, RAKKEN_LOGO_384, type LogoRaster } from './rakken-logo';
+
 const ESC = 0x1b;
 const GS = 0x1d;
 const LF = 0x0a;
+
+/** ESC/POS raster bit image command (GS v 0) — width must be a multiple of 8. */
+function logoRasterCommand(logo: LogoRaster): Buffer {
+  const bytesPerRow = logo.width / 8;
+  const header = Buffer.from([
+    GS, 0x76, 0x30, 0x00,
+    bytesPerRow & 0xff, (bytesPerRow >> 8) & 0xff,
+    logo.height & 0xff, (logo.height >> 8) & 0xff,
+  ]);
+  return Buffer.concat([header, logo.data]);
+}
 
 const CMD = {
   INIT: Buffer.from([ESC, 0x40]),
@@ -115,9 +128,7 @@ export function formatReceipt(data: ReceiptData, lineWidth = 48): Buffer {
   add(CMD.LINE_SPACING_DEFAULT);
 
   add(CMD.ALIGN_CENTER);
-  add(CMD.BOLD_ON);
-  add(CMD.SIZE_DOUBLE_W);
-  add(textBuf('RAKKEN COFFEE'));
+  add(logoRasterCommand(lineWidth >= 48 ? RAKKEN_LOGO_576 : RAKKEN_LOGO_384));
   newline();
   add(CMD.SIZE_NORMAL);
   add(CMD.BOLD_OFF);

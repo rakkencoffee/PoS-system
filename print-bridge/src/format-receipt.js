@@ -5,10 +5,23 @@
  * Uses raw ESC/POS byte commands for precise thermal printer control.
  */
 
+const { RAKKEN_LOGO_384 } = require('./rakken-logo');
+
 // ─── ESC/POS COMMAND CONSTANTS ──────────────────────────────
 const ESC = 0x1B;
 const GS = 0x1D;
 const LF = 0x0A;
+
+/** ESC/POS raster bit image command (GS v 0) — width must be a multiple of 8. */
+function logoRasterCommand(logo) {
+  const bytesPerRow = logo.width / 8;
+  const header = Buffer.from([
+    GS, 0x76, 0x30, 0x00,
+    bytesPerRow & 0xff, (bytesPerRow >> 8) & 0xff,
+    logo.height & 0xff, (logo.height >> 8) & 0xff,
+  ]);
+  return Buffer.concat([header, logo.data]);
+}
 
 const CMD = {
   // Initialize printer
@@ -152,9 +165,7 @@ function formatReceipt(data) {
   // HEADER — Brand
   // ═══════════════════════════════════════
   add(CMD.ALIGN_CENTER);
-  add(CMD.BOLD_ON);
-  add(CMD.SIZE_DOUBLE_W);
-  add(textBuf('RAKKEN COFFEE'));
+  add(logoRasterCommand(RAKKEN_LOGO_384));
   newline();
   add(CMD.SIZE_NORMAL);
   add(CMD.BOLD_OFF);
