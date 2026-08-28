@@ -130,12 +130,14 @@ export function formatReceipt(data: ReceiptData, lineWidth = 48): Buffer {
   add(CMD.ALIGN_CENTER);
   add(logoRasterCommand(lineWidth >= 48 ? RAKKEN_LOGO_576 : RAKKEN_LOGO_384));
   newline();
+  newline(); // gap biar alamat gak mepet ke logo
   add(CMD.SIZE_NORMAL);
   add(CMD.BOLD_OFF);
-  add(textBuf('STARTFRIDAY SPECIALTY'));
-  newline();
-  add(textBuf('South Jakarta'));
-  newline();
+  const addressLines = wrapText('Jl. HR. Soebrantas, Simpang Baru, Kec. Tampan, Kota Pekanbaru, Riau', 0);
+  for (const al of addressLines) {
+    add(textBuf(al));
+    newline();
+  }
 
   add(CMD.ALIGN_LEFT);
   add(doubleLine());
