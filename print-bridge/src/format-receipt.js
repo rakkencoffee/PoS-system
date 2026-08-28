@@ -5,7 +5,8 @@
  * Uses raw ESC/POS byte commands for precise thermal printer control.
  */
 
-const { RAKKEN_LOGO_384 } = require('./rakken-logo');
+const { RAKKEN_LOGO_288 } = require('./rakken-logo');
+const { buildHeaderRaster } = require('./dynamic-header');
 
 // ─── ESC/POS COMMAND CONSTANTS ──────────────────────────────
 const ESC = 0x1B;
@@ -23,9 +24,45 @@ function logoRasterCommand(logo) {
   return Buffer.concat([header, logo.data]);
 }
 
+/**
+ * ESC/POS QR code command sequence (GS ( k — printer generates the QR itself,
+ * no bitmap/raster data needed, so payload stays tiny regardless of QR size).
+ * @param {string} data - text/URL to encode
+ * @param {number} [moduleSize=6] - dot size per QR module (1-16, bigger = larger QR)
+ * @param {number} [errorCorrection=48] - 48=L, 49=M, 50=Q, 51=H
+ */
+function qrCodeCommand(data, moduleSize = 6, errorCorrection = 48) {
+  const dataBuf = Buffer.from(data, 'utf8');
+
+  // 1. Select model 2 (standard)
+  const selectModel = Buffer.from([GS, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00]);
+
+  // 2. Set module size
+  const setSize = Buffer.from([GS, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, moduleSize]);
+
+  // 3. Set error correction level
+  const setEC = Buffer.from([GS, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, errorCorrection]);
+
+  // 4. Store data (pL/pH = length of [m + data], m is fixed 0x30)
+  const storeLen = dataBuf.length + 3;
+  const storeData = Buffer.concat([
+    Buffer.from([GS, 0x28, 0x6B, storeLen & 0xff, (storeLen >> 8) & 0xff, 0x31, 0x50, 0x30]),
+    dataBuf,
+  ]);
+
+  // 5. Print the stored QR symbol
+  const printSymbol = Buffer.from([GS, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30]);
+
+  return Buffer.concat([selectModel, setSize, setEC, storeData, printSymbol]);
+}
+
 const CMD = {
   // Initialize printer
   INIT: Buffer.from([ESC, 0x40]),
+
+  // Font select (ESC M) — Font A = default (12x24), Font B = condensed (9x17, lebih kecil/gak full lebar kertas)
+  FONT_A: Buffer.from([ESC, 0x4D, 0x00]),
+  FONT_B: Buffer.from([ESC, 0x4D, 0x01]),
 
   // Text alignment
   ALIGN_LEFT: Buffer.from([ESC, 0x61, 0x00]),
@@ -165,14 +202,16 @@ function formatReceipt(data) {
   // HEADER — Brand
   // ═══════════════════════════════════════
   add(CMD.ALIGN_CENTER);
-  add(logoRasterCommand(RAKKEN_LOGO_384));
+  add(logoRasterCommand(RAKKEN_LOGO_288));
   newline();
+  newline(); // gap biar alamat gak mepet ke logo
   add(CMD.SIZE_NORMAL);
   add(CMD.BOLD_OFF);
-  add(textBuf('STARTFRIDAY SPECIALTY'));
-  newline();
-  add(textBuf('South Jakarta'));
-  newline();
+  const addressLines = wrapText('Jl. HR. Soebrantas, Simpang Baru, Kec. Tampan, Kota Pekanbaru, Riau', 0);
+  for (const al of addressLines) {
+    add(textBuf(al));
+    newline();
+  }
 
   // Divider
   add(CMD.ALIGN_LEFT);
@@ -410,7 +449,7 @@ function formatReceipt(data) {
  * Format Drink Labels into ESC/POS binary buffer
  * Prints individual labels for each drink cup.
  */
-function formatDrinkLabels(data) {
+async function formatDrinkLabels(data) {
   const parts = [];
   const add = (...buffers) => buffers.forEach(b => parts.push(b));
   const newline = () => add(CMD.FEED_LINE);
@@ -440,26 +479,32 @@ function formatDrinkLabels(data) {
     return nums.length > 3 ? nums.slice(-3) : nums.padStart(3, '0');
   })();
 
-  const now = new Date().toLocaleString('id-ID', {
-    dateStyle: 'medium',
-    timeStyle: 'medium',
-    timeZone: 'Asia/Jakarta',
-  });
+  // Header (logo kiri + nomor antrian kanan) di-generate SEKALI, dipakai ulang
+  // buat semua cup di order yang sama (nomor antreannya kan sama semua)
+  const headerRaster = await buildHeaderRaster(queueNum);
 
   for (const item of drinkItems) {
     const qty = item.quantity || 1;
     for (let i = 0; i < qty; i++) {
       add(CMD.INIT);
       add(CMD.LINE_SPACING_DEFAULT);
-      
-      // Header: No: 178         1/3
-      add(CMD.ALIGN_LEFT);
-      add(CMD.SIZE_NORMAL);
-      add(CMD.BOLD_ON);
-      add(leftRight(`No: ${queueNum}`, `${currentCup}/${totalCups}`));
+      add(CMD.FONT_B); // font kondensed biar teks gak full lebar kertas
+
+      // Header gabungan: logo pojok kiri, nomor antrian pojok kanan
+      add(CMD.ALIGN_CENTER);
+      add(logoRasterCommand(headerRaster));
       newline();
-      
-      // Name and Size
+
+      // Info line: nama pelanggan - jenis order - urutan cup (misal 01/02)
+      add(CMD.ALIGN_LEFT);
+      const customerLabel = data.customerName || 'Customer';
+      const orderTypeLabel = data.orderType === 'DINE_IN' ? 'Dine In' : 'Takeaway';
+      const cupNote = `${String(currentCup).padStart(2, '0')}/${String(totalCups).padStart(2, '0')}`;
+      add(textBuf(`${customerLabel} - ${orderTypeLabel} - ${cupNote}`));
+      newline();
+      newline(); // gap dikit sebelum menu
+
+      add(CMD.BOLD_ON);
       const name = item.menuItem?.name || item.name || 'Drink';
       const hasSizeInNotes = item.notes && item.notes.toLowerCase().includes('size:');
       const sizeStr = (item.size && item.size !== '-' && !hasSizeInNotes) ? ` (${item.size})` : '';
@@ -469,40 +514,34 @@ function formatDrinkLabels(data) {
         newline();
       }
       add(CMD.BOLD_OFF);
-      
-      // Notes / Customizations
+
+      // Notes / Customizations — 1 baris menyamping, dipisah "|" (bukan ke bawah),
+      // isinya persis sesuai nama di menu & pilihan customer (bukan teks bebas)
       if (item.notes) {
-        // For stickers, we split by ALL commas to put every variant on a new line for max readability
         const notesArray = item.notes.split(',').map(n => n.trim()).filter(Boolean);
-        for (let note of notesArray) {
-          // Remove "Size: " from the string for a cleaner sticker
-          note = note.replace(/^Size:\s*/i, '');
-          const noteLines = wrapText(`  * ${note.toUpperCase()}`, 0);
-          for (const nl of noteLines) {
-            add(textBuf(nl));
-            newline();
-          }
+        const cleaned = notesArray.map(note => note.replace(/^Size:\s*/i, '').toUpperCase());
+        const notesLine = cleaned.join(' | ');
+        const noteLines = wrapText(notesLine, 0);
+        for (const nl of noteLines) {
+          add(textBuf(nl));
+          newline();
         }
-      } else {
-        // Empty notes but add space for alignment if needed
-        newline();
       }
-      
-      // Footer Date/Time
+      newline(); // gap dikit sebelum tanggal
+
+      // Tanggal & Jam
+      const orderDate = new Date().toLocaleString('id-ID', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+        timeZone: 'Asia/Jakarta',
+      });
+      add(textBuf(orderDate));
       newline();
-      add(CMD.ALIGN_LEFT);
-      add(CMD.SIZE_NORMAL);
-      add(textBuf(now));
-      newline();
-      
-      // Cut line separator for manual tearing
-      newline();
-      add(line('-'));
-      newline();
-      
-      // Feed paper to ensure it's outside the printer lip
-      add(CMD.FEED_5);
-      
+
+      // Feed buat sobek manual (printer ini gak ada auto-cutter) — dinaikin
+      // dikit dari 1 baris karena tanggalnya kepotong pas sobek terlalu mepet
+      add(CMD.FEED_3);
+
       currentCup++;
     }
   }

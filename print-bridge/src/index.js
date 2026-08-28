@@ -312,7 +312,7 @@ app.post('/print', authMiddleware, async (req, res) => {
 
     // Format receipt ke ESC/POS binary commands
     const receiptBuffer = formatReceipt(data);
-    const labelsBuffer = formatDrinkLabels(data);
+    const labelsBuffer = await formatDrinkLabels(data);
     const finalBuffer = Buffer.concat([receiptBuffer, labelsBuffer]);
 
     // Kirim ke printer (routing per-station kalau di-body-nya ada `station`)
@@ -521,7 +521,7 @@ async function pollCloudPrintJobs() {
 
           // Format receipt & labels
           const receiptBuffer = formatReceipt(data);
-          const labelsBuffer = formatDrinkLabels(data);
+          const labelsBuffer = await formatDrinkLabels(data);
           const finalBuffer = Buffer.concat([receiptBuffer, labelsBuffer]);
 
           // Write to printer (routing per-station kalau ada)
