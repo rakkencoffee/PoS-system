@@ -836,10 +836,22 @@ export async function updateOrderPaymentStatus(
 
           // Step 6: Create Print Job in the Cloud Print Queue automatically
           try {
-            const localOrderFull = await prisma.order.findUnique({
+            // This runs concurrently with createOrder's own background sync task,
+            // which is the one that actually attaches items to the local Order row
+            // (its last step, after every item has been added to Olsera) — so the
+            // very first read here can easily land before that write, especially on
+            // multi-item orders. Retry briefly instead of printing with 0 items.
+            let localOrderFull = await prisma.order.findUnique({
               where: { id: orderId },
               include: { items: true }
             });
+            for (let attempt = 1; attempt <= 8 && localOrderFull && localOrderFull.items.length === 0; attempt++) {
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+              localOrderFull = await prisma.order.findUnique({
+                where: { id: orderId },
+                include: { items: true }
+              });
+            }
 
             // Prevent duplicate print jobs
             const existingJob = await prisma.printJob.findFirst({
