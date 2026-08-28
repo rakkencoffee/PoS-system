@@ -7,7 +7,7 @@
  */
 
 import net from 'net';
-import { formatReceipt, formatDrinkLabels, type ReceiptData } from './format-receipt';
+import { formatReceipt, type ReceiptData } from './format-receipt';
 
 export interface StationPrinterConfig {
   host: string;
@@ -85,11 +85,12 @@ export async function tryDirectPrint(
 
   try {
     const lineWidth = config.lineWidth ?? 48;
+    // Direct-print stations only print the receipt, not drink labels — unlike
+    // the print-bridge daemon path, these printers aren't set up for the
+    // combined receipt+labels roll.
     const receiptBuffer = formatReceipt(data, lineWidth);
-    const labelsBuffer = formatDrinkLabels(data, lineWidth);
-    const finalBuffer = Buffer.concat([receiptBuffer, labelsBuffer]);
 
-    await writeToSocket(config.host, config.port, finalBuffer);
+    await writeToSocket(config.host, config.port, receiptBuffer);
     console.log(`[DirectPrint] Sent order ${data.orderId} straight to station ${station} (${config.host}:${config.port})`);
     return true;
   } catch (err) {
