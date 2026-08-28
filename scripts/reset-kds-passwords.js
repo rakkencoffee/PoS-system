@@ -1,24 +1,12 @@
-// One-off: reset kitchen/barista KDS login passwords (password = username).
-// Runs inside the Vercel build step so it picks up the real production
-// DATABASE_URL (not obtainable locally) — see feedback_rakken_pos_prisma_db_push.
-const bcrypt = require('bcryptjs');
+// One-off: list all User rows (read-only) to find the real kitchen/barista
+// usernames in production before resetting their passwords.
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 (async () => {
-  const updates = [
-    { username: 'kitchen', password: 'kitchen' },
-    { username: 'barista', password: 'barista' },
-  ];
-
-  for (const { username, password } of updates) {
-    const passwordHash = await bcrypt.hash(password, 10);
-    const result = await prisma.user.updateMany({
-      where: { username },
-      data: { passwordHash },
-    });
-    console.log(`[ResetPassword] ${username}: matched ${result.count} row(s)`);
-  }
-
+  const users = await prisma.user.findMany({
+    select: { id: true, username: true, name: true, role: true },
+  });
+  console.log('[ListUsers]', JSON.stringify(users, null, 2));
   await prisma.$disconnect();
 })();
