@@ -57,7 +57,11 @@ function writeToSocket(host: string, port: number, buffer: Buffer, timeoutMs = 8
     socket.connect(port, host, () => {
       socket.write(buffer, (err) => {
         if (err) return finish(err);
-        finish();
+        // write()'s callback only means the OS accepted the bytes — cheap
+        // embedded printers on a slow WiFi link (RTT can be 800ms+) can still
+        // be mid-print; destroying the socket immediately truncates the job.
+        // Give it a moment to actually finish before tearing down.
+        setTimeout(() => finish(), 2000);
       });
     });
   });

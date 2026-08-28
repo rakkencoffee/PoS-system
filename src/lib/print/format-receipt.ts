@@ -6,7 +6,7 @@
  * Kept as a close mirror of the print-bridge version so both stay easy to compare.
  */
 
-import { RAKKEN_LOGO_576, RAKKEN_LOGO_384, type LogoRaster } from './rakken-logo';
+import { RAKKEN_LOGO_288, type LogoRaster } from './rakken-logo';
 
 const ESC = 0x1b;
 const GS = 0x1d;
@@ -128,7 +128,10 @@ export function formatReceipt(data: ReceiptData, lineWidth = 48): Buffer {
   add(CMD.LINE_SPACING_DEFAULT);
 
   add(CMD.ALIGN_CENTER);
-  add(logoRasterCommand(lineWidth >= 48 ? RAKKEN_LOGO_576 : RAKKEN_LOGO_384));
+  // RAKKEN_LOGO_576/384 TERBUKTI merusak data sesudahnya di printer fisik
+  // (raster GS v 0 di atas ~1600 byte kelewat besar buat buffer printer clone
+  // ini) — lihat catatan di rakken-logo.ts. RAKKEN_LOGO_288 proven-safe.
+  add(logoRasterCommand(RAKKEN_LOGO_288));
   newline();
   newline(); // gap biar alamat gak mepet ke logo
   add(CMD.SIZE_NORMAL);

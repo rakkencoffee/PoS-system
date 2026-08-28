@@ -5,7 +5,7 @@
  * Uses raw ESC/POS byte commands for precise thermal printer control.
  */
 
-const { RAKKEN_LOGO_288 } = require('./rakken-logo');
+const { RAKKEN_LOGO_288, RAKKEN_LOGO_576 } = require('./rakken-logo');
 const { buildHeaderRaster } = require('./dynamic-header');
 
 // ─── ESC/POS COMMAND CONSTANTS ──────────────────────────────
@@ -158,7 +158,7 @@ function wrapText(text, indent = 0) {
 
 /**
  * Format receipt data into ESC/POS binary buffer
- * 
+ *
  * @param {Object} data - Receipt data
  * @param {string} data.orderId - Order ID (e.g., "OLSERA-12345")
  * @param {string|number} data.queueNumber - Queue number
@@ -167,9 +167,11 @@ function wrapText(text, indent = 0) {
  * @param {number} data.total - Total amount
  * @param {number} [data.discount] - Discount amount
  * @param {string} data.paymentMethod - Payment method
+ * @param {number} [lineWidth] - chars per line — 32 for 58mm (default), 48 for 80mm (IW-J300H)
+ * @param {boolean} [cut] - kirim perintah partial-cut di akhir (printer harus punya auto-cutter)
  * @returns {Buffer} ESC/POS binary commands
  */
-function formatReceipt(data) {
+function formatReceipt(data, lineWidth = LINE_WIDTH, cut = false) {
   const parts = [];
 
   const add = (...buffers) => {
@@ -177,6 +179,39 @@ function formatReceipt(data) {
   };
 
   const newline = () => add(CMD.FEED_LINE);
+
+  // RAKKEN_LOGO_576 (6552 byte) TERBUKTI juga merusak data sesudahnya (alamat
+  // ke-skip) di printer fisik IW-J300H (WiFi/TCP) — pola sama kayak insiden
+  // QPOS di rakken-logo.js. RAKKEN_LOGO_288 (1584 byte) proven-safe di kedua
+  // printer, jadi dipakai buat semua lineWidth sampai ada logo raster khusus
+  // 80mm yang ukurannya lebih dijaga.
+  const logo = RAKKEN_LOGO_288;
+  const line = (char = '-') => textBuf(char.repeat(lineWidth));
+  const doubleLine = () => textBuf('='.repeat(lineWidth));
+  const leftRight = (left, right) => {
+    const space = lineWidth - left.length - right.length;
+    if (space < 1) {
+      const maxLeft = lineWidth - right.length - 1;
+      return textBuf(left.substring(0, maxLeft) + ' ' + right);
+    }
+    return textBuf(left + ' '.repeat(space) + right);
+  };
+  const wrapText = (text, indent = 0) => {
+    const maxLen = lineWidth - indent;
+    const prefix = ' '.repeat(indent);
+    const lines = [];
+    while (text.length > 0) {
+      if (text.length <= maxLen) {
+        lines.push(prefix + text);
+        break;
+      }
+      let breakAt = text.lastIndexOf(' ', maxLen);
+      if (breakAt <= 0) breakAt = maxLen;
+      lines.push(prefix + text.substring(0, breakAt));
+      text = text.substring(breakAt).trimStart();
+    }
+    return lines;
+  };
 
   // Current time
   const now = new Date().toLocaleString('id-ID', {
@@ -202,7 +237,7 @@ function formatReceipt(data) {
   // HEADER — Brand
   // ═══════════════════════════════════════
   add(CMD.ALIGN_CENTER);
-  add(logoRasterCommand(RAKKEN_LOGO_288));
+  add(logoRasterCommand(logo));
   newline();
   newline(); // gap biar alamat gak mepet ke logo
   add(CMD.SIZE_NORMAL);
@@ -439,8 +474,8 @@ function formatReceipt(data) {
   // Feed paper so receipt is fully visible
   add(CMD.FEED_5);
 
-  // Cut (if printer supports it — EPM58UB biasanya tidak punya auto-cutter)
-  // add(CMD.CUT_PARTIAL);
+  // Cut (opsional — cuma printer yang punya auto-cutter, misal IW-J300H)
+  if (cut) add(CMD.CUT_PARTIAL);
 
   return Buffer.concat(parts);
 }

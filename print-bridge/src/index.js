@@ -233,7 +233,12 @@ function writeToPrinterTCP(buffer, host = PRINTER_TCP_HOST, port = PRINTER_TCP_P
     }, 10000);
 
     socket.connect(port, host, () => {
-      socket.write(buffer, () => socket.end());
+      socket.write(buffer, () => {
+        // write() cuma nandain OS udah terima byte-nya — printer WiFi murah di
+        // link lambat (RTT bisa >800ms) bisa masih proses cetak; nutup socket
+        // langsung abis write() bisa motong data yang belum sempat dicetak.
+        setTimeout(() => socket.end(), 2000);
+      });
     });
 
     socket.on('close', () => {

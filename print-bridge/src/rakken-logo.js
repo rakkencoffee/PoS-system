@@ -26,6 +26,14 @@ const RAKKEN_LOGO_576 = {
 // benar — dipakai di formatReceipt() (struk). Buat formatDrinkLabels() (label
 // stiker) pakai RAKKEN_LOGO_200 di bawah, yang lebih kecil lagi (permintaan
 // user biar konten label gak full lebar kertas).
+//
+// NOTE (2026-08-28): RAKKEN_LOGO_576 (576x91, 6552 byte) — dimaksudkan buat
+// printer 80mm (IW-J300H) — TERBUKTI juga merusak data sesudahnya (alamat
+// ke-skip) di printer fisik itu lewat WiFi/TCP, pola identik sama insiden
+// QPOS di atas. formatReceipt() sekarang SELALU pakai RAKKEN_LOGO_288 buat
+// semua printer/lineWidth, terlepas dari lebar kertas, sampai ada logo raster
+// 80mm baru yang ukuran datanya dijaga tetap kecil (dibikin lebih tipis/pendek,
+// bukan sekadar di-scale linear dari yang 288, biar gak nabrak limit yang sama).
 const RAKKEN_LOGO_288 = {
   width: 288,
   height: 44,

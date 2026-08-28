@@ -43,7 +43,8 @@ const sampleReceipt = {
   total: 28000 * 2 + 25000,
 };
 
-const data = formatReceipt(sampleReceipt);
+// 48 = lebar 80mm (IW-J300H), cut = true — tes final semua fix bareng
+const data = formatReceipt(sampleReceipt, 48, true);
 
 console.log(`Menghubungkan ke ${host}:${port}...`);
 
@@ -52,7 +53,11 @@ const socket = new net.Socket();
 socket.connect(port, host, () => {
   console.log('Terhubung. Mengirim data print job...');
   socket.write(data, () => {
-    socket.end();
+    // Kasih jeda sebelum nutup koneksi — printer WiFi murah di link yang lambat
+    // (ping bisa >800ms) butuh waktu buat beneran proses & cetak buffer-nya;
+    // nutup socket langsung abis write() bisa motong data yang belum sempat dicetak.
+    console.log('Data terkirim, tunggu printer selesai proses sebelum tutup koneksi...');
+    setTimeout(() => socket.end(), 2000);
   });
 });
 
