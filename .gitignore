@@ -49,6 +49,7 @@ next-env.d.ts
 # IDE and tool settings
 .vscode/
 .claude/
+.impeccable/
 
 # credentials testing files
 test_env_fetch.mjs
