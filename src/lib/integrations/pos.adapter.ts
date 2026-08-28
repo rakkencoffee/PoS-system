@@ -376,6 +376,28 @@ export async function createOrder(
       console.warn(`[Queue] Failed to generate queue number:`, qErr);
     }
 
+    // 2.5. Create a minimal local Order row synchronously so queueNumber is
+    // immediately visible to KDS/print — without this, KDS falls back to
+    // `olseraOrderId % 1000` (a meaningless number) for the several seconds
+    // it takes step 3 below to finish and mirror the full order. Step 3c
+    // upserts this same row with items/total/status once that's done.
+    try {
+      const { prisma } = await import("@/lib/db");
+      await prisma.order.create({
+        data: {
+          id: `OLSERA-${orderId}`,
+          stationId: "KIOSK",
+          printStation: station || null,
+          cashierId: "cmo83g6140000vq5g10u03858",
+          queueNumber: queueNum || null,
+          total: 0,
+          status: "PENDING",
+        },
+      });
+    } catch (earlyCreateErr) {
+      console.warn(`[Queue] Failed to create early Order row for ${orderId} (non-fatal, background sync will retry):`, earlyCreateErr);
+    }
+
     // 3. Offload all heavy synchronization steps to the background
     runInBackground(async () => {
       console.log(`[Sync] Starting background synchronization for POS order #${orderId}`);
@@ -554,8 +576,33 @@ export async function createOrder(
         );
         const finalTotal = Math.max(0, baseTotal - discountAmount);
 
-        await prisma.order.create({
-          data: {
+        const itemsCreate = items.map((item) => {
+          // Format customization details for local receipt fallback
+          let displayNotes = item.note || "";
+          const optStr = formatOptionsWithToppings(item.options);
+          if (optStr) displayNotes = displayNotes ? `${displayNotes} (${optStr})` : optStr;
+
+          return {
+            olseraId: item.productId,
+            name: item.name || "Item",
+            quantity: item.quantity,
+            price: item.price || 0,
+            subtotal: (item.price || 0) * item.quantity,
+            notes: displayNotes,
+          };
+        });
+
+        // Upsert, not create — the early minimal row from step 2.5 usually
+        // already exists at this point; this fills in items/total/status.
+        await prisma.order.upsert({
+          where: { id: `OLSERA-${orderId}` },
+          update: {
+            total: finalTotal,
+            baristaStatus: hasCoffee ? "PENDING" : "COMPLETED",
+            kitchenStatus: hasFood ? "PENDING" : "COMPLETED",
+            items: { create: itemsCreate },
+          },
+          create: {
             id: `OLSERA-${orderId}`,
             stationId: "KIOSK", // Kiosk self-service
             printStation: station || null,
@@ -565,23 +612,7 @@ export async function createOrder(
             status: "PENDING",
             baristaStatus: hasCoffee ? "PENDING" : "COMPLETED",
             kitchenStatus: hasFood ? "PENDING" : "COMPLETED",
-            items: {
-              create: items.map((item) => {
-                // Format customization details for local receipt fallback
-                let displayNotes = item.note || "";
-                const optStr = formatOptionsWithToppings(item.options);
-                if (optStr) displayNotes = displayNotes ? `${displayNotes} (${optStr})` : optStr;
-
-                return {
-                  olseraId: item.productId,
-                  name: item.name || "Item",
-                  quantity: item.quantity,
-                  price: item.price || 0,
-                  subtotal: (item.price || 0) * item.quantity,
-                  notes: displayNotes,
-                };
-              }),
-            },
+            items: { create: itemsCreate },
           },
         });
         console.log(`[Sync] Order OLSERA-${orderId} (${orderNo}) Queue=#${String(queueNum).padStart(3, '0')} mirrored.`);
