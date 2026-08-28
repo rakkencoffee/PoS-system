@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCartStore } from '@/stores/useCartStore';
-import { useCreateOrder, useValidateVoucher, usePaymentConfig } from '@/hooks/useOrders';
+import { useCreateOrder, useValidateVoucher } from '@/hooks/useOrders';
 import { db, encryptPendingOrder } from '@/lib/dexie';
-import { payWithEDC } from '@/lib/print-bridge';
 import { CartItem } from '@/lib/types';
 import { KioskHeader } from '@/components/kiosk/KioskHeader';
 import { getStation } from '@/lib/station';
@@ -63,22 +62,6 @@ function savePrintData(cartItems: CartItem[], orderId: string) {
   } catch (_) {}
 }
 
-declare global {
-  interface Window {
-    snap?: {
-      pay: (
-        token: string,
-        options: {
-          onSuccess?: (result: Record<string, unknown>) => void;
-          onPending?: (result: Record<string, unknown>) => void;
-          onError?: (result: Record<string, unknown>) => void;
-          onClose?: () => void;
-        }
-      ) => void;
-    };
-  }
-}
-
 const isFoodCategory = (categoryName?: string) => {
   if (!categoryName) return false;
   const lower = categoryName.toLowerCase();
@@ -100,8 +83,6 @@ export default function CheckoutNewPage() {
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<string>('');
-  const [snapLoaded, setSnapLoaded] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'online' | 'edc'>('online');
   const [searchQuery, setSearchQuery] = useState('');
   const goSearch = (value: string) => router.push(`/menu?search=${encodeURIComponent(value)}`);
   const checkoutInProgress = useRef(false);
@@ -115,7 +96,6 @@ export default function CheckoutNewPage() {
   // TanStack Query Hooks
   const createOrderMutation = useCreateOrder();
   const validateVoucherMutation = useValidateVoucher();
-  const { data: paymentConfig } = usePaymentConfig();
 
   useEffect(() => {
     if (itemCount === 0 && !checkoutInProgress.current) {
@@ -123,63 +103,10 @@ export default function CheckoutNewPage() {
     }
   }, [itemCount, router]);
 
-  // Load Midtrans Snap.js dynamically
-  const loadSnapScript = useCallback(() => {
-    if (window.snap || !paymentConfig) {
-      if (window.snap) setSnapLoaded(true);
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = paymentConfig.snapUrl;
-    script.setAttribute('data-client-key', paymentConfig.clientKey);
-    script.onload = () => setSnapLoaded(true);
-    script.onerror = () => console.error('Failed to load Midtrans Snap');
-    document.head.appendChild(script);
-  }, [paymentConfig]);
-
-  useEffect(() => {
-    loadSnapScript();
-  }, [loadSnapScript]);
-
-  const triggerSnapPopup = (token: string, id: string, queueNumber: number, orderNo?: string, redirectPath?: string) => {
-    setPaymentStatus('Opening payment...');
-    if (window.snap) {
-      window.snap.pay(token, {
-        onSuccess: async () => {
-          setPaymentStatus('Payment successful!');
-          savePrintData(items, id);
-          clearCart();
-          const queueNum = queueNumber.toString();
-          const orderNoParam = orderNo ? `&orderNo=${orderNo}` : '';
-          router.push(`/success?orderId=${id}&queue=${queueNum}${orderNoParam}&orderType=${orderType}`);
-        },
-        onPending: () => {
-          setPaymentStatus('Waiting for payment...');
-          clearCart();
-          router.push(`/status?orderId=${id}&status=pending`);
-        },
-        onError: () => {
-          setPaymentStatus('');
-          setIsProcessing(false);
-          checkoutInProgress.current = false;
-          alert('Payment failed. Please try again.');
-        },
-        onClose: () => {
-          setPaymentStatus('');
-          setIsProcessing(false);
-          checkoutInProgress.current = false;
-        },
-      });
-    } else if (redirectPath) {
-      window.location.href = redirectPath;
-    }
-  };
-
   const handleCheckout = async () => {
     checkoutInProgress.current = true;
     setIsProcessing(true);
-    setPaymentStatus('Creating payment...');
+    setPaymentStatus('Memproses pesanan...');
 
     try {
       const data = await createOrderMutation.mutateAsync({
@@ -193,57 +120,14 @@ export default function CheckoutNewPage() {
         orderType,
       });
 
-      if (data.freeOrder) {
-        // Voucher covered the full amount — order already marked paid server-side, no Snap popup needed.
-        setPaymentStatus('Payment successful!');
-        savePrintData(items, data.orderId);
-        clearCart();
-        const queueNum = (data.queueNumber || 0).toString();
-        const orderNoParam = data.orderNo ? `&orderNo=${data.orderNo}` : '';
-        router.push(`/success?orderId=${data.orderId}&queue=${queueNum}${orderNoParam}&orderType=${orderType}`);
-      } else if (data.snapToken) {
-        triggerSnapPopup(data.snapToken, data.orderId, data.queueNumber || 0, data.orderNo, data.redirectUrl);
-      } else {
-        throw new Error('No payment token received');
-      }
-    } catch (error: any) {
-      handleCheckoutError(error);
-    }
-  };
-
-  const handleCheckoutEDC = async () => {
-    checkoutInProgress.current = true;
-    setIsProcessing(true);
-    setPaymentStatus('Connecting to EDC...');
-
-    try {
-      const data = await createOrderMutation.mutateAsync({
-        items: buildOrderItems(items),
-        totalAmount: subtotal,
-        discountAmount: appliedDiscount,
-        customerName: customerName,
-        customerPhone: customerPhone,
-        voucherCode: appliedDiscount > 0 ? voucherCode : undefined,
-        paymentMethod: 'EDC',
-        station: getStation(),
-        orderType,
-      });
-
-      setPaymentStatus('Please tap/swipe card on EDC terminal...');
-      const edcResult = await payWithEDC(total, data.orderId);
-
-      if (edcResult.success) {
-        setPaymentStatus('Payment Approved!');
-        savePrintData(items, data.orderId);
-        clearCart();
-        const queueNum = (data.queueNumber || 0).toString();
-        const orderNoParam = data.orderNo ? `&orderNo=${data.orderNo}` : '';
-        const edcParams = `&edc=true&approval=${edcResult.data.approvalCode}&card=${edcResult.data.cardNo}`;
-        router.push(`/success?orderId=${data.orderId}&queue=${queueNum}${orderNoParam}${edcParams}&orderType=${orderType}`);
-      } else {
-        throw new Error(edcResult.error || 'Payment declined by EDC');
-      }
-
+      // No payment gateway wired up yet — server marks the order paid
+      // immediately (simulated), so there's no popup/redirect to wait on here.
+      setPaymentStatus('Pesanan berhasil!');
+      savePrintData(items, data.orderId);
+      clearCart();
+      const queueNum = (data.queueNumber || 0).toString();
+      const orderNoParam = data.orderNo ? `&orderNo=${data.orderNo}` : '';
+      router.push(`/success?orderId=${data.orderId}&queue=${queueNum}${orderNoParam}&orderType=${orderType}`);
     } catch (error: any) {
       handleCheckoutError(error);
     }
@@ -313,14 +197,6 @@ export default function CheckoutNewPage() {
   const subtotal = totalAmount;
   const discount = appliedDiscount;
   const total = Math.max(0, subtotal - discount);
-
-  const handlePayment = () => {
-    if (paymentMethod === 'online') {
-      handleCheckout();
-    } else {
-      handleCheckoutEDC();
-    }
-  };
 
   return (
     <div className="min-h-dvh bg-background font-body-md text-on-background relative">
@@ -510,39 +386,10 @@ export default function CheckoutNewPage() {
                   </div>
                 </div>
 
-                {/* Payment Methods */}
-                <div className="space-y-standard">
-                  <label className="font-tag text-tag text-taupe uppercase font-semibold">Select Method</label>
-                  
-                  {/* Online/QRIS */}
-                  <div 
-                    onClick={() => { if(!isProcessing) setPaymentMethod('online'); }}
-                    className={`payment-card cursor-pointer flex items-center justify-between p-standard bg-white border rounded-2xl transition-all ${
-                      paymentMethod === 'online' ? 'active-payment border-2 border-primary shadow-md' : 'border-surface-variant border-1.5 hover:bg-off-white'
-                    }`}
-                  >
-                    <div className="flex items-center gap-standard">
-                      <div className="w-12 h-12 bg-primary-fixed rounded-full flex items-center justify-center">
-                        <span className="material-symbols-outlined text-primary">qr_code_2</span>
-                      </div>
-                      <div>
-                        <h4 className="font-h4 text-h4 text-near-black font-semibold">Online / QRIS</h4>
-                        <p className="font-caption text-caption text-taupe">GoPay, OVO, ShopeePay</p>
-                      </div>
-                    </div>
-                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                      paymentMethod === 'online' ? 'border-primary' : 'border-surface-variant'
-                    }`}>
-                      {paymentMethod === 'online' && <div className="w-3 h-3 bg-primary rounded-full"></div>}
-                    </div>
-                  </div>
-
-                </div>
-
                 {/* Pay Button */}
-                <button 
-                  onClick={handlePayment}
-                  disabled={isProcessing || (paymentMethod === 'online' && !snapLoaded) || createOrderMutation.isPending}
+                <button
+                  onClick={handleCheckout}
+                  disabled={isProcessing || createOrderMutation.isPending}
                   className="w-full mt-section-sep py-standard bg-primary text-white font-display text-h3 rounded-2xl transition-all active:scale-95 shadow-lg shadow-primary/20 hover:bg-red-dark cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {isProcessing || createOrderMutation.isPending ? (
@@ -730,37 +577,6 @@ export default function CheckoutNewPage() {
             </div>
           </section>
 
-          {/* Payment Method Toggle Cards */}
-          <section className="space-y-standard">
-            <h3 className="font-h4 text-h4 text-near-black font-semibold">Metode Pembayaran</h3>
-            <div className="grid grid-cols-1 gap-standard">
-              {/* QRIS Card */}
-              <div 
-                onClick={() => { if(!isProcessing) setPaymentMethod('online'); }}
-                className={`payment-card cursor-pointer bg-surface rounded-xl p-card-inner border shadow-sm transition-all duration-200 ${
-                  paymentMethod === 'online' ? 'active-payment border-primary' : 'border-surface-variant'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-standard">
-                    <div className="w-10 h-10 flex items-center justify-center bg-off-white rounded-lg">
-                      <span className="material-symbols-outlined text-primary">qr_code_2</span>
-                    </div>
-                    <div>
-                      <h4 className="font-h4 text-h4 text-on-surface font-semibold">QRIS / E-Wallet</h4>
-                      <p className="font-caption text-caption text-taupe">GoPay, OVO, Dana, LinkAja</p>
-                    </div>
-                  </div>
-                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                    paymentMethod === 'online' ? 'border-primary' : 'border-surface-variant'
-                  }`}>
-                    {paymentMethod === 'online' && <div className="w-3 h-3 rounded-full bg-primary"></div>}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-
           {/* Bill Details */}
           <section className="bg-surface-container-low rounded-xl p-card-inner space-y-standard">
             <div className="flex justify-between">
@@ -795,9 +611,9 @@ export default function CheckoutNewPage() {
               )}
             </div>
           </div>
-          <button 
-            onClick={handlePayment}
-            disabled={isProcessing || (paymentMethod === 'online' && !snapLoaded) || createOrderMutation.isPending}
+          <button
+            onClick={handleCheckout}
+            disabled={isProcessing || createOrderMutation.isPending}
             className="w-full bg-primary text-on-primary py-standard rounded-full font-h3 text-h3 shadow-lg active:scale-95 transition-all duration-200 flex items-center justify-center gap-standard cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
             id="pay-button"
           >

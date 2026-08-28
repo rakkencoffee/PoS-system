@@ -2,9 +2,7 @@ import { prisma } from '@/lib/db';
 
 export type StatusLogSource =
   | 'order_created'
-  | 'midtrans_webhook'
-  | 'midtrans_manual_verify'
-  | 'system_voucher_100'
+  | 'system_simulated'
   | 'olsera_settlement'
   | 'kds_manual'
   | 'olsera_webhook'

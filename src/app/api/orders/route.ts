@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
           else if (oStatus === 'Z' || oStatus === 'S' || oStatus === 'T') kdsStatus = 'COMPLETED';
           else kdsStatus = 'PENDING';
 
-          let pMethod = order.payment_mode_name || order.payment_method || 'MIDTRANS';
+          let pMethod = order.payment_mode_name || order.payment_method || 'SIMULATED';
           if (pMethod === '1' || pMethod === 'Cash') pMethod = 'CASH';
 
           const rawItems = order.items || order.orderitems || order.order_items || [];

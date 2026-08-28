@@ -729,7 +729,7 @@ export async function updateOrderPaymentStatus(
               queueNumber: olseraOrderId % 1000,
               status: "PENDING",
               totalAmount: orderDetail.total || paymentAmount || 0,
-              paymentMethod: "MIDTRANS",
+              paymentMethod: "SIMULATED",
               createdAt: orderDetail.order_date || new Date().toISOString(),
               items: Array.isArray(orderDetail.items)
                 ? orderDetail.items.map((item: any, idx: number) => ({
@@ -931,7 +931,7 @@ export async function updateOrderPaymentStatus(
           );
         }
       } catch (error: any) {
-        // Log but don't throw — webhook must still return 200 to Midtrans
+        // Log but don't throw — caller (e.g. a webhook handler) must still return 200
         console.error(
           `[Auto-Settlement] ❌ Failed to settle order ${orderId} in Olsera:`,
           error.message,
@@ -958,7 +958,7 @@ export async function updateOrderPaymentStatus(
             fromStatus: before.status,
             toStatus: "CANCELLED",
             source,
-            metadata: { midtransStatus: status, ...extraMetadata },
+            metadata: { paymentStatus: status, ...extraMetadata },
           });
         }
       } catch (cancelErr) {
@@ -974,7 +974,7 @@ export async function updateOrderPaymentStatus(
   // SYNC RECOVERY: Order SF- (Fallback) yang sudah dibayar
   // ═══════════════════════════════════════════════════════════════
   // Skenario: Saat checkout, Olsera API gagal → ID jadi SF-xxxx.
-  // Pelanggan tetap bayar via Midtrans → webhook masuk dengan SF-xxxx.
+  // Order tetap ditandai paid (simulasi) dengan SF-xxxx.
   // Kita HARUS recover order ini ke Olsera agar tidak hilang.
   if (USE_OLSERA && orderId.startsWith("SF-") && status === "paid") {
     console.log(`[Recovery] ⚠️ Order fallback terdeteksi: ${orderId}`);
@@ -1057,7 +1057,7 @@ export async function updateOrderPaymentStatus(
           queueNumber: Math.floor(Math.random() * 900) + 100,
           status: "PENDING",
           totalAmount: paymentAmount || 0,
-          paymentMethod: "MIDTRANS",
+          paymentMethod: "SIMULATED",
           createdAt: new Date().toISOString(),
           items: [], // Items tidak tersedia dari webhook context
           isRecovered: true, // Flag agar KDS tahu ini order recovery
@@ -1107,7 +1107,7 @@ export async function updateOrderPaymentStatus(
             cashierId: "cmo83g6140000vq5g10u03858",
             total: paymentAmount || 0,
             status: "PAID",
-            paymentMethod: "MIDTRANS",
+            paymentMethod: "SIMULATED",
             olseraSynced: recoveredOlseraId !== null,
             olseraTransactionId: recoveredOlseraId || undefined,
             items: { create: [] },
@@ -1147,7 +1147,7 @@ export async function updateOrderPaymentStatus(
 /**
  * Apply a discount to an Olsera order (best-effort)
  * Note: Olsera Open API may not support native discount injection.
- * We log it here so it's tracked, and the actual discount is reflected in Midtrans payment amount.
+ * We log it here so it's tracked, and the actual discount is reflected in the settled payment amount.
  */
 export async function applyOrderDiscount(
   orderId: string,
@@ -1155,9 +1155,9 @@ export async function applyOrderDiscount(
 ): Promise<void> {
   if (!USE_OLSERA) return;
   // Olsera Open API doesn't have a dedicated discount endpoint.
-  // The discount is already reflected in the Midtrans payment amount.
+  // The discount is already reflected in the amount settled via updateOrderPaymentStatus.
   console.log(
-    `[POS Adapter] Discount of Rp ${discountAmount.toLocaleString("id-ID")} applied to order ${orderId} (tracked in Midtrans, not synced to Olsera).`,
+    `[POS Adapter] Discount of Rp ${discountAmount.toLocaleString("id-ID")} applied to order ${orderId} (tracked at settlement, not synced to Olsera).`,
   );
 }
 

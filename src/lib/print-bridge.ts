@@ -36,11 +36,6 @@ export interface PrintReceiptData {
   total: number;
   discount?: number;
   paymentMethod: string;
-  edcData?: {
-    approvalCode: string;
-    cardNo: string;
-    refNo: string;
-  };
   station?: string | null;
 }
 
@@ -110,35 +105,6 @@ export async function printReceipt(
     }
 
     return { printed: false, method: 'none', error: message };
-  }
-}
-
-/**
- * Initiate payment via local EDC terminal
- */
-export async function payWithEDC(
-  amount: number,
-  orderId: string
-): Promise<{ success: boolean; data?: any; error?: string }> {
-  try {
-    const res = await fetch(`${PRINT_BRIDGE_URL}/payment/edc`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'x-api-key': PRINT_BRIDGE_API_KEY
-      },
-      body: JSON.stringify({ amount, orderId }),
-      // No standard signal timeout here as EDC payment can take time
-    });
-
-    const data = await res.json();
-    if (res.ok && data.success) {
-      return { success: true, data };
-    }
-    return { success: false, error: data.error || 'Payment failed' };
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    return { success: false, error: `Print Bridge Offline: ${message}` };
   }
 }
 

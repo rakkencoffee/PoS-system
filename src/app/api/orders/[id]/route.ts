@@ -583,7 +583,7 @@ export async function PATCH(
         baristaStatus: localOrder?.baristaStatus,
         kitchenStatus: localOrder?.kitchenStatus,
         totalAmount: detail ? (detail.total || detail.grand_total || 0) : 0,
-        paymentMethod: 'MIDTRANS',
+        paymentMethod: 'SIMULATED',
         createdAt: detail ? (detail.order_date || detail.created_at || new Date().toISOString()) : new Date().toISOString(),
         customerName: detail?.customer_name || '',
         items: detail && Array.isArray(detail.items) ? detail.items.map((item: any, idx: number) => {

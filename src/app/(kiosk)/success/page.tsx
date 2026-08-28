@@ -11,7 +11,6 @@ function buildReceiptData(
   orderId: string | null,
   queue: string,
   orderData: any,
-  edcData: { approvalCode: string; cardNo: string } | null,
   orderType: 'DINE_IN' | 'TAKEAWAY',
 ): PrintReceiptData {
   const displayOrderNo = (orderNo || orderData?.orderNo) || orderId || '';
@@ -52,12 +51,7 @@ function buildReceiptData(
     items,
     total: orderData?.totalAmount || 0,
     discount: orderData?.discount || 0,
-    paymentMethod: edcData ? 'Debit/Credit' : (orderData?.paymentMethod || 'E-Wallet'),
-    edcData: edcData ? {
-      approvalCode: edcData.approvalCode || '',
-      cardNo: edcData.cardNo || '',
-      refNo: orderId || '',
-    } : undefined,
+    paymentMethod: orderData?.paymentMethod || 'E-Wallet',
     station: getStation(),
     orderType,
   };
@@ -67,10 +61,8 @@ function SuccessContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  // Handle both our router.push format AND Midtrans redirect format
-  const orderId = searchParams.get('orderId') || searchParams.get('order_id');
-  const transactionStatus = searchParams.get('transaction_status');
-  
+  const orderId = searchParams.get('orderId');
+
   // Extract queue: either from explicit param or from order ID (last 3 digits)
   const isOffline = searchParams.get('offline') === 'true';
   const rawQueue = searchParams.get('queue');
@@ -87,7 +79,6 @@ function SuccessContent() {
   
   const [countdown, setCountdown] = useState(isOffline ? 30 : 15);
   const [orderData, setOrderData] = useState<any>(null);
-  const [edcData, setEdcData] = useState<any>(null);
   const hasPrinted = useRef(false);
   const [printStatus, setPrintStatus] = useState<'idle' | 'printing' | 'success' | 'fallback' | 'error'>('idle');
 
@@ -119,32 +110,10 @@ function SuccessContent() {
       };
 
       fetchOrder();
-
-      // Webhooks from Midtrans can't reach `localhost` in local dev, so the
-      // order never gets settled to PAID there — force a manual verify as a
-      // stand-in for the webhook. ONLY do this in test mode: in every real
-      // deployment (including preview/production) the webhook genuinely
-      // reaches Midtrans, so firing this unconditionally (it used to also
-      // trigger whenever `transactionStatus` was absent, which is ALWAYS —
-      // our own router.push redirect never carries it) raced with the real
-      // webhook and caused duplicate settlement/print jobs.
-      if (process.env.NEXT_PUBLIC_TEST_MODE === 'true') {
-        fetch(`/api/payment/verify?orderId=${orderId}`, { method: 'POST' }).catch((e) => {
-          console.warn('[Success] Manual payment verify failed (non-blocking):', e);
-        });
-      }
-    }
-
-    const isEdc = searchParams.get('edc') === 'true';
-    if (isEdc) {
-      setEdcData({
-        approvalCode: searchParams.get('approval'),
-        cardNo: searchParams.get('card'),
-      });
     }
 
     return () => clearTimeout(timeoutId);
-  }, [orderId, isOffline, searchParams, transactionStatus]);
+  }, [orderId, isOffline]);
 
   /**
    * Submit a print job to the Cloud Print Queue and poll for completion.
@@ -213,7 +182,7 @@ function SuccessContent() {
         setPrintStatus('printing');
 
         try {
-          const receiptData = buildReceiptData(orderNo, orderId, queue, orderData, edcData, orderType);
+          const receiptData = buildReceiptData(orderNo, orderId, queue, orderData, orderType);
           const result = await submitCloudPrintJob(receiptData);
 
           if (result === 'success') {
@@ -235,12 +204,12 @@ function SuccessContent() {
       const timer = setTimeout(triggerPrint, 300);
       return () => clearTimeout(timer);
     }
-  }, [orderData, orderId, queue, edcData, orderNo]);
+  }, [orderData, orderId, queue, orderNo]);
 
   const handlePrint = async () => {
     setPrintStatus('printing');
     try {
-      const receiptData = buildReceiptData(orderNo, orderId, queue, orderData, edcData, orderType);
+      const receiptData = buildReceiptData(orderNo, orderId, queue, orderData, orderType);
       const result = await submitCloudPrintJob(receiptData);
       if (result === 'success') {
         setPrintStatus('success');

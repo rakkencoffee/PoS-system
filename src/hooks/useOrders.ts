@@ -183,15 +183,3 @@ export function useValidateVoucher() {
     },
   });
 }
-
-export function usePaymentConfig() {
-  return useQuery({
-    queryKey: ['payment-config'],
-    queryFn: async () => {
-      const res = await fetch('/api/payment/config');
-      if (!res.ok) throw new Error('Failed to fetch payment config');
-      return res.json();
-    },
-    staleTime: Infinity,
-  });
-}
