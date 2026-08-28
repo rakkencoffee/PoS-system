@@ -15,7 +15,6 @@ const shortData = {
   orderId: 'OLSERA-TEST-002',
   queueNumber: '088',
   customerName: 'Budi Santoso',
-  orderType: 'DINE_IN',
   items: [
     {
       name: 'Dirty Matcha',

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { CartItem, CartState, OrderType } from '@/lib/types';
+import { CartItem, CartState } from '@/lib/types';
 
 interface CartStore extends CartState {
   addItem: (item: CartItem) => void;
@@ -9,7 +9,6 @@ interface CartStore extends CartState {
   updateQuantity: (id: string, quantity: number) => void;
   setCustomerName: (name: string) => void;
   setCustomerPhone: (phone: string) => void;
-  setOrderType: (orderType: OrderType) => void;
   clearCart: () => void;
   itemCount: number;
 }
@@ -32,7 +31,6 @@ export const useCartStore = create<CartStore>()(
       totalAmount: 0,
       customerName: '',
       customerPhone: '',
-      orderType: 'TAKEAWAY',
       itemCount: 0,
 
       addItem: (newItem: CartItem) => {
@@ -109,12 +107,8 @@ export const useCartStore = create<CartStore>()(
         set({ customerPhone: phone });
       },
 
-      setOrderType: (orderType: OrderType) => {
-        set({ orderType });
-      },
-
       clearCart: () => {
-        set({ items: [], totalAmount: 0, itemCount: 0, customerName: '', customerPhone: '', orderType: 'TAKEAWAY' });
+        set({ items: [], totalAmount: 0, itemCount: 0, customerName: '', customerPhone: '' });
       },
     }),
     {

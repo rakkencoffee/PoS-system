@@ -495,12 +495,11 @@ async function formatDrinkLabels(data) {
       add(logoRasterCommand(headerRaster));
       newline();
 
-      // Info line: nama pelanggan - jenis order - urutan cup (misal 01/02)
+      // Info line: nama pelanggan - urutan cup (misal 01/02)
       add(CMD.ALIGN_LEFT);
       const customerLabel = data.customerName || 'Customer';
-      const orderTypeLabel = data.orderType === 'DINE_IN' ? 'Dine In' : 'Takeaway';
       const cupNote = `${String(currentCup).padStart(2, '0')}/${String(totalCups).padStart(2, '0')}`;
-      add(textBuf(`${customerLabel} - ${orderTypeLabel} - ${cupNote}`));
+      add(textBuf(`${customerLabel} - ${cupNote}`));
       newline();
       newline(); // gap dikit sebelum menu
 

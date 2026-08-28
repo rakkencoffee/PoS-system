@@ -118,7 +118,6 @@ const data = {
       notes: 'Less Ice, Extra Shot, Oat Milk, No Sugar, Whip Cream',
     },
   ],
-  orderType: 'DINE_IN',
 };
 
 (async () => {

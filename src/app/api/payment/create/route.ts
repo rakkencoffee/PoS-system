@@ -17,7 +17,7 @@ import { NextRequest, NextResponse } from "next/server";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { items, totalAmount, customerName, customerPhone, discountAmount, voucherCode, station, orderType } =
+    const { items, totalAmount, customerName, customerPhone, discountAmount, voucherCode, station } =
       body;
 
     if (!items || !items.length || typeof totalAmount !== "number") {
@@ -51,8 +51,7 @@ export async function POST(request: NextRequest) {
         discountAmount || 0,
         voucherCode,
         customerPhone,
-        station,
-        orderType
+        station
       );
       dbOrderId = adapterOrder.orderId;
       dbOrderNo = adapterOrder.orderNo || null;

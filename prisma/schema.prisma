@@ -26,7 +26,6 @@ model Order {
   printStation        String?     // A/B/C — tablet asal order, buat routing print job ke printer yang benar
   cashierId           String
   tableNumber         String?
-  orderType           OrderType   @default(TAKEAWAY)
   queueNumber         Int?        // Daily queue number (001, 002, ...) resets at 00:00 WIB
   status              OrderStatus @default(PENDING)
   baristaStatus       OrderStatus @default(PENDING)
@@ -137,11 +136,6 @@ enum Role {
   MANAGER
   KITCHEN
   ADMIN
-}
-
-enum OrderType {
-  DINE_IN
-  TAKEAWAY
 }
 
 enum OrderStatus {

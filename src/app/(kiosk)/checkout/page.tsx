@@ -79,7 +79,7 @@ function formatCurrency(amount: number): string {
 
 export default function CheckoutNewPage() {
   const router = useRouter();
-  const { items, totalAmount, clearCart, itemCount, customerName, customerPhone, orderType, updateQuantity, removeItem } = useCartStore();
+  const { items, totalAmount, clearCart, itemCount, customerName, customerPhone, updateQuantity, removeItem } = useCartStore();
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<string>('');
@@ -117,7 +117,6 @@ export default function CheckoutNewPage() {
         customerPhone: customerPhone,
         voucherCode: appliedDiscount > 0 ? voucherCode : undefined,
         station: getStation(),
-        orderType,
       });
 
       // No payment gateway wired up yet — server marks the order paid
@@ -127,7 +126,7 @@ export default function CheckoutNewPage() {
       clearCart();
       const queueNum = (data.queueNumber || 0).toString();
       const orderNoParam = data.orderNo ? `&orderNo=${data.orderNo}` : '';
-      router.push(`/success?orderId=${data.orderId}&queue=${queueNum}${orderNoParam}&orderType=${orderType}`);
+      router.push(`/success?orderId=${data.orderId}&queue=${queueNum}${orderNoParam}`);
     } catch (error: any) {
       handleCheckoutError(error);
     }
@@ -155,7 +154,7 @@ export default function CheckoutNewPage() {
         setPaymentStatus('Order saved offline!');
         clearCart();
         
-        router.push(`/success?orderId=${orderPayload.orderId}&offline=true&orderType=${orderType}`);
+        router.push(`/success?orderId=${orderPayload.orderId}&offline=true`);
         return;
       } catch (dexieError) {
         console.error('Failed to save to Dexie:', dexieError);
