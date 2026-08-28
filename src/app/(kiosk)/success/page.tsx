@@ -33,6 +33,11 @@ function buildReceiptData(
               ...item,
               notes: item.notes || match.notes,
               size: (item.size && item.size !== '-') ? item.size : (match.size !== '-' ? match.size : item.size),
+              // Fall back to the price the customer actually paid (known at
+              // checkout) when the API's price is missing/0 — happens when
+              // this order's background Olsera price-sync (per item) hasn't
+              // finished for this item yet by the time the receipt is built.
+              price: item.price || match.price,
             };
           }
           return item;
