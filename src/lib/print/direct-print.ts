@@ -88,7 +88,7 @@ export async function tryDirectPrint(
     // Direct-print stations only print the receipt, not drink labels — unlike
     // the print-bridge daemon path, these printers aren't set up for the
     // combined receipt+labels roll.
-    const receiptBuffer = formatReceipt(data, lineWidth);
+    const receiptBuffer = formatReceipt(data, lineWidth, true);
 
     await writeToSocket(config.host, config.port, receiptBuffer);
     console.log(`[DirectPrint] Sent order ${data.orderId} straight to station ${station} (${config.host}:${config.port})`);

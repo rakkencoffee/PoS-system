@@ -73,8 +73,9 @@ function textBuf(str: string): Buffer {
 
 /**
  * @param lineWidth chars per line — 32 for 58mm paper, 48 for 80mm (iWare D260WF)
+ * @param cut send a partial-cut command at the end (printer must have an auto-cutter)
  */
-export function formatReceipt(data: ReceiptData, lineWidth = 48): Buffer {
+export function formatReceipt(data: ReceiptData, lineWidth = 48, cut = false): Buffer {
   const parts: Buffer[] = [];
   const add = (...buffers: Buffer[]) => buffers.forEach((b) => parts.push(b));
   const newline = () => add(CMD.FEED_LINE);
@@ -326,6 +327,11 @@ export function formatReceipt(data: ReceiptData, lineWidth = 48): Buffer {
   newline();
 
   add(CMD.FEED_5);
+
+  // The printer's own "Auto Append Cut Function" firmware feature jammed
+  // (blinking light, alarm, no cut) — sending the cut command from software
+  // instead, which was confirmed working cleanly on the IW-J300H.
+  if (cut) add(CMD.CUT_PARTIAL);
 
   return Buffer.concat(parts);
 }
