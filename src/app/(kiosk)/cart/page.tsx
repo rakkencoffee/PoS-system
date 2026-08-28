@@ -225,6 +225,8 @@ export default function CartNewPage() {
     customerName,
     setCustomerPhone,
     customerPhone,
+    setOrderType,
+    orderType,
   } = useCartStore();
 
   const { data: allMenuItems = [] } = useMenuItems('all');
@@ -365,6 +367,30 @@ export default function CartNewPage() {
                     )}
                   </div>
 
+                  {/* Order Type */}
+                  <div className="mb-6">
+                    <label className="block text-[13px] font-[500] text-[#998075] mb-1 uppercase tracking-widest" style={JKT}>
+                      Tipe Pesanan
+                    </label>
+                    <div className="flex gap-2 bg-[#F5F5F5] rounded-lg p-1 border border-[#f3e0be]">
+                      {(['DINE_IN', 'TAKEAWAY'] as const).map((type) => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => setOrderType(type)}
+                          className={`flex-1 py-2 rounded-md text-[13px] font-[600] transition-all ${
+                            orderType === type
+                              ? 'bg-[#78000f] text-white shadow-sm'
+                              : 'text-[#998075] hover:text-[#5a403f]'
+                          }`}
+                          style={JKT}
+                        >
+                          {type === 'DINE_IN' ? 'Dine In' : 'Takeaway'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* Phone (optional, CRM) */}
                   <div className="mb-6">
                     <label className="block text-[13px] font-[500] text-[#998075] mb-1 uppercase tracking-widest" style={JKT}>
@@ -482,6 +508,30 @@ export default function CartNewPage() {
                   onChange={(e) => setCustomerName(e.target.value)}
                 />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-[#998075]" style={{ fontSize: '20px' }}>edit</span>
+              </div>
+            </section>
+
+            {/* Order Type */}
+            <section>
+              <label className="block text-[12px] font-[500] text-[#998075] mb-2 uppercase tracking-widest" style={JKT}>
+                Tipe Pesanan
+              </label>
+              <div className="flex gap-2 bg-white border-[1.5px] border-[#f3e0be] rounded-xl p-1">
+                {(['DINE_IN', 'TAKEAWAY'] as const).map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => setOrderType(type)}
+                    className={`flex-1 py-2.5 rounded-lg text-[14px] font-[600] transition-all ${
+                      orderType === type
+                        ? 'bg-[#78000f] text-white shadow-sm'
+                        : 'text-[#998075]'
+                    }`}
+                    style={JKT}
+                  >
+                    {type === 'DINE_IN' ? 'Dine In' : 'Takeaway'}
+                  </button>
+                ))}
               </div>
             </section>
 

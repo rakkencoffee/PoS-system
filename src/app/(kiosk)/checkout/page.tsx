@@ -96,7 +96,7 @@ function formatCurrency(amount: number): string {
 
 export default function CheckoutNewPage() {
   const router = useRouter();
-  const { items, totalAmount, clearCart, itemCount, customerName, customerPhone, updateQuantity, removeItem } = useCartStore();
+  const { items, totalAmount, clearCart, itemCount, customerName, customerPhone, orderType, updateQuantity, removeItem } = useCartStore();
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<string>('');
@@ -152,7 +152,7 @@ export default function CheckoutNewPage() {
           clearCart();
           const queueNum = queueNumber.toString();
           const orderNoParam = orderNo ? `&orderNo=${orderNo}` : '';
-          router.push(`/success?orderId=${id}&queue=${queueNum}${orderNoParam}`);
+          router.push(`/success?orderId=${id}&queue=${queueNum}${orderNoParam}&orderType=${orderType}`);
         },
         onPending: () => {
           setPaymentStatus('Waiting for payment...');
@@ -190,6 +190,7 @@ export default function CheckoutNewPage() {
         customerPhone: customerPhone,
         voucherCode: appliedDiscount > 0 ? voucherCode : undefined,
         station: getStation(),
+        orderType,
       });
 
       if (data.freeOrder) {
@@ -199,7 +200,7 @@ export default function CheckoutNewPage() {
         clearCart();
         const queueNum = (data.queueNumber || 0).toString();
         const orderNoParam = data.orderNo ? `&orderNo=${data.orderNo}` : '';
-        router.push(`/success?orderId=${data.orderId}&queue=${queueNum}${orderNoParam}`);
+        router.push(`/success?orderId=${data.orderId}&queue=${queueNum}${orderNoParam}&orderType=${orderType}`);
       } else if (data.snapToken) {
         triggerSnapPopup(data.snapToken, data.orderId, data.queueNumber || 0, data.orderNo, data.redirectUrl);
       } else {
@@ -225,6 +226,7 @@ export default function CheckoutNewPage() {
         voucherCode: appliedDiscount > 0 ? voucherCode : undefined,
         paymentMethod: 'EDC',
         station: getStation(),
+        orderType,
       });
 
       setPaymentStatus('Please tap/swipe card on EDC terminal...');
@@ -237,7 +239,7 @@ export default function CheckoutNewPage() {
         const queueNum = (data.queueNumber || 0).toString();
         const orderNoParam = data.orderNo ? `&orderNo=${data.orderNo}` : '';
         const edcParams = `&edc=true&approval=${edcResult.data.approvalCode}&card=${edcResult.data.cardNo}`;
-        router.push(`/success?orderId=${data.orderId}&queue=${queueNum}${orderNoParam}${edcParams}`);
+        router.push(`/success?orderId=${data.orderId}&queue=${queueNum}${orderNoParam}${edcParams}&orderType=${orderType}`);
       } else {
         throw new Error(edcResult.error || 'Payment declined by EDC');
       }
@@ -269,7 +271,7 @@ export default function CheckoutNewPage() {
         setPaymentStatus('Order saved offline!');
         clearCart();
         
-        router.push(`/success?orderId=${orderPayload.orderId}&offline=true`);
+        router.push(`/success?orderId=${orderPayload.orderId}&offline=true&orderType=${orderType}`);
         return;
       } catch (dexieError) {
         console.error('Failed to save to Dexie:', dexieError);

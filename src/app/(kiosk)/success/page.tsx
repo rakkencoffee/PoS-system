@@ -12,6 +12,7 @@ function buildReceiptData(
   queue: string,
   orderData: any,
   edcData: { approvalCode: string; cardNo: string } | null,
+  orderType: 'DINE_IN' | 'TAKEAWAY',
 ): PrintReceiptData {
   const displayOrderNo = (orderNo || orderData?.orderNo) || orderId || '';
 
@@ -58,6 +59,7 @@ function buildReceiptData(
       refNo: orderId || '',
     } : undefined,
     station: getStation(),
+    orderType,
   };
 }
 
@@ -73,6 +75,7 @@ function SuccessContent() {
   const isOffline = searchParams.get('offline') === 'true';
   const rawQueue = searchParams.get('queue');
   const orderNo = searchParams.get('orderNo') || '';
+  const orderType = searchParams.get('orderType') === 'DINE_IN' ? 'DINE_IN' : 'TAKEAWAY';
   const queue = rawQueue || (() => {
     if (!orderId) return '123';
     
@@ -210,7 +213,7 @@ function SuccessContent() {
         setPrintStatus('printing');
 
         try {
-          const receiptData = buildReceiptData(orderNo, orderId, queue, orderData, edcData);
+          const receiptData = buildReceiptData(orderNo, orderId, queue, orderData, edcData, orderType);
           const result = await submitCloudPrintJob(receiptData);
 
           if (result === 'success') {
@@ -237,7 +240,7 @@ function SuccessContent() {
   const handlePrint = async () => {
     setPrintStatus('printing');
     try {
-      const receiptData = buildReceiptData(orderNo, orderId, queue, orderData, edcData);
+      const receiptData = buildReceiptData(orderNo, orderId, queue, orderData, edcData, orderType);
       const result = await submitCloudPrintJob(receiptData);
       if (result === 'success') {
         setPrintStatus('success');

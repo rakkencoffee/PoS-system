@@ -22,6 +22,7 @@ export interface PrintReceiptData {
   dbOrderId?: string;
   queueNumber: string | number;
   customerName?: string;
+  orderType?: 'DINE_IN' | 'TAKEAWAY';
   items: {
     name?: string;
     menuItem?: { name: string };

@@ -338,7 +338,9 @@ export async function createOrder(
   voucherCode?: string,
   customerPhone?: string,
   station?: string | null,
+  orderType?: string,
 ): Promise<{ orderId: string; olseraOrderId?: number; orderNo?: string; queueNumber?: number }> {
+  const resolvedOrderType = orderType === 'DINE_IN' ? 'DINE_IN' : 'TAKEAWAY';
   if (USE_OLSERA) {
     // CRM (F5): if the customer left a phone number, try to match an existing
     // Olsera customer so the order is linked to their profile/history.
@@ -560,6 +562,7 @@ export async function createOrder(
             stationId: "KIOSK", // Kiosk self-service
             printStation: station || null,
             cashierId: "cmo83g6140000vq5g10u03858", // Valid system user for Kiosk sync
+            orderType: resolvedOrderType,
             queueNumber: queueNum || null,
             total: finalTotal,
             status: "PENDING",

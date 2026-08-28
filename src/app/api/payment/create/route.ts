@@ -16,7 +16,7 @@ import { createSnapTransaction } from "@/lib/integrations/midtrans.service";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { items, totalAmount, customerName, customerPhone, discountAmount, voucherCode, station } =
+    const { items, totalAmount, customerName, customerPhone, discountAmount, voucherCode, station, orderType } =
       body;
 
     if (!items || !items.length || typeof totalAmount !== "number") {
@@ -50,7 +50,8 @@ export async function POST(request: NextRequest) {
         discountAmount || 0,
         voucherCode,
         customerPhone,
-        station
+        station,
+        orderType
       );
       dbOrderId = adapterOrder.orderId;
       dbOrderNo = adapterOrder.orderNo || null;

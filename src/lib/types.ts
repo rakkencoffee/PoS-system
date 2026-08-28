@@ -18,11 +18,14 @@ export interface CartItem {
   category?: string;
 }
 
+export type OrderType = 'DINE_IN' | 'TAKEAWAY';
+
 export interface CartState {
   items: CartItem[];
   totalAmount: number;
   customerName: string;
   customerPhone: string;
+  orderType: OrderType;
 }
 
 export type OrderStatus = 'PENDING' | 'PREPARING' | 'READY' | 'COMPLETED';
