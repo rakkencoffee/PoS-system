@@ -67,10 +67,19 @@ function writeToSocket(host: string, port: number, buffer: Buffer, timeoutMs = 8
   });
 }
 
+const MAX_ATTEMPTS = 3;
+const RETRY_DELAY_MS = 2000;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 /**
  * Best-effort direct print. Never throws — callers should fire this without
  * blocking the customer-facing response, since printer reachability over the
  * internet is inherently less reliable than local network/Bluetooth.
+ *
+ * Retries a couple times with a short delay before giving up — cheap WiFi
+ * printers on a flaky link can drop for a few seconds and come right back,
+ * and a single attempt has no way to ride that out.
  *
  * Returns true if the bytes were handed off successfully, false otherwise
  * (caller should leave the PrintJob row alone on false so the local daemon,
@@ -83,18 +92,26 @@ export async function tryDirectPrint(
   const config = getStationPrinterConfig(station);
   if (!config) return false;
 
-  try {
-    const lineWidth = config.lineWidth ?? 48;
-    // Direct-print stations only print the receipt, not drink labels — unlike
-    // the print-bridge daemon path, these printers aren't set up for the
-    // combined receipt+labels roll.
-    const receiptBuffer = formatReceipt(data, lineWidth, true);
+  const lineWidth = config.lineWidth ?? 48;
+  // Direct-print stations only print the receipt, not drink labels — unlike
+  // the print-bridge daemon path, these printers aren't set up for the
+  // combined receipt+labels roll.
+  const receiptBuffer = formatReceipt(data, lineWidth, true);
 
-    await writeToSocket(config.host, config.port, receiptBuffer);
-    console.log(`[DirectPrint] Sent order ${data.orderId} straight to station ${station} (${config.host}:${config.port})`);
-    return true;
-  } catch (err) {
-    console.warn(`[DirectPrint] Failed to reach station ${station} printer directly:`, (err as Error).message);
-    return false;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      await writeToSocket(config.host, config.port, receiptBuffer);
+      console.log(`[DirectPrint] Sent order ${data.orderId} straight to station ${station} (${config.host}:${config.port})${attempt > 1 ? ` on attempt ${attempt}` : ''}`);
+      return true;
+    } catch (err) {
+      const isLastAttempt = attempt === MAX_ATTEMPTS;
+      console.warn(
+        `[DirectPrint] Attempt ${attempt}/${MAX_ATTEMPTS} failed to reach station ${station} printer directly:`,
+        (err as Error).message
+      );
+      if (!isLastAttempt) await sleep(RETRY_DELAY_MS);
+    }
   }
+
+  return false;
 }
