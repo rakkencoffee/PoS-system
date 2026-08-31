@@ -10,7 +10,7 @@ const CustomizeModal = dynamic(() => import('@/components/kiosk/CustomizeModal')
 });
 import { CartItem } from '@/lib/types';
 import { KioskHeader } from '@/components/kiosk/KioskHeader';
-import { BAG_OPTIONS, BagKey, calculateBagQuantity, countFoodAndDrink } from '@/lib/bag-options';
+import { BAG_OPTIONS, BagKey } from '@/lib/bag-options';
 
 /* ─────────────────────────────────────────────
    Helpers
@@ -192,18 +192,17 @@ interface BagLine {
   label: string;
   price: number;
   description: string;
-  checked: boolean;
   qty: number;
   subtotal: number;
 }
 
 function BagOptionsSection({
   lines,
-  onToggle,
+  onChange,
   bordered = true,
 }: {
   lines: BagLine[];
-  onToggle: (key: BagKey) => void;
+  onChange: (key: BagKey, qty: number) => void;
   bordered?: boolean;
 }) {
   return (
@@ -211,31 +210,29 @@ function BagOptionsSection({
       <h3 className="text-[15px] font-[600] text-[#323131] mb-3" style={JKT}>Tambah Kemasan</h3>
       <div className="space-y-2">
         {lines.map((line) => (
-          <label
+          <div
             key={line.key}
-            className="flex items-start gap-3 p-3 rounded-xl border border-[#f3e0be] cursor-pointer hover:bg-[#fff8f2] transition-colors"
+            className="flex items-center gap-3 p-3 rounded-xl border border-[#f3e0be]"
           >
-            <input
-              type="checkbox"
-              checked={line.checked}
-              onChange={() => onToggle(line.key)}
-              className="mt-1 w-4 h-4 accent-[#78000f] shrink-0"
-            />
             <div className="flex-1 min-w-0">
               <div className="flex justify-between items-center gap-2">
                 <span className="text-[14px] font-[600] text-[#323131]" style={JKT}>{line.label}</span>
                 <span className="text-[13px] font-[600] text-[#78000f] shrink-0" style={JKT}>{formatCurrency(line.price)}</span>
               </div>
               <p className="text-[11px] text-[#998075]" style={JKT}>{line.description}</p>
-              {line.checked && (
+              {line.qty > 0 && (
                 <p className="text-[12px] text-[#5a403f] mt-1" style={JKT}>
-                  {line.qty > 0
-                    ? `${line.qty}x = ${formatCurrency(line.subtotal)}`
-                    : 'Gak dibutuhkan buat pesanan ini'}
+                  {line.qty}x = {formatCurrency(line.subtotal)}
                 </p>
               )}
             </div>
-          </label>
+            <QuantityStepper
+              qty={line.qty}
+              onDec={() => onChange(line.key, line.qty - 1)}
+              onInc={() => onChange(line.key, line.qty + 1)}
+              size="sm"
+            />
+          </div>
         ))}
       </div>
     </div>
@@ -281,18 +278,16 @@ export default function CartNewPage() {
     customerName,
     setCustomerPhone,
     customerPhone,
-    selectedBags,
-    toggleBag,
+    bagQuantities,
+    setBagQuantity,
   } = useCartStore();
 
   const bagLines: BagLine[] = useMemo(() => {
-    const { food, drink } = countFoodAndDrink(items);
     return BAG_OPTIONS.map((opt) => {
-      const checked = selectedBags[opt.key];
-      const qty = checked ? calculateBagQuantity(opt.key, food, drink) : 0;
-      return { ...opt, checked, qty, subtotal: qty * opt.price };
+      const qty = bagQuantities[opt.key] || 0;
+      return { ...opt, qty, subtotal: qty * opt.price };
     });
-  }, [items, selectedBags]);
+  }, [bagQuantities]);
 
   const bagTotal = bagLines.reduce((sum, l) => sum + l.subtotal, 0);
   const grandTotal = totalAmount + bagTotal;
@@ -458,7 +453,7 @@ export default function CartNewPage() {
                   </div>
 
                   {/* Bag Options */}
-                  <BagOptionsSection lines={bagLines} onToggle={toggleBag} />
+                  <BagOptionsSection lines={bagLines} onChange={setBagQuantity} />
 
                   {/* Price Breakdown */}
                   <div className="space-y-2 border-t border-[#f3e0be] pt-4 mb-6 mt-4">
@@ -614,7 +609,7 @@ export default function CartNewPage() {
 
             {/* Bag Options */}
             <div className="bg-white rounded-[20px] p-4 border border-[#f3e0be]">
-              <BagOptionsSection lines={bagLines} onToggle={toggleBag} bordered={false} />
+              <BagOptionsSection lines={bagLines} onChange={setBagQuantity} bordered={false} />
             </div>
 
             {/* Add more suggestion */}

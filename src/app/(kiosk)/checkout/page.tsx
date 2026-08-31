@@ -83,7 +83,7 @@ function formatCurrency(amount: number): string {
 
 export default function CheckoutNewPage() {
   const router = useRouter();
-  const { items, totalAmount, clearCart, itemCount, customerName, customerPhone, updateQuantity, removeItem, selectedBags } = useCartStore();
+  const { items, totalAmount, clearCart, itemCount, customerName, customerPhone, updateQuantity, removeItem, bagQuantities } = useCartStore();
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<string>('');
@@ -114,7 +114,7 @@ export default function CheckoutNewPage() {
 
     try {
       const data = await createOrderMutation.mutateAsync({
-        items: [...buildOrderItems(items), ...buildBagOrderItems(items, selectedBags)],
+        items: [...buildOrderItems(items), ...buildBagOrderItems(bagQuantities)],
         totalAmount: subtotal + bagTotal,
         discountAmount: appliedDiscount,
         customerName: customerName,
@@ -126,7 +126,7 @@ export default function CheckoutNewPage() {
       // No payment gateway wired up yet — server marks the order paid
       // immediately (simulated), so there's no popup/redirect to wait on here.
       setPaymentStatus('Pesanan berhasil!');
-      savePrintData(items, data.orderId, buildBagOrderItems(items, selectedBags));
+      savePrintData(items, data.orderId, buildBagOrderItems(bagQuantities));
       clearCart();
       const queueNum = (data.queueNumber || 0).toString();
       const orderNoParam = data.orderNo ? `&orderNo=${data.orderNo}` : '';
@@ -145,7 +145,7 @@ export default function CheckoutNewPage() {
       try {
         const orderPayload = {
           orderId: `OFFLINE-${Date.now()}`,
-          items: [...buildOrderItems(items), ...buildBagOrderItems(items, selectedBags)],
+          items: [...buildOrderItems(items), ...buildBagOrderItems(bagQuantities)],
           customerName: customerName,
           totalAmount: total,
           createdAt: new Date().toISOString(),
@@ -199,7 +199,7 @@ export default function CheckoutNewPage() {
 
   const subtotal = totalAmount;
   const discount = appliedDiscount;
-  const bagTotal = calculateBagTotal(items, selectedBags);
+  const bagTotal = calculateBagTotal(bagQuantities);
   const total = Math.max(0, subtotal - discount) + bagTotal;
 
   return (

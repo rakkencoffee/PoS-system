@@ -10,16 +10,16 @@ interface CartStore extends CartState {
   updateQuantity: (id: string, quantity: number) => void;
   setCustomerName: (name: string) => void;
   setCustomerPhone: (phone: string) => void;
-  toggleBag: (key: BagKey) => void;
+  setBagQuantity: (key: BagKey, quantity: number) => void;
   clearCart: () => void;
   itemCount: number;
-  selectedBags: Record<BagKey, boolean>;
+  bagQuantities: Record<BagKey, number>;
 }
 
-const emptySelectedBags: Record<BagKey, boolean> = {
-  cupCarrier: false,
-  paperBag: false,
-  insulatedBag: false,
+const emptyBagQuantities: Record<BagKey, number> = {
+  cupCarrier: 0,
+  paperBag: 0,
+  insulatedBag: 0,
 };
 
 function calculateTotal(items: CartItem[]): number {
@@ -41,7 +41,7 @@ export const useCartStore = create<CartStore>()(
       customerName: '',
       customerPhone: '',
       itemCount: 0,
-      selectedBags: emptySelectedBags,
+      bagQuantities: emptyBagQuantities,
 
       addItem: (newItem: CartItem) => {
         const { items } = get();
@@ -117,13 +117,13 @@ export const useCartStore = create<CartStore>()(
         set({ customerPhone: phone });
       },
 
-      toggleBag: (key: BagKey) => {
-        const { selectedBags } = get();
-        set({ selectedBags: { ...selectedBags, [key]: !selectedBags[key] } });
+      setBagQuantity: (key: BagKey, quantity: number) => {
+        const { bagQuantities } = get();
+        set({ bagQuantities: { ...bagQuantities, [key]: Math.max(0, quantity) } });
       },
 
       clearCart: () => {
-        set({ items: [], totalAmount: 0, itemCount: 0, customerName: '', customerPhone: '', selectedBags: emptySelectedBags });
+        set({ items: [], totalAmount: 0, itemCount: 0, customerName: '', customerPhone: '', bagQuantities: emptyBagQuantities });
       },
     }),
     {
