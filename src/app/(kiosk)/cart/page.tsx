@@ -493,16 +493,6 @@ export default function CartNewPage() {
                     <span className="text-[12px]" style={JKT}>Pembayaran Aman &amp; Terenkripsi</span>
                   </div>
                 </div>
-
-                {/* Promo card */}
-                <div className="bg-[#78000f] text-white p-4 rounded-xl flex items-center justify-between overflow-hidden relative">
-                  <div className="z-10">
-                    <p className="text-[11px] font-[500] opacity-80 uppercase tracking-widest mb-0.5" style={JKT}>Penawaran Terbatas</p>
-                    <h4 className="text-[16px] font-bold" style={JKT}>Promo Bundle Sarapan!</h4>
-                    <p className="text-[12px] opacity-70 mt-0.5" style={JKT}>Hemat Rp 15rb untuk Croissant.</p>
-                  </div>
-                  <span className="material-symbols-outlined absolute -right-3 -bottom-1 opacity-20" style={{ fontSize: '80px' }}>celebration</span>
-                </div>
               </aside>
             </div>
           )}

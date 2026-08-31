@@ -1,8 +1,8 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { useEffect } from 'react';
-import { captureStationFromUrl } from '@/lib/station';
+import { useEffect, useState } from 'react';
+import { captureStationFromUrl, getStation } from '@/lib/station';
 
 export default function KioskLayout({
   children,
@@ -11,9 +11,11 @@ export default function KioskLayout({
 }) {
   const pathname = usePathname();
   const isLandingPage = pathname === '/';
+  const [station, setStation] = useState<string | null>(null);
 
   useEffect(() => {
     captureStationFromUrl();
+    setStation(getStation());
   }, []);
 
   return (
@@ -33,6 +35,21 @@ export default function KioskLayout({
           {children}
         </div>
       </div>
+
+      {/* Tiny always-visible station indicator — the only way to check this on
+          an iOS home-screen shortcut, since apple-mobile-web-app-capable hides
+          the address bar (and the ?station= param along with it). */}
+      {!isLandingPage && (
+        <div
+          className="fixed bottom-2 left-2 z-[100] px-2 py-0.5 rounded-md text-[10px] font-mono pointer-events-none select-none"
+          style={{
+            background: station ? 'rgba(0,0,0,0.35)' : 'rgba(186,26,26,0.85)',
+            color: '#fff',
+          }}
+        >
+          {station ? `Station ${station}` : 'No Station'}
+        </div>
+      )}
     </>
   );
 }
