@@ -13,8 +13,8 @@ export interface BagOption {
 
 export const BAG_OPTIONS: BagOption[] = [
   { key: 'cupCarrier', label: 'Cup Carrier', price: 3000, description: 'Khusus minuman, 2 cup per carrier', olseraProductId: 121736115 },
-  { key: 'paperBag', label: 'Paper Bag', price: 4000, description: '2 makanan + 1 minuman per bag', olseraProductId: 121735685 },
-  { key: 'insulatedBag', label: 'Insulated Bag', price: 5000, description: '3 item (boleh campur) per bag', olseraProductId: 121735700 },
+  { key: 'paperBag', label: 'Paper Bag', price: 4000, description: '2 makanan atau 3 minuman per bag', olseraProductId: 121735685 },
+  { key: 'insulatedBag', label: 'Insulated Bag', price: 5000, description: '4 makanan atau 4 minuman per bag', olseraProductId: 121735700 },
 ];
 
 // Same list used in CustomizeModal.tsx to tell food and drink categories apart.
@@ -40,9 +40,9 @@ export function calculateBagQuantity(key: BagKey, food: number, drink: number): 
     case 'cupCarrier':
       return drink > 0 ? Math.ceil(drink / 2) : 0;
     case 'paperBag':
-      return Math.max(food > 0 ? Math.ceil(food / 2) : 0, drink);
+      return Math.max(food > 0 ? Math.ceil(food / 2) : 0, drink > 0 ? Math.ceil(drink / 3) : 0);
     case 'insulatedBag':
-      return food + drink > 0 ? Math.ceil((food + drink) / 3) : 0;
+      return Math.max(food > 0 ? Math.ceil(food / 4) : 0, drink > 0 ? Math.ceil(drink / 4) : 0);
     default:
       return 0;
   }
