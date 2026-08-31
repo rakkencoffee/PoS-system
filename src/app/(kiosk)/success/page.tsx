@@ -237,17 +237,17 @@ function SuccessContent() {
   }, [countdown, router]);
 
   return (
-    <div className="min-h-dvh flex items-center justify-center p-8">
-      <div className="text-center max-w-md">
+    <div className="h-dvh overflow-hidden flex items-center justify-center p-4">
+      <div className="text-center max-w-md w-full flex flex-col gap-3">
         {/* Success Animation */}
-        <div className="mb-8 animate-scale-in">
+        <div className="animate-scale-in">
           <div className="relative inline-block">
-            <div className={`w-28 h-28 rounded-full flex items-center justify-center mx-auto shadow-2xl ${
-              isOffline 
-                ? 'bg-linear-to-r from-amber-500 to-orange-500 shadow-amber-500/30' 
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto shadow-xl ${
+              isOffline
+                ? 'bg-linear-to-r from-amber-500 to-orange-500 shadow-amber-500/30'
                 : 'bg-linear-to-r from-green-500 to-emerald-500 shadow-green-500/30'
             }`}>
-              <svg className="w-14 h-14 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 {isOffline ? (
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 ) : (
@@ -255,93 +255,95 @@ function SuccessContent() {
                 )}
               </svg>
             </div>
-            <div className={`absolute -inset-4 rounded-full blur-xl animate-pulse ${
+            <div className={`absolute -inset-2 rounded-full blur-lg animate-pulse ${
               isOffline ? 'bg-amber-500/20' : 'bg-green-500/20'
             }`} />
           </div>
         </div>
 
-        <h1 className="text-3xl font-bold text-(--text-primary) mb-2 animate-fade-in-up">
-          {isOffline ? 'Pesanan Disimpan Offline' : 'Pesanan Berhasil!'}
-        </h1>
-        <p className="text-(--text-muted) mb-8 animate-fade-in delay-1 text-sm">
-          {isOffline
-            ? 'Pesanan Anda disimpan sementara dan akan otomatis terkirim ke dapur begitu koneksi internet kembali normal.'
-            : 'Mohon tunggu, struk Anda sedang dicetak.'}
-        </p>
+        <div>
+          <h1 className="text-xl font-bold text-(--text-primary) animate-fade-in-up">
+            {isOffline ? 'Pesanan Disimpan Offline' : 'Pesanan Berhasil!'}
+          </h1>
+          <p className="text-(--text-muted) animate-fade-in delay-1 text-xs mt-1">
+            {isOffline
+              ? 'Pesanan Anda disimpan sementara dan akan otomatis terkirim ke dapur begitu koneksi internet kembali normal.'
+              : 'Mohon tunggu, struk Anda sedang dicetak.'}
+          </p>
+        </div>
 
         {/* Queue & Order Number */}
-        <div className="glass-card p-8 mb-8 animate-fade-in-up delay-2" style={{ opacity: 0 }}>
-          <p className="text-sm text-(--text-muted) uppercase tracking-wider mb-2">Nomor Antrean</p>
-          <div className="text-7xl font-black text-gradient mb-2">
+        <div className="glass-card p-4 animate-fade-in-up delay-2" style={{ opacity: 0 }}>
+          <p className="text-xs text-(--text-muted) uppercase tracking-wider mb-1">Nomor Antrean</p>
+          <div className="text-5xl font-black text-gradient leading-none">
             #{String(queue).padStart(3, '0')}
           </div>
-          <div className="text-sm text-(--text-muted) mb-4 font-mono">
+          <div className="text-xs text-(--text-muted) mt-2 mb-2 font-mono">
             ID: {(orderNo || orderData?.orderNo) || orderId}
           </div>
           <div className="flex items-center justify-center gap-2 text-(--text-secondary)">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <span className="text-sm">Estimated wait: 5-10 minutes</span>
+            <span className="text-xs">Estimated wait: 5-10 minutes</span>
           </div>
         </div>
 
         {/* Instructions */}
-        <div className="glass-card p-5 mb-8 text-left animate-fade-in delay-3" style={{ opacity: 0 }}>
-          <h3 className="font-semibold text-(--text-primary) mb-3 text-center">Langkah Selanjutnya</h3>
-          <div className="space-y-3">
-            <div className="flex items-start gap-3">
-              <span className="w-6 h-6 rounded-full bg-[#A8131E] flex items-center justify-center text-xs text-white mt-0.5 shrink-0">1</span>
-              <p className="text-sm text-(--text-secondary)">Ambil struk Anda</p>
+        <div className="glass-card p-3 text-left animate-fade-in delay-3" style={{ opacity: 0 }}>
+          <h3 className="font-semibold text-(--text-primary) text-sm mb-2 text-center">Langkah Selanjutnya</h3>
+          <div className="space-y-1.5">
+            <div className="flex items-start gap-2.5">
+              <span className="w-5 h-5 rounded-full bg-[#A8131E] flex items-center justify-center text-[11px] text-white mt-0.5 shrink-0">1</span>
+              <p className="text-xs text-(--text-secondary)">Ambil struk Anda</p>
             </div>
-            <div className="flex items-start gap-3">
-              <span className="w-6 h-6 rounded-full bg-[#A8131E] flex items-center justify-center text-xs text-white mt-0.5 shrink-0">2</span>
-              <p className="text-sm text-(--text-secondary)">Tunggu nomor antrean Anda dipanggil</p>
+            <div className="flex items-start gap-2.5">
+              <span className="w-5 h-5 rounded-full bg-[#A8131E] flex items-center justify-center text-[11px] text-white mt-0.5 shrink-0">2</span>
+              <p className="text-xs text-(--text-secondary)">Tunggu nomor antrean Anda dipanggil</p>
             </div>
           </div>
         </div>
 
         {/* Buttons */}
-        <div className="space-y-3 animate-fade-in delay-4" style={{ opacity: 0 }}>
+        <div className="space-y-2 animate-fade-in delay-4" style={{ opacity: 0 }}>
           {!isOffline && (
             <>
               <button
                 onClick={handlePrint}
                 disabled={printStatus === 'printing'}
-                className="w-full py-4 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold flex items-center justify-center gap-3 transition-all active:scale-95 border border-white/10 disabled:opacity-50"
+                className="w-full py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-95 border border-white/10 disabled:opacity-50"
               >
                 {printStatus === 'printing' ? (
                   <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     Printing...
                   </>
                 ) : printStatus === 'success' ? (
                   <>
-                    <svg className="w-5 h-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    Struk Tercetak ✓
+                    Struk Tercetak
                   </>
                 ) : (
                   <>
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                     </svg>
-                    🧾 Cetak Struk
+                    Cetak Struk
                   </>
                 )}
               </button>
-              
+
               {printStatus === 'fallback' && (
                 <p className="text-xs text-amber-400 text-center">Print Bridge offline — menggunakan browser print</p>
               )}
             </>
           )}
-          
+
           <button
             onClick={() => router.push('/menu')}
-            className="btn-primary w-full"
+            className="btn-primary w-full py-3 text-sm"
           >
             Kembali Ke Menu ({countdown}s)
           </button>
