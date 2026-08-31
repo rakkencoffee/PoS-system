@@ -232,7 +232,7 @@ function SuccessContent() {
 
   useEffect(() => {
     if (countdown <= 0) {
-      router.push('/');
+      router.push('/menu');
     }
   }, [countdown, router]);
 
@@ -262,12 +262,12 @@ function SuccessContent() {
         </div>
 
         <h1 className="text-3xl font-bold text-(--text-primary) mb-2 animate-fade-in-up">
-          {isOffline ? 'Order Queued Offline' : 'Payment Successful!'}
+          {isOffline ? 'Pesanan Disimpan Offline' : 'Pesanan Berhasil!'}
         </h1>
         <p className="text-(--text-muted) mb-8 animate-fade-in delay-1 text-sm">
-          {isOffline 
-            ? 'We saved your order locally. It will be sent to the kitchen as soon as internet is restored.' 
-            : 'Your order has been placed and sent to the kitchen.'}
+          {isOffline
+            ? 'Pesanan Anda disimpan sementara dan akan otomatis terkirim ke dapur begitu koneksi internet kembali normal.'
+            : 'Mohon tunggu, struk Anda sedang dicetak.'}
         </p>
 
         {/* Queue & Order Number */}
@@ -289,19 +289,15 @@ function SuccessContent() {
 
         {/* Instructions */}
         <div className="glass-card p-5 mb-8 text-left animate-fade-in delay-3" style={{ opacity: 0 }}>
-          <h3 className="font-semibold text-(--text-primary) mb-3 text-center">What&apos;s Next?</h3>
+          <h3 className="font-semibold text-(--text-primary) mb-3 text-center">Langkah Selanjutnya</h3>
           <div className="space-y-3">
             <div className="flex items-start gap-3">
               <span className="w-6 h-6 rounded-full bg-[#A8131E] flex items-center justify-center text-xs text-white mt-0.5 shrink-0">1</span>
-              <p className="text-sm text-(--text-secondary)">Wait for your number to be called</p>
+              <p className="text-sm text-(--text-secondary)">Ambil struk Anda</p>
             </div>
             <div className="flex items-start gap-3">
               <span className="w-6 h-6 rounded-full bg-[#A8131E] flex items-center justify-center text-xs text-white mt-0.5 shrink-0">2</span>
-              <p className="text-sm text-(--text-secondary)">Check the screen for order status</p>
-            </div>
-            <div className="flex items-start gap-3">
-              <span className="w-6 h-6 rounded-full bg-[#A8131E] flex items-center justify-center text-xs text-white mt-0.5 shrink-0">3</span>
-              <p className="text-sm text-(--text-secondary)">Pick up your order when it&apos;s ready</p>
+              <p className="text-sm text-(--text-secondary)">Tunggu nomor antrean Anda dipanggil</p>
             </div>
           </div>
         </div>
@@ -344,18 +340,10 @@ function SuccessContent() {
           )}
           
           <button
-            onClick={() => !isOffline && router.push(`/status?orderId=${orderId}`)}
-            disabled={isOffline}
-            className="btn-primary w-full disabled:opacity-50 disabled:grayscale"
+            onClick={() => router.push('/menu')}
+            className="btn-primary w-full"
           >
-            {isOffline ? 'Tracking Unavailable (Offline)' : 'Track My Order'}
-          </button>
-          
-          <button
-            onClick={() => router.push('/')}
-            className="btn-ghost w-full"
-          >
-            Back to Home ({countdown}s)
+            Kembali Ke Menu ({countdown}s)
           </button>
         </div>
 

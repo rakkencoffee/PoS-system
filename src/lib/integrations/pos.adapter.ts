@@ -258,6 +258,10 @@ export async function getCategories(): Promise<NormalizedCategory[]> {
       const groups = await olsera.getProductGroups();
       olseraCache.categories = groups
         .map(mapOlseraGroup)
+        // "Packaging" only exists so bag/kemasan products have an Olsera
+        // product ID to sync against at checkout — it's never a browsable
+        // menu category on the kiosk.
+        .filter((c) => c.slug !== "packaging")
         .sort(
           (a, b) =>
             (CATEGORY_ORDER[a.slug] ?? 99) - (CATEGORY_ORDER[b.slug] ?? 99),

@@ -498,7 +498,7 @@ function MenuPageContent() {
         </div>
 
         {/* Main Content */}
-        <main className="pb-28 px-4 pt-4">
+        <main className="pb-8 px-4 pt-4">
           {loading ? (
             <MobileSkeleton />
           ) : debouncedSearch ? (
@@ -556,7 +556,7 @@ function MenuPageContent() {
         {itemCount > 0 && (
           <button
             onClick={() => router.push('/cart')}
-            className="fixed bottom-24 right-5 z-50 bg-[#78000f] text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all overflow-hidden"
+            className="fixed bottom-5 right-5 z-50 bg-[#78000f] text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all overflow-hidden"
           >
             <span className="material-symbols-outlined" style={{ fontSize: '26px' }}>shopping_cart</span>
             <div
@@ -568,24 +568,6 @@ function MenuPageContent() {
           </button>
         )}
 
-        {/* Bottom Navigation */}
-        <nav className="fixed bottom-0 w-full z-50 flex justify-around items-center px-4 py-2 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.08)] rounded-t-xl">
-          <button className="flex flex-col items-center gap-0.5 bg-[#78000f] text-white rounded-full px-4 py-1.5 active:scale-95 transition-transform">
-            <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>coffee</span>
-            <span className="text-[10px] font-[500]" style={JKT}>Menu</span>
-          </button>
-          <button
-            onClick={() => router.push('/cart')}
-            className="flex flex-col items-center gap-0.5 text-[#998075] hover:text-[#78000f] active:scale-95 transition-all"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>shopping_cart</span>
-            <span className="text-[10px] font-[500]" style={JKT}>Keranjang</span>
-          </button>
-          <button className="flex flex-col items-center gap-0.5 text-[#998075] hover:text-[#78000f] active:scale-95 transition-all">
-            <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>receipt_long</span>
-            <span className="text-[10px] font-[500]" style={JKT}>Riwayat</span>
-          </button>
-        </nav>
       </div>
 
       {/* ── CustomizeModal — shared between both layouts ── */}
