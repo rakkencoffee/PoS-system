@@ -371,7 +371,7 @@ export function formatDrinkLabels(data: ReceiptData, lineWidth = 48): Buffer {
 
   if (!data.items || data.items.length === 0) return Buffer.concat(parts);
 
-  const excludedCategories = ['bites', 'dessert', 'main-course', 'snack', 'pastry', 'makanan', 'cemilan'];
+  const excludedCategories = ['bites', 'dessert', 'main-course', 'snack', 'pastry', 'makanan', 'cemilan', 'packaging', 'other'];
   const drinkItems = data.items.filter((item) => {
     const category = (item.categorySlug || item.category || '').toLowerCase();
     if (category) return !excludedCategories.some((excluded) => category.includes(excluded));

@@ -8,6 +8,7 @@ import { db, encryptPendingOrder } from '@/lib/dexie';
 import { CartItem } from '@/lib/types';
 import { KioskHeader } from '@/components/kiosk/KioskHeader';
 import { getStation } from '@/lib/station';
+import { buildBagOrderItems, calculateBagTotal } from '@/lib/bag-options';
 import * as Sentry from "@sentry/nextjs";
 
 function buildOrderItems(items: CartItem[]) {
@@ -49,15 +50,18 @@ function formatItemNotes(item: CartItem): string {
   return parts.join(', ');
 }
 
-function savePrintData(cartItems: CartItem[], orderId: string) {
+function savePrintData(cartItems: CartItem[], orderId: string, bagItems: { name: string; quantity: number; price: number }[] = []) {
   try {
-    const data = cartItems.map(item => ({
-      name: item.name,
-      quantity: item.quantity,
-      price: item.subtotal / item.quantity,
-      notes: formatItemNotes(item),
-      size: item.size || '-',
-    }));
+    const data = [
+      ...cartItems.map(item => ({
+        name: item.name,
+        quantity: item.quantity,
+        price: item.subtotal / item.quantity,
+        notes: formatItemNotes(item),
+        size: item.size || '-',
+      })),
+      ...bagItems.map(b => ({ name: b.name, quantity: b.quantity, price: b.price, notes: '', size: '-' })),
+    ];
     sessionStorage.setItem(`print_${orderId}`, JSON.stringify(data));
   } catch (_) {}
 }
@@ -79,7 +83,7 @@ function formatCurrency(amount: number): string {
 
 export default function CheckoutNewPage() {
   const router = useRouter();
-  const { items, totalAmount, clearCart, itemCount, customerName, customerPhone, updateQuantity, removeItem } = useCartStore();
+  const { items, totalAmount, clearCart, itemCount, customerName, customerPhone, updateQuantity, removeItem, selectedBags } = useCartStore();
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<string>('');
@@ -110,8 +114,8 @@ export default function CheckoutNewPage() {
 
     try {
       const data = await createOrderMutation.mutateAsync({
-        items: buildOrderItems(items),
-        totalAmount: subtotal,
+        items: [...buildOrderItems(items), ...buildBagOrderItems(items, selectedBags)],
+        totalAmount: subtotal + bagTotal,
         discountAmount: appliedDiscount,
         customerName: customerName,
         customerPhone: customerPhone,
@@ -122,7 +126,7 @@ export default function CheckoutNewPage() {
       // No payment gateway wired up yet — server marks the order paid
       // immediately (simulated), so there's no popup/redirect to wait on here.
       setPaymentStatus('Pesanan berhasil!');
-      savePrintData(items, data.orderId);
+      savePrintData(items, data.orderId, buildBagOrderItems(items, selectedBags));
       clearCart();
       const queueNum = (data.queueNumber || 0).toString();
       const orderNoParam = data.orderNo ? `&orderNo=${data.orderNo}` : '';
@@ -141,7 +145,7 @@ export default function CheckoutNewPage() {
       try {
         const orderPayload = {
           orderId: `OFFLINE-${Date.now()}`,
-          items: buildOrderItems(items),
+          items: [...buildOrderItems(items), ...buildBagOrderItems(items, selectedBags)],
           customerName: customerName,
           totalAmount: total,
           createdAt: new Date().toISOString(),
@@ -195,7 +199,8 @@ export default function CheckoutNewPage() {
 
   const subtotal = totalAmount;
   const discount = appliedDiscount;
-  const total = Math.max(0, subtotal - discount);
+  const bagTotal = calculateBagTotal(items, selectedBags);
+  const total = Math.max(0, subtotal - discount) + bagTotal;
 
   return (
     <div className="min-h-dvh bg-background font-body-md text-on-background relative">
@@ -373,6 +378,12 @@ export default function CheckoutNewPage() {
                     <span>Subtotal</span>
                     <span>{formatCurrency(subtotal)}</span>
                   </div>
+                  {bagTotal > 0 && (
+                    <div className="flex justify-between text-body-lg text-taupe font-body-lg">
+                      <span>Kemasan</span>
+                      <span>{formatCurrency(bagTotal)}</span>
+                    </div>
+                  )}
                   {discount > 0 && (
                     <div className="flex justify-between text-body-lg text-green-600 font-body-lg">
                       <span>Voucher Discount</span>
@@ -582,6 +593,12 @@ export default function CheckoutNewPage() {
               <span className="font-body-md text-taupe">Subtotal ({itemCount} items)</span>
               <span className="font-body-md text-on-surface">{formatCurrency(subtotal)}</span>
             </div>
+            {bagTotal > 0 && (
+              <div className="flex justify-between">
+                <span className="font-body-md text-taupe">Kemasan</span>
+                <span className="font-body-md text-on-surface">{formatCurrency(bagTotal)}</span>
+              </div>
+            )}
             {discount > 0 && (
               <div className="flex justify-between text-green-600">
                 <span>Voucher Discount</span>

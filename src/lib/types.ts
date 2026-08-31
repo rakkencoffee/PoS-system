@@ -16,6 +16,7 @@ export interface CartItem {
   subtotal: number;
   notes?: string;
   category?: string;
+  categorySlug?: string;
 }
 
 export interface CartState {

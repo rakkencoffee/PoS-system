@@ -264,6 +264,7 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
       toppings: finalToppings,
       subtotal: totalPrice,
       category: typeof item.category === 'string' ? item.category : item.category?.name || '',
+      categorySlug: slug,
     };
 
     if (isEditMode) {

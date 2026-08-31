@@ -12,7 +12,10 @@
 import * as olsera from "./olsera.service";
 import type { OlseraProduct, OlseraProductGroup } from "./olsera.service";
 import { logOrderStatusChange, type StatusLogSource } from "@/lib/order-status-log";
+import { BAG_OPTIONS } from "@/lib/bag-options";
 import { Prisma } from "@prisma/client";
+
+const BAG_PRODUCT_IDS = new Set(BAG_OPTIONS.map((b) => String(b.olseraProductId)));
 
 const USE_OLSERA = process.env.USE_OLSERA === "true";
 
@@ -472,15 +475,19 @@ export async function createOrder(
               return categorySlug !== 'non-coffee';
             }) && discountAmount < totalOrderAmount * 0.22);
 
-          let eligibleItems = items;
+          // Packaging (bags) is a service fee, not discountable stock — never
+          // eligible for voucher discount regardless of restriction mode.
+          const nonBagItems = items.filter(item => !BAG_PRODUCT_IDS.has(String(item.productId || '')));
+
+          let eligibleItems = nonBagItems;
           if (isRestrictedToNonCoffee) {
-            eligibleItems = items.filter(item => {
+            eligibleItems = nonBagItems.filter(item => {
               const categorySlug = catMap.get(item.name || "");
               return categorySlug === 'non-coffee';
             });
           }
           if (eligibleItems.length === 0) {
-            eligibleItems = items;
+            eligibleItems = nonBagItems;
           }
 
           const eligibleTotalAmount = eligibleItems.reduce((acc, item) => acc + (item.price || 0) * item.quantity, 0);

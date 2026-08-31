@@ -4,8 +4,10 @@ import { prisma } from '@/lib/db';
 import { getMenuItems } from '@/lib/integrations/pos.adapter';
 import { logOrderStatusChange } from '@/lib/order-status-log';
 import { auth } from '@/lib/auth';
+import { BAG_OPTIONS } from '@/lib/bag-options';
 
 const USE_OLSERA = process.env.USE_OLSERA === 'true';
+const BAG_NAMES = new Set(BAG_OPTIONS.map((b) => b.label));
 
 // PATCH can wait up to ~9s for the checkout background sync to land before
 // self-healing — stay well clear of the platform's default function timeout.
@@ -37,16 +39,21 @@ function distributeItemsDiscount(items: any[], discount: number, totalAmount: nu
     return isNonCoffeeItem(cat, name);
   };
 
+  const isBag = (i: any) => BAG_NAMES.has(i.menuItem?.name || i.name || '');
+
   const hasNonCoffee = items.some(i => isNonCoffee(i));
   const hasOtherThanNonCoffee = items.some(i => !isNonCoffee(i));
   const isRestrictedToNonCoffee = hasNonCoffee && hasOtherThanNonCoffee && discount < totalAmount * 0.22;
 
-  let eligibleItems = items;
+  // Packaging (bags) is a service fee, not discountable stock.
+  const nonBagItems = items.filter(i => !isBag(i));
+
+  let eligibleItems = nonBagItems;
   if (isRestrictedToNonCoffee) {
-    eligibleItems = items.filter(i => isNonCoffee(i));
+    eligibleItems = nonBagItems.filter(i => isNonCoffee(i));
   }
   if (eligibleItems.length === 0) {
-    eligibleItems = items;
+    eligibleItems = nonBagItems;
   }
 
   const eligibleSum = eligibleItems.reduce((sum, i) => sum + ((i.price || i.subtotal || 0) * (i.quantity || 1)), 0);
