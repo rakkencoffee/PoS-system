@@ -170,6 +170,16 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
     }
   }, [item.sizes, isEditMode]);
 
+  // Lock background scroll while the modal is open — otherwise touch/trackpad
+  // scroll gestures that start on the backdrop can scroll the page behind it.
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, []);
+
   const milkChoices = [
     { key: 'dairy', label: 'Dairy Milk', sub: 'Susu standar', price: 0 },
     { key: 'skim', label: 'Skim Milk', sub: 'Low-fat', price: 6000 },
@@ -210,10 +220,10 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
     { key: 'more', label: 'More Sugar', sub: 'gula 130%' }
   ];
   const iceLevels = [
-    { key: 'none', label: 'No Ice', sub: 'Tanpa es', icon: '🚫🧊' },
-    { key: 'less', label: 'Less Ice', sub: 'es 70%', icon: '🧊' },
-    { key: 'normal', label: 'Normal Ice', sub: 'Standar penyajian', icon: '🧊🧊' },
-    { key: 'more', label: 'More Ice', sub: 'es 130%', icon: '🧊🧊🧊' },
+    { key: 'none', label: 'No Ice', sub: 'Tanpa es' },
+    { key: 'less', label: 'Less Ice', sub: 'es 70%' },
+    { key: 'normal', label: 'Normal Ice', sub: 'Standar penyajian' },
+    { key: 'more', label: 'More Ice', sub: 'es 130%' },
   ];
 
   const toggleChoice = (choice: Topping) => {
@@ -275,15 +285,6 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
     onClose();
   };
 
-  // Size label mapping
-  const sizeLabel = (size: string) => {
-    switch (size) {
-      case 'Hot': return '🔥 Hot';
-      case 'Ice': return '🧊 Ice';
-      case 'Upsize': return '⬆️ Upsize';
-      default: return size;
-    }
-  };
 
   return (
     <div className="fixed inset-0 z-100 flex items-end md:items-center justify-center">
@@ -293,24 +294,31 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
         onClick={onClose}
       />
 
-      {/* Modal */}
-      <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-t-3xl md:rounded-3xl glass animate-slide-up"
+      {/* Modal — flex column so the header/footer stay fixed in normal flow
+          and only the body scrolls. The old layout put overflow-y-auto on
+          this same element while the header/footer were `sticky` inside it,
+          which is what caused the scroll glitches. */}
+      <div className="relative w-full max-w-lg max-h-[90vh] flex flex-col rounded-t-3xl md:rounded-3xl glass animate-slide-up overflow-hidden"
         style={{ background: 'var(--bg-secondary)' }}
       >
         {/* Header */}
-        <div className="sticky top-0 z-10 flex items-center justify-between p-5 border-b border-(--border-subtle)"
-          style={{ background: 'var(--bg-secondary)' }}
-        >
-          <div>
-            <h2 className="text-xl font-bold text-(--text-primary)">{item.name}</h2>
-            <p className="text-sm text-(--text-muted) whitespace-pre-line">{item.description?.replace(/\\n/g, '\n')}</p>
+        <div className="shrink-0 flex items-center justify-between gap-4 p-5 border-b border-(--border-subtle)">
+          <div className="min-w-0">
+            <h2 className="text-xl font-bold text-(--text-primary) truncate">{item.name}</h2>
+            {item.description && (
+              <p className="text-sm text-(--text-muted) whitespace-pre-line line-clamp-2">{item.description.replace(/\\n/g, '\n')}</p>
+            )}
           </div>
-          <button onClick={onClose} className="w-10 h-10 rounded-full bg-(--bg-card) flex items-center justify-center text-(--text-secondary) hover:text-(--text-primary) transition-colors">
-            ✕
+          <button
+            onClick={onClose}
+            aria-label="Tutup"
+            className="shrink-0 w-10 h-10 rounded-full bg-(--bg-card) flex items-center justify-center text-(--text-secondary) hover:text-(--text-primary) transition-colors"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>close</span>
           </button>
         </div>
 
-        <div className="p-5 space-y-6">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-5 space-y-6">
           {/* Size Selection (Hot / Ice / Upsize for drinks) */}
           {hasSizes && (
             <div>
@@ -328,7 +336,7 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
                         : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle) hover:border-[var(--brand-400)] hover:scale-[1.02] hover:shadow-sm'
                     }`}
                   >
-                    <span className="block text-sm font-bold">{sizeLabel(size.size)}</span>
+                    <span className="block text-sm font-bold">{size.size}</span>
                     <span className="block text-[10px] mt-0.5 opacity-80">
                       {size.priceAdjustment === 0
                         ? 'Base'
@@ -380,9 +388,7 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
                         : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle) hover:border-[var(--brand-400)] hover:scale-[1.02]'
                     }`}
                   >
-                    <span className="text-sm font-bold block flex items-center justify-center gap-1 leading-tight">
-                      {ice.icon} {ice.label}
-                    </span>
+                    <span className="text-sm font-bold block leading-tight">{ice.label}</span>
                     <span className="text-[10px] opacity-80 block mt-0.5 leading-tight">{ice.sub}</span>
                   </button>
                 ))}
@@ -490,7 +496,7 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
                         <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
                           isSelected ? 'bg-[#A8131E] border-[#A8131E]' : 'border-white/30'
                         }`}>
-                          {isSelected && <span className="text-white text-xs">✓</span>}
+                          {isSelected && <span className="material-symbols-outlined text-white" style={{ fontSize: '14px' }}>check</span>}
                         </div>
                         <span className="text-sm text-(--text-primary) font-medium">{choice.name}</span>
                       </div>
@@ -510,25 +516,25 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
             <div className="flex items-center justify-center gap-6">
               <button
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="w-12 h-12 rounded-full bg-(--bg-card) border border-(--border-subtle) flex items-center justify-center text-xl text-(--text-primary) hover:border-(--border-default) transition-all active:scale-90"
+                aria-label="Kurangi jumlah"
+                className="w-12 h-12 rounded-full bg-(--bg-card) border border-(--border-subtle) flex items-center justify-center text-(--text-primary) hover:border-(--border-default) transition-all active:scale-90"
               >
-                −
+                <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>remove</span>
               </button>
-              <span className="text-3xl font-bold text-(--text-primary) w-12 text-center">{quantity}</span>
+              <span className="text-3xl font-bold text-(--text-primary) w-12 text-center tabular-nums">{quantity}</span>
               <button
                 onClick={() => setQuantity(quantity + 1)}
-                className="w-12 h-12 rounded-full bg-[var(--brand-500)] flex items-center justify-center text-xl text-white shadow-lg hover:shadow-xl transition-all active:scale-90"
+                aria-label="Tambah jumlah"
+                className="w-12 h-12 rounded-full bg-[var(--brand-500)] flex items-center justify-center text-white shadow-lg hover:shadow-xl transition-all active:scale-90"
               >
-                +
+                <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>add</span>
               </button>
             </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 p-5 border-t border-(--border-subtle)"
-          style={{ background: 'var(--bg-secondary)' }}
-        >
+        <div className="shrink-0 p-5 border-t border-(--border-subtle)">
           <button
             onClick={handleSubmit}
             className="btn-primary w-full flex items-center justify-between text-lg py-4 rounded-2xl"
