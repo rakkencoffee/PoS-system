@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { CartItem, CartState } from '@/lib/types';
+import { BagKey } from '@/lib/bag-options';
 
 interface CartStore extends CartState {
   addItem: (item: CartItem) => void;
@@ -9,9 +10,17 @@ interface CartStore extends CartState {
   updateQuantity: (id: string, quantity: number) => void;
   setCustomerName: (name: string) => void;
   setCustomerPhone: (phone: string) => void;
+  toggleBag: (key: BagKey) => void;
   clearCart: () => void;
   itemCount: number;
+  selectedBags: Record<BagKey, boolean>;
 }
+
+const emptySelectedBags: Record<BagKey, boolean> = {
+  cupCarrier: false,
+  paperBag: false,
+  insulatedBag: false,
+};
 
 function calculateTotal(items: CartItem[]): number {
   return items.reduce((sum, item) => sum + item.subtotal, 0);
@@ -32,6 +41,7 @@ export const useCartStore = create<CartStore>()(
       customerName: '',
       customerPhone: '',
       itemCount: 0,
+      selectedBags: emptySelectedBags,
 
       addItem: (newItem: CartItem) => {
         const { items } = get();
@@ -107,8 +117,13 @@ export const useCartStore = create<CartStore>()(
         set({ customerPhone: phone });
       },
 
+      toggleBag: (key: BagKey) => {
+        const { selectedBags } = get();
+        set({ selectedBags: { ...selectedBags, [key]: !selectedBags[key] } });
+      },
+
       clearCart: () => {
-        set({ items: [], totalAmount: 0, itemCount: 0, customerName: '', customerPhone: '' });
+        set({ items: [], totalAmount: 0, itemCount: 0, customerName: '', customerPhone: '', selectedBags: emptySelectedBags });
       },
     }),
     {
