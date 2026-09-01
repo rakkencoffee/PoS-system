@@ -1,14 +1,20 @@
 import { KdsView } from '@/components/kds/KdsView';
 import { KdsAuthGate } from '@/components/kds/KdsAuthGate';
-import { BaristaPrinterPanel } from '@/components/kds/BaristaPrinterPanel';
+import { StationPrinterPanel } from '@/components/kds/StationPrinterPanel';
 
 export default function BaristaPage() {
   return (
     <KdsAuthGate station="Barista">
-      <div className="fixed top-3 right-3 z-50">
-        <BaristaPrinterPanel />
-      </div>
-      <KdsView type="barista" title="Barista Station" />
+      <KdsView
+        type="barista"
+        title="Barista Station"
+        headerExtra={
+          <StationPrinterPanel
+            labelEndpointBase="/api/kds/sticker"
+            emptyMessage="Tidak ada minuman di order ini."
+          />
+        }
+      />
     </KdsAuthGate>
   );
 }

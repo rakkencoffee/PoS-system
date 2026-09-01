@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { ReactNode, useEffect, useState, useMemo } from 'react';
 import { useKitchenOrders, useUpdateOrderStatus, getKdsLastSyncedAt } from '@/hooks/useOrders';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useQueryClient } from '@tanstack/react-query';
@@ -9,9 +9,11 @@ import { OrderData } from '@/lib/types';
 interface KdsViewProps {
   type: 'kitchen' | 'barista';
   title: string;
+  /** Extra controls rendered in the header, alongside Sync Data/clock (e.g. StationPrinterPanel). */
+  headerExtra?: ReactNode;
 }
 
-export function KdsView({ type, title }: KdsViewProps) {
+export function KdsView({ type, title, headerExtra }: KdsViewProps) {
   const queryClient = useQueryClient();
   const { data: orders = [], isLoading: loading, refetch: fetchOrders, isFetching: refreshing } = useKitchenOrders();
   const updateStatusMutation = useUpdateOrderStatus();
@@ -329,6 +331,7 @@ export function KdsView({ type, title }: KdsViewProps) {
           </div>
 
           <div className="flex items-center gap-3">
+            {headerExtra}
             <button
               onClick={() => fetchOrders()}
               disabled={refreshing}

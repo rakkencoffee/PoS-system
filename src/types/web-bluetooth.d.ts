@@ -1,6 +1,6 @@
 /**
  * Minimal Web Bluetooth ambient types -- only the subset used by
- * useBaristaPrinter.ts. Not in lib.dom.d.ts; no @types/web-bluetooth
+ * useBlePrinter.ts. Not in lib.dom.d.ts; no @types/web-bluetooth
  * dependency added for this one file.
  */
 

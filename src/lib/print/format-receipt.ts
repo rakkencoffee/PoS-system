@@ -338,19 +338,29 @@ export function formatReceipt(data: ReceiptData, lineWidth = 48, cut = false): B
   return Buffer.concat(parts);
 }
 
+const DRINK_CATEGORIES = ['bites', 'dessert', 'main-course', 'snack', 'pastry', 'makanan', 'cemilan', 'packaging', 'other'];
+
+function isDrinkItem(item: ReceiptItem): boolean {
+  const category = (item.categorySlug || item.category || '').toLowerCase();
+  if (category) return !DRINK_CATEGORIES.some((excluded) => category.includes(excluded));
+  const name = (item.menuItem?.name || item.name || '').toLowerCase();
+  return !DRINK_CATEGORIES.some((excluded) => name.includes(excluded));
+}
+
 /**
- * Individual per-cup drink labels — condensed font (font B), notes joined on
- * one "|"-separated line, customer name + cup index, matching the visual
- * style of print-bridge/src/format-receipt.js EXCEPT the header stays plain
- * text ("No.XXX  01/01") instead of a logo+queue-number graphic. The
- * graphic version (GS v 0 raster via buildHeaderRaster) was tried and
- * dropped 2026-09-01: sending raster image data over Web Bluetooth's small
- * chunked writes (see ble-config.ts, ~20 bytes/write) desyncs this printer
- * clone's raster receiver partway through and it falls back to printing the
+ * Shared per-item label renderer for Barista (drinks) and Kitchen (food) --
+ * condensed font (font B), notes joined on one "|"-separated line, customer
+ * name + item index, matching the visual style of
+ * print-bridge/src/format-receipt.js EXCEPT the header stays plain text
+ * ("No.XXX  01/01") instead of a logo+queue-number graphic. The graphic
+ * version (GS v 0 raster via buildHeaderRaster) was tried and dropped
+ * 2026-09-01: sending raster image data over Web Bluetooth's small chunked
+ * writes (see ble-config.ts, ~20 bytes/write) desyncs this printer clone's
+ * raster receiver partway through and it falls back to printing the
  * remaining bitmap bytes as garbage text -- confirmed via physical print,
  * not a data-correctness bug. Plain text has no such transport dependency.
  */
-export function formatDrinkLabels(data: ReceiptData, lineWidth = 32): Buffer {
+function formatItemLabels(data: ReceiptData, items: ReceiptItem[], defaultName: string, lineWidth: number): Buffer {
   const parts: Buffer[] = [];
   const add = (...buffers: Buffer[]) => buffers.forEach((b) => parts.push(b));
   const newline = () => add(CMD.FEED_LINE);
@@ -381,20 +391,10 @@ export function formatDrinkLabels(data: ReceiptData, lineWidth = 32): Buffer {
     return lines;
   };
 
-  if (!data.items || data.items.length === 0) return Buffer.concat(parts);
+  if (items.length === 0) return Buffer.concat(parts);
 
-  const excludedCategories = ['bites', 'dessert', 'main-course', 'snack', 'pastry', 'makanan', 'cemilan', 'packaging', 'other'];
-  const drinkItems = data.items.filter((item) => {
-    const category = (item.categorySlug || item.category || '').toLowerCase();
-    if (category) return !excludedCategories.some((excluded) => category.includes(excluded));
-    const name = (item.menuItem?.name || item.name || '').toLowerCase();
-    return !excludedCategories.some((excluded) => name.includes(excluded));
-  });
-
-  if (drinkItems.length === 0) return Buffer.concat(parts);
-
-  const totalCups = drinkItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
-  let currentCup = 1;
+  const totalItems = items.reduce((sum, item) => sum + (item.quantity || 1), 0);
+  let currentItem = 1;
 
   const queueNum =
     data.queueNumber ||
@@ -404,7 +404,7 @@ export function formatDrinkLabels(data: ReceiptData, lineWidth = 32): Buffer {
       return nums.length > 3 ? nums.slice(-3) : nums.padStart(3, '0');
     })();
 
-  for (const item of drinkItems) {
+  for (const item of items) {
     const qty = item.quantity || 1;
     for (let i = 0; i < qty; i++) {
       add(CMD.INIT);
@@ -412,8 +412,8 @@ export function formatDrinkLabels(data: ReceiptData, lineWidth = 32): Buffer {
       add(CMD.FONT_B);
 
       add(CMD.ALIGN_LEFT);
-      const cupNote = `${String(currentCup).padStart(2, '0')}/${String(totalCups).padStart(2, '0')}`;
-      add(leftRight(`No.${queueNum}`, cupNote));
+      const itemNote = `${String(currentItem).padStart(2, '0')}/${String(totalItems).padStart(2, '0')}`;
+      add(leftRight(`No.${queueNum}`, itemNote));
       newline();
 
       const customerLabel = data.customerName || 'Customer';
@@ -422,7 +422,7 @@ export function formatDrinkLabels(data: ReceiptData, lineWidth = 32): Buffer {
       newline();
 
       add(CMD.BOLD_ON);
-      const name = item.menuItem?.name || item.name || 'Drink';
+      const name = item.menuItem?.name || item.name || defaultName;
       const hasSizeInNotes = item.notes && item.notes.toLowerCase().includes('size:');
       const sizeStr = item.size && item.size !== '-' && !hasSizeInNotes ? ` (${item.size})` : '';
       const nameLines = wrapText(`${name}${sizeStr}`, 0);
@@ -454,9 +454,21 @@ export function formatDrinkLabels(data: ReceiptData, lineWidth = 32): Buffer {
 
       add(CMD.FEED_3);
 
-      currentCup++;
+      currentItem++;
     }
   }
 
   return Buffer.concat(parts);
+}
+
+/** Individual per-cup drink labels (Barista station). See formatItemLabels for layout notes. */
+export function formatDrinkLabels(data: ReceiptData, lineWidth = 32): Buffer {
+  const drinkItems = (data.items || []).filter(isDrinkItem);
+  return formatItemLabels(data, drinkItems, 'Drink', lineWidth);
+}
+
+/** Individual per-item food labels (Kitchen station) -- everything formatDrinkLabels excludes. */
+export function formatFoodLabels(data: ReceiptData, lineWidth = 32): Buffer {
+  const foodItems = (data.items || []).filter((item) => !isDrinkItem(item));
+  return formatItemLabels(data, foodItems, 'Item', lineWidth);
 }

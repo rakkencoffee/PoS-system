@@ -11,12 +11,13 @@ import {
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Web Bluetooth connection to the barista's paired sticker printer.
+ * Web Bluetooth connection to a station's paired label printer (Barista or
+ * Kitchen, both using the same QPOS/iWare printer family for now).
  * requestDevice() must be called from a real user click (BLE permission
  * requirement) -- that's what connect() is for. Once connected, writeBytes()
  * can be called freely from any event handler (Pusher callbacks included).
  */
-export function useBaristaPrinter() {
+export function useBlePrinter() {
   const [connected, setConnected] = useState(false);
   const [deviceName, setDeviceName] = useState<string | null>(null);
   const characteristicRef = useRef<BluetoothRemoteGATTCharacteristic | null>(null);
