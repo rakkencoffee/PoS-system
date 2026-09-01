@@ -40,8 +40,14 @@ export default withSentryConfig(withPWA(nextConfig), {
   // Upload a larger set of source maps for prettier stack traces (increases build time)
   widenClientFileUpload: true,
 
-  // Hides source maps from visitors by deleting them after upload
+  // TEMP 2026-09-01: sourcemap upload (a network call to Sentry's API) is
+  // hanging the build indefinitely today, same outage as the telemetry call
+  // above -- disabling entirely to unblock deploys. Only cost is worse
+  // (minified) stack traces in the Sentry dashboard, error tracking itself
+  // still works. Re-enable (delete this `disable` line) once Sentry's own
+  // service is confirmed healthy again.
   sourcemaps: {
+    disable: true,
     deleteSourcemapsAfterUpload: true,
   },
 
