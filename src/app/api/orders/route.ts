@@ -50,9 +50,16 @@ export async function GET(request: NextRequest) {
             take: 50,
           });
           localMap = new Map(localActiveOrders.map((lo) => [lo.id, lo]));
+          // olseraTransactionId is only ever populated by a rare recovery
+          // path, not the normal create flow -- filtering on it here (an
+          // earlier version of this fix did) silently matched zero orders
+          // every time, confirmed via production logs 2026-09-01 right
+          // after placing a fresh order. Order.id is always `OLSERA-<id>`
+          // (or `OFFLINE-<id>`) per pos.adapter.ts's early synchronous
+          // create, so extract the numeric id from there instead.
           activeOrdersToEnrich = localActiveOrders
-            .filter((lo) => lo.olseraTransactionId)
-            .map((lo) => ({ id: lo.olseraTransactionId }));
+            .map((lo) => ({ id: lo.id.replace(/^OLSERA-/, '').replace(/^OFFLINE-/, '') }))
+            .filter((o) => o.id);
 
           console.log(`[API] Local active orders (not fully completed) today: ${activeOrdersToEnrich.length}`);
         } else {
