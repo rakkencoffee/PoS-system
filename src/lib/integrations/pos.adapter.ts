@@ -305,6 +305,133 @@ function formatOptionsWithToppings(options: any): string {
 }
 
 /**
+ * Build and dispatch the print job (PrintJob row + direct-print attempt +
+ * NEW_JOB broadcast) straight from the items the client sent at checkout --
+ * every field print needs (name, price, quantity, notes/options) is already
+ * known here, none of it comes from Olsera. Moved out of the old post-
+ * settlement path 2026-09-01: that path waited on createOrder's background
+ * Olsera sync (sequential additem calls, the slowest part of the whole
+ * order flow) before it could read items back off the local Order row --
+ * printing never actually needed that data to exist first.
+ */
+async function createAndDispatchPrintJob(params: {
+  orderId: string; // local Order.id, e.g. "OLSERA-<id>"
+  queueNumber?: number;
+  customerName?: string;
+  items: {
+    quantity: number;
+    price?: number;
+    name?: string;
+    note?: string;
+    options?: any;
+  }[];
+  discountAmount?: number;
+  station?: string | null;
+}): Promise<void> {
+  const { orderId, queueNumber, customerName, items, discountAmount = 0, station } = params;
+  const { prisma } = await import("@/lib/db");
+
+  try {
+    // Prevent duplicate print jobs (same dedup this path always had, plus
+    // the P2002 unique constraint below as the race-proof backstop).
+    const existingJob = await prisma.printJob.findFirst({
+      where: { orderId, status: { in: ["PENDING", "PRINTING", "PRINTED"] } },
+    });
+    if (existingJob) {
+      console.log(`[PrintDispatch] Print job for ${orderId} already exists, skipping.`);
+      return;
+    }
+
+    let menuItems: any[] = [];
+    try {
+      menuItems = await getMenuItems();
+    } catch (mErr) {}
+    const catMap = new Map();
+    menuItems.forEach((m) => catMap.set(m.name, m.categorySlug));
+
+    const itemsPayload = items.map((item, idx) => {
+      let displayNotes = item.note || "";
+      const optStr = formatOptionsWithToppings(item.options);
+      if (optStr) displayNotes = displayNotes ? `${displayNotes} (${optStr})` : optStr;
+
+      let displaySize = "-";
+      const sizeMatch = displayNotes.match(/Size:\s*([^,)]+)/i);
+      if (sizeMatch) displaySize = sizeMatch[1];
+
+      return {
+        id: idx,
+        menuItem: { name: item.name || "Item" },
+        quantity: item.quantity,
+        price: item.price || 0,
+        notes: displayNotes,
+        size: displaySize,
+        categorySlug: catMap.get(item.name || "") || "other",
+      };
+    });
+
+    const baseTotal = itemsPayload.reduce((acc, item) => acc + item.price * item.quantity, 0);
+    const finalTotal = Math.max(0, baseTotal - discountAmount);
+
+    const qNum = queueNumber
+      ? String(queueNumber)
+      : (() => {
+          const numericId = orderId.replace("OLSERA-", "").replace(/OFFLINE-/, "").replace(/[^0-9]/g, "");
+          return numericId.length > 3 ? numericId.slice(-3) : numericId;
+        })();
+
+    const printPayload = {
+      orderId,
+      queueNumber: qNum,
+      customerName: customerName || "Customer",
+      items: itemsPayload,
+      total: finalTotal,
+      discount: discountAmount,
+      paymentMethod: "E-Wallet",
+    };
+
+    let createdJob;
+    try {
+      createdJob = await prisma.printJob.create({
+        data: {
+          orderId,
+          payload: printPayload,
+          status: "PENDING",
+          station: station || null,
+        },
+      });
+    } catch (createErr) {
+      if (createErr instanceof Prisma.PrismaClientKnownRequestError && createErr.code === "P2002") {
+        console.log(`[PrintDispatch] Print job for ${orderId} already exists (race), skipping.`);
+        return;
+      }
+      throw createErr;
+    }
+
+    console.log(`[PrintDispatch] Cloud Print Job created for ${orderId} with ${itemsPayload.length} items (from checkout data, ahead of Olsera sync).`);
+
+    try {
+      const { tryDirectPrint } = await import("@/lib/print/direct-print");
+      const printed = await tryDirectPrint(createdJob.station, printPayload);
+      if (printed) {
+        await prisma.printJob.update({ where: { id: createdJob.id }, data: { status: "PRINTED" } });
+      }
+    } catch (directPrintErr) {
+      console.warn("[PrintDispatch] Direct print attempt failed (non-blocking):", directPrintErr);
+    }
+
+    try {
+      const { pusherServer } = await import("@/lib/pusher");
+      await pusherServer.trigger("print-queue", "NEW_JOB", { jobId: createdJob.id });
+      console.log(`[PrintDispatch] NEW_JOB broadcast sent for job ${createdJob.id}`);
+    } catch (printPusherErr) {
+      console.warn("[PrintDispatch] Failed to broadcast NEW_JOB (non-blocking):", printPusherErr);
+    }
+  } catch (err) {
+    console.warn(`[PrintDispatch] Failed to create/dispatch print job for ${orderId}:`, err);
+  }
+}
+
+/**
  * Create order in POS system
  */
 // Background task helper that works in Next.js runtime and Node CLI tests
@@ -404,6 +531,20 @@ export async function createOrder(
     } catch (earlyCreateErr) {
       console.warn(`[Queue] Failed to create early Order row for ${orderId} (non-fatal, background sync will retry):`, earlyCreateErr);
     }
+
+    // 2.6. Dispatch the print job now — every field it needs (item names,
+    // prices, quantities, notes/options) is already known from the request,
+    // so it doesn't need to wait for step 3's Olsera item sync below.
+    runInBackground(() =>
+      createAndDispatchPrintJob({
+        orderId: `OLSERA-${orderId}`,
+        queueNumber: queueNum,
+        customerName,
+        items,
+        discountAmount,
+        station,
+      })
+    );
 
     // 3. Offload all heavy synchronization steps to the background
     runInBackground(async () => {
@@ -845,140 +986,11 @@ export async function updateOrderPaymentStatus(
             metadata: { paymentAmount, olseraOrderId, ...extraMetadata },
           });
 
-          // Step 6: Create Print Job in the Cloud Print Queue automatically
-          try {
-            // This runs concurrently with createOrder's own background sync task,
-            // which is the one that actually attaches items to the local Order row
-            // (its last step, after every item has been added to Olsera) — so the
-            // very first read here can easily land before that write, especially on
-            // multi-item orders. Retry briefly instead of printing with 0 items.
-            // Bumped 8->20 (still 1s apart) 2026-09-01: an 8-item order with many
-            // sequential Olsera additem/updatedetail calls under concurrent test
-            // traffic still hadn't written any items after 8s, producing a real
-            // "Cloud Print Job created ... with 0 items" in production.
-            let localOrderFull = await prisma.order.findUnique({
-              where: { id: orderId },
-              include: { items: true }
-            });
-            for (let attempt = 1; attempt <= 20 && localOrderFull && localOrderFull.items.length === 0; attempt++) {
-              await new Promise((resolve) => setTimeout(resolve, 1000));
-              localOrderFull = await prisma.order.findUnique({
-                where: { id: orderId },
-                include: { items: true }
-              });
-            }
-
-            // Prevent duplicate print jobs
-            const existingJob = await prisma.printJob.findFirst({
-              where: {
-                orderId: orderId,
-                status: { in: ['PENDING', 'PRINTING', 'PRINTED'] }
-              }
-            });
-
-            if (!existingJob) {
-              const displayOrderNo = localOrderFull?.olseraTransactionId 
-                ? `OLSERA-${localOrderFull.olseraTransactionId}` 
-                : orderId;
-
-              const qNum = localOrderFull?.queueNumber 
-                ? String(localOrderFull.queueNumber) 
-                : (() => {
-                    const numericId = orderId.replace('OLSERA-', '').replace(/OFFLINE-/, '').replace(/[^0-9]/g, '');
-                    return numericId.length > 3 ? numericId.slice(-3) : numericId;
-                  })();
-
-              // Fetch menu items for category mapping
-              let menuItems: any[] = [];
-              try {
-                menuItems = await getMenuItems();
-              } catch (mErr) {}
-              const catMap = new Map();
-              menuItems.forEach(m => catMap.set(m.name, m.categorySlug));
-
-              const itemsPayload = localOrderFull?.items.map((item, idx) => {
-                let displaySize = '-';
-                const sizeMatch = item.notes?.match(/Size:\s*([^,)]+)/i);
-                if (sizeMatch) displaySize = sizeMatch[1];
-
-                return {
-                  id: idx,
-                  menuItem: { name: item.name },
-                  quantity: item.quantity,
-                  price: item.price,
-                  notes: item.notes || '',
-                  size: displaySize,
-                  categorySlug: catMap.get(item.name) || 'other',
-                };
-              }) || [];
-
-              const itemsSum = itemsPayload.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-              // Local Prisma total is authoritative (set at order creation from the actual
-              // discount) — `||` would wrongly fall back to actualOlseraTotal for legitimate
-              // Rp 0 orders since 0 is falsy.
-              const finalTotal = localOrderFull?.total ?? actualOlseraTotal;
-              const calculatedDiscount = Math.max(0, itemsSum - finalTotal);
-
-              const printPayload = {
-                orderId: displayOrderNo,
-                queueNumber: qNum,
-                customerName: orderDetail?.customer_name || 'Customer',
-                items: itemsPayload,
-                total: finalTotal,
-                discount: calculatedDiscount,
-                paymentMethod: localOrderFull?.paymentMethod || 'E-Wallet',
-              };
-
-              let createdJob;
-              try {
-                createdJob = await prisma.printJob.create({
-                  data: {
-                    orderId: orderId,
-                    payload: printPayload,
-                    status: 'PENDING',
-                    station: localOrderFull?.printStation || null,
-                  }
-                });
-              } catch (createErr) {
-                // Race: the client-side POST (print-jobs/route.ts, fired from
-                // success/page.tsx) created the job for this order between
-                // our dedup check above and this create call.
-                if (createErr instanceof Prisma.PrismaClientKnownRequestError && createErr.code === 'P2002') {
-                  console.log(`[Auto-Settlement] Print job for ${orderId} already exists (race with client-side create), skipping.`);
-                } else {
-                  throw createErr;
-                }
-              }
-
-              if (createdJob) {
-                console.log(`[Auto-Settlement] Cloud Print Job created for ${orderId} with ${itemsPayload.length} items.`);
-
-                // Stations configured in STATION_PRINTER_MAP skip the local
-                // daemon entirely — send straight from the server.
-                try {
-                  const { tryDirectPrint } = await import("@/lib/print/direct-print");
-                  const printed = await tryDirectPrint(createdJob.station, printPayload);
-                  if (printed) {
-                    await prisma.printJob.update({ where: { id: createdJob.id }, data: { status: 'PRINTED' } });
-                  }
-                } catch (directPrintErr) {
-                  console.warn('[Auto-Settlement] Direct print attempt failed (non-blocking):', directPrintErr);
-                }
-
-                // Nudge the print-bridge daemon instead of making it wait for
-                // its next poll tick.
-                try {
-                  const { pusherServer } = await import("@/lib/pusher");
-                  await pusherServer.trigger('print-queue', 'NEW_JOB', { jobId: createdJob.id });
-                  console.log(`[Auto-Settlement] NEW_JOB broadcast sent for job ${createdJob.id}`);
-                } catch (printPusherErr) {
-                  console.warn('[Auto-Settlement] Failed to broadcast NEW_JOB (non-blocking):', printPusherErr);
-                }
-              }
-            }
-          } catch (printJobErr) {
-            console.warn(`[Auto-Settlement] Failed to automatically create cloud print job:`, printJobErr);
-          }
+          // Print job creation used to happen here, after waiting for
+          // createOrder's background Olsera item sync to land locally --
+          // moved to createAndDispatchPrintJob(), fired right after order
+          // creation instead (see createOrder, step 2.6), since printing
+          // never actually needed Olsera-synced data in the first place.
         } catch (dbUpdateErr) {
           console.warn(
             `[Sync] Failed to update local order status:`,
