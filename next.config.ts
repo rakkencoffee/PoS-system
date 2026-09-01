@@ -27,6 +27,13 @@ export default withSentryConfig(withPWA(nextConfig), {
   // Only print logs for uploading source maps in CI
   silent: !process.env.CI,
 
+  // Anonymous plugin-usage telemetry Sentry sends about itself (separate from
+  // actual sourcemap upload) -- disabled 2026-09-01 after it hung the build
+  // indefinitely at "Sending telemetry data..." both locally and on Vercel,
+  // apparently a transient Sentry-side outage. No reason to let an optional
+  // stats call block every deploy if it happens again.
+  telemetry: false,
+
   // For all available options, see:
   // https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
 
