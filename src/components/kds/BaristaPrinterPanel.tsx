@@ -13,24 +13,25 @@ function base64ToBytes(base64: string): Uint8Array {
 /**
  * Self-contained barista sticker printer control -- deliberately separate
  * from KdsView so this pilot can't destabilize the existing KDS board.
- * Independently subscribes to the same `kitchen` / ORDER_CREATED event
- * KdsView already listens to (safe: pusher-js shares one channel object per
- * name, and this component only ever binds/unbinds its own handler, never
- * unsubscribes the shared channel).
+ * Subscribes to `print-queue` / NEW_JOB (same event print-bridge polls for)
+ * rather than `kitchen` / ORDER_CREATED -- ORDER_CREATED fires as soon as
+ * the order is placed, before settlement has created the PrintJob row, so
+ * fetching the sticker off it 404s (confirmed via dev logs 2026-09-01).
+ * NEW_JOB fires exactly when the job (and its payload) exists.
  */
 export function BaristaPrinterPanel() {
   const { connected, deviceName, connect, disconnect, writeBytes } = useBaristaPrinter();
-  const [lastOrderId, setLastOrderId] = useState<string | null>(null);
+  const [lastJobId, setLastJobId] = useState<string | null>(null);
   const [status, setStatus] = useState<string>('');
   const connectedRef = useRef(connected);
   connectedRef.current = connected;
   const writeBytesRef = useRef(writeBytes);
   writeBytesRef.current = writeBytes;
 
-  const printSticker = useCallback(async (orderId: string) => {
+  const printSticker = useCallback(async (jobId: string) => {
     setStatus('Mencetak...');
     try {
-      const res = await fetch(`/api/kds/sticker/${orderId}`);
+      const res = await fetch(`/api/kds/sticker/${jobId}`);
       if (res.status === 204) {
         setStatus('Tidak ada minuman di order ini.');
         return;
@@ -45,24 +46,34 @@ export function BaristaPrinterPanel() {
   }, []);
 
   useEffect(() => {
+    // React Strict Mode (dev) mounts this effect twice; without the
+    // `cancelled` guard, an unmount that fires while the async subscribe()
+    // below is still pending finds `channel`/`handler` still undefined and
+    // skips unbind, leaving two handlers bound to the same shared pusher-js
+    // channel object -- confirmed via physical print 2026-09-01, the sticker
+    // printed twice for one order.
+    let cancelled = false;
     let channel: any;
-    let handler: ((data: { order: { id: string } }) => void) | undefined;
+    let handler: ((data: { jobId: string }) => void) | undefined;
 
     (async () => {
       const { getPusherClient } = await import('@/lib/pusher');
       const pusher = getPusherClient();
-      channel = pusher.subscribe('kitchen');
+      const ch = pusher.subscribe('print-queue');
+      if (cancelled) return;
+      channel = ch;
 
       handler = (data) => {
-        if (!data.order?.id) return;
-        setLastOrderId(data.order.id);
-        if (connectedRef.current) printSticker(data.order.id);
+        if (!data.jobId) return;
+        setLastJobId(data.jobId);
+        if (connectedRef.current) printSticker(data.jobId);
       };
-      channel.bind('ORDER_CREATED', handler);
+      channel.bind('NEW_JOB', handler);
     })();
 
     return () => {
-      if (channel && handler) channel.unbind('ORDER_CREATED', handler);
+      cancelled = true;
+      if (channel && handler) channel.unbind('NEW_JOB', handler);
     };
   }, [printSticker]);
 
@@ -93,9 +104,9 @@ export function BaristaPrinterPanel() {
           Connect Printer
         </button>
       )}
-      {lastOrderId && (
+      {lastJobId && (
         <button
-          onClick={() => printSticker(lastOrderId)}
+          onClick={() => printSticker(lastJobId)}
           disabled={!connected}
           className="ml-2 text-zinc-400 hover:text-white disabled:opacity-40 disabled:hover:text-zinc-400 transition-colors"
           title="Cetak ulang stiker order terakhir"

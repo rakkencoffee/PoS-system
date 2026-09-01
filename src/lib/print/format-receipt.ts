@@ -42,6 +42,8 @@ const CMD = {
   CUT_FULL: Buffer.from([GS, 0x56, 0x00]),
   LINE_SPACING_DEFAULT: Buffer.from([ESC, 0x32]),
   LINE_SPACING_TIGHT: Buffer.from([ESC, 0x33, 0x10]),
+  FONT_A: Buffer.from([ESC, 0x4d, 0x00]),
+  FONT_B: Buffer.from([ESC, 0x4d, 0x01]),
 };
 
 export interface ReceiptItem {
@@ -336,12 +338,22 @@ export function formatReceipt(data: ReceiptData, lineWidth = 48, cut = false): B
   return Buffer.concat(parts);
 }
 
-/** Individual per-cup drink labels — mirrors formatDrinkLabels in print-bridge/src/format-receipt.js */
-export function formatDrinkLabels(data: ReceiptData, lineWidth = 48): Buffer {
+/**
+ * Individual per-cup drink labels — condensed font (font B), notes joined on
+ * one "|"-separated line, customer name + cup index, matching the visual
+ * style of print-bridge/src/format-receipt.js EXCEPT the header stays plain
+ * text ("No.XXX  01/01") instead of a logo+queue-number graphic. The
+ * graphic version (GS v 0 raster via buildHeaderRaster) was tried and
+ * dropped 2026-09-01: sending raster image data over Web Bluetooth's small
+ * chunked writes (see ble-config.ts, ~20 bytes/write) desyncs this printer
+ * clone's raster receiver partway through and it falls back to printing the
+ * remaining bitmap bytes as garbage text -- confirmed via physical print,
+ * not a data-correctness bug. Plain text has no such transport dependency.
+ */
+export function formatDrinkLabels(data: ReceiptData, lineWidth = 32): Buffer {
   const parts: Buffer[] = [];
   const add = (...buffers: Buffer[]) => buffers.forEach((b) => parts.push(b));
   const newline = () => add(CMD.FEED_LINE);
-  const line = (char = '-') => textBuf(char.repeat(lineWidth));
 
   const leftRight = (left: string, right: string) => {
     const space = lineWidth - left.length - right.length;
@@ -392,24 +404,24 @@ export function formatDrinkLabels(data: ReceiptData, lineWidth = 48): Buffer {
       return nums.length > 3 ? nums.slice(-3) : nums.padStart(3, '0');
     })();
 
-  const now = new Date().toLocaleString('id-ID', {
-    dateStyle: 'medium',
-    timeStyle: 'medium',
-    timeZone: 'Asia/Jakarta',
-  });
-
   for (const item of drinkItems) {
     const qty = item.quantity || 1;
     for (let i = 0; i < qty; i++) {
       add(CMD.INIT);
       add(CMD.LINE_SPACING_DEFAULT);
+      add(CMD.FONT_B);
 
       add(CMD.ALIGN_LEFT);
-      add(CMD.SIZE_NORMAL);
-      add(CMD.BOLD_ON);
-      add(leftRight(`No: ${queueNum}`, `${currentCup}/${totalCups}`));
+      const cupNote = `${String(currentCup).padStart(2, '0')}/${String(totalCups).padStart(2, '0')}`;
+      add(leftRight(`No.${queueNum}`, cupNote));
       newline();
 
+      const customerLabel = data.customerName || 'Customer';
+      add(textBuf(customerLabel));
+      newline();
+      newline();
+
+      add(CMD.BOLD_ON);
       const name = item.menuItem?.name || item.name || 'Drink';
       const hasSizeInNotes = item.notes && item.notes.toLowerCase().includes('size:');
       const sizeStr = item.size && item.size !== '-' && !hasSizeInNotes ? ` (${item.size})` : '';
@@ -422,29 +434,25 @@ export function formatDrinkLabels(data: ReceiptData, lineWidth = 48): Buffer {
 
       if (item.notes) {
         const notesArray = item.notes.split(',').map((n) => n.trim()).filter(Boolean);
-        for (let note of notesArray) {
-          note = note.replace(/^Size:\s*/i, '');
-          const noteLines = wrapText(`  * ${note.toUpperCase()}`, 0);
-          for (const nl of noteLines) {
-            add(textBuf(nl));
-            newline();
-          }
+        const cleaned = notesArray.map((note) => note.replace(/^Size:\s*/i, '').toUpperCase());
+        const notesLine = cleaned.join(' | ');
+        const noteLines = wrapText(notesLine, 0);
+        for (const nl of noteLines) {
+          add(textBuf(nl));
+          newline();
         }
-      } else {
-        newline();
       }
-
-      newline();
-      add(CMD.ALIGN_LEFT);
-      add(CMD.SIZE_NORMAL);
-      add(textBuf(now));
       newline();
 
-      newline();
-      add(line('-'));
+      const orderDate = new Date().toLocaleString('id-ID', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+        timeZone: 'Asia/Jakarta',
+      });
+      add(textBuf(orderDate));
       newline();
 
-      add(CMD.FEED_5);
+      add(CMD.FEED_3);
 
       currentCup++;
     }

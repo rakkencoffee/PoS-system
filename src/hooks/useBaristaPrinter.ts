@@ -26,8 +26,15 @@ export function useBaristaPrinter() {
       throw new Error('Browser ini tidak mendukung Web Bluetooth. Pakai Chrome di Android.');
     }
 
+    // Filtering by services: [UUID] would require the printer to advertise that
+    // GATT service in its BLE advertisement packet -- confirmed via
+    // src/app/debug/ble-test (since deleted) that neither the QPOS nor the
+    // iWare unit does this, they only advertise their local name. Filter by
+    // that name instead; optionalServices still grants access to the service
+    // once connected.
     const device = await navigator.bluetooth.requestDevice({
-      filters: [{ services: [BARISTA_PRINTER_SERVICE_UUID] }],
+      filters: [{ namePrefix: 'RPP' }],
+      optionalServices: [BARISTA_PRINTER_SERVICE_UUID],
     });
 
     const server = await device.gatt?.connect();
