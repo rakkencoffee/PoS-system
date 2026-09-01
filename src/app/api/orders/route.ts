@@ -2,6 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const USE_OLSERA = process.env.USE_OLSERA === 'true';
 
+/**
+ * Start of "today" in WIB (UTC+7), as a UTC Date instant -- matches the
+ * WIB-day convention already used by getNextQueueNumber() in queue-number.ts.
+ * Vercel functions run in UTC, so a naive `setHours(0,0,0,0)` would reset at
+ * UTC midnight (07:00 WIB) instead of local midnight, cutting the "today"
+ * window short by 7 hours.
+ */
+function startOfTodayWIB(): Date {
+  const wibOffsetMs = 7 * 60 * 60 * 1000;
+  const wibNow = new Date(Date.now() + wibOffsetMs);
+  const wibMidnightAsUTC = new Date(Date.UTC(wibNow.getUTCFullYear(), wibNow.getUTCMonth(), wibNow.getUTCDate()));
+  return new Date(wibMidnightAsUTC.getTime() - wibOffsetMs);
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -10,42 +24,68 @@ export async function GET(request: NextRequest) {
 
     if (USE_OLSERA) {
       const olsera = await import('@/lib/integrations/olsera.service');
+      const { prisma } = await import('@/lib/db');
       let orders: any[] = [];
-      
+
       try {
-        // 1. Fetch List of Orders from Olsera
-        const rawList = today === 'true' 
-          ? await olsera.getAllOrders({ today: true })
-          : await olsera.olseraFetch('/order/openorder?per_page=100').then(res => res.json().then(d => d.data || d || []));
-        
-        // 2. Identify "Active" orders that need details (Pending/Preparing)
-        // Increased limit to 50 to cover all orders seen in backoffice
-        const allPotentialOrders = (Array.isArray(rawList) ? rawList : []);
-        const activeOrdersToEnrich = allPotentialOrders
-          .filter(o => {
-            const status = (o.status || '').toUpperCase();
-            const isPaid = o.is_paid === true || 
-                           o.is_paid === 1 || 
-                           o.is_paid === '1' || 
-                           o.payment_status === '1' || 
-                           o.payment_status === 'paid' || 
-                           o.payment_status_name === 'Paid' ||
-                           o.payment_status_name === 'Lunas';
-            return status !== 'Z' && status !== 'T' && isPaid; // ONLY paid orders
-          })
-          .slice(0, 50);
+        let activeOrdersToEnrich: any[] = [];
+        let localMap = new Map<string, any>();
 
-        console.log(`[API] Total list items: ${allPotentialOrders.length}, Active to enrich: ${activeOrdersToEnrich.length}`);
+        if (today === 'true') {
+          // "Active for KDS" must come from OUR OWN baristaStatus/kitchenStatus,
+          // not Olsera's order status/paid list -- Olsera can transition an
+          // order to a closed status within seconds of our instant-settlement
+          // (payment is simulated, not a real gateway round-trip), well before
+          // staff have actually made the drink/food. Filtering on Olsera's
+          // list status here made paid orders vanish off the KDS board under a
+          // minute after being placed (confirmed via production logs 2026-09-01).
+          const localActiveOrders = await prisma.order.findMany({
+            where: {
+              createdAt: { gte: startOfTodayWIB() },
+              status: { not: 'CANCELLED' },
+              NOT: { baristaStatus: 'COMPLETED', kitchenStatus: 'COMPLETED' },
+            },
+            include: { items: true },
+            orderBy: { createdAt: 'asc' },
+            take: 50,
+          });
+          localMap = new Map(localActiveOrders.map((lo) => [lo.id, lo]));
+          activeOrdersToEnrich = localActiveOrders
+            .filter((lo) => lo.olseraTransactionId)
+            .map((lo) => ({ id: lo.olseraTransactionId }));
 
-        // 3. Fetch local order statuses from Prisma to merge with Olsera data
-        const { prisma } = await import('@/lib/db');
-        const localOrders = await (prisma.order as any).findMany({
-          where: {
-            id: { in: activeOrdersToEnrich.map(o => `OLSERA-${o.id || o.order_id}`) }
-          },
-          include: { items: true }
-        });
-        const localMap = new Map(localOrders.map((lo: any) => [lo.id, lo]));
+          console.log(`[API] Local active orders (not fully completed) today: ${activeOrdersToEnrich.length}`);
+        } else {
+          // 1. Fetch List of Orders from Olsera
+          const rawList = await olsera.olseraFetch('/order/openorder?per_page=100').then(res => res.json().then(d => d.data || d || []));
+
+          // 2. Identify "Active" orders that need details (Pending/Preparing)
+          const allPotentialOrders = (Array.isArray(rawList) ? rawList : []);
+          activeOrdersToEnrich = allPotentialOrders
+            .filter(o => {
+              const status = (o.status || '').toUpperCase();
+              const isPaid = o.is_paid === true ||
+                             o.is_paid === 1 ||
+                             o.is_paid === '1' ||
+                             o.payment_status === '1' ||
+                             o.payment_status === 'paid' ||
+                             o.payment_status_name === 'Paid' ||
+                             o.payment_status_name === 'Lunas';
+              return status !== 'Z' && status !== 'T' && isPaid; // ONLY paid orders
+            })
+            .slice(0, 50);
+
+          console.log(`[API] Total list items: ${allPotentialOrders.length}, Active to enrich: ${activeOrdersToEnrich.length}`);
+
+          // 3. Fetch local order statuses from Prisma to merge with Olsera data
+          const localOrders = await (prisma.order as any).findMany({
+            where: {
+              id: { in: activeOrdersToEnrich.map(o => `OLSERA-${o.id || o.order_id}`) }
+            },
+            include: { items: true }
+          });
+          localMap = new Map(localOrders.map((lo: any) => [lo.id, lo]));
+        }
 
         // 4. Fetch details for active orders in small concurrent batches.
         // getOrderDetail() already has its own 429 detection + backoff retry,
@@ -87,7 +127,14 @@ export async function GET(request: NextRequest) {
           
           const localData = localMap.get(`OLSERA-${numericId}`) as any;
           
-          if (oStatus === 'A') kdsStatus = 'PREPARING';
+          if (localData) {
+            // Local baristaStatus/kitchenStatus is authoritative when we have
+            // it -- Olsera's own status (oStatus below) can say "closed"
+            // while staff are still actively preparing the order.
+            const bothCompleted = localData.baristaStatus === 'COMPLETED' && localData.kitchenStatus === 'COMPLETED';
+            const anyPreparing = localData.baristaStatus === 'PREPARING' || localData.kitchenStatus === 'PREPARING';
+            kdsStatus = bothCompleted ? 'COMPLETED' : anyPreparing ? 'PREPARING' : 'PENDING';
+          } else if (oStatus === 'A') kdsStatus = 'PREPARING';
           else if (oStatus === 'Z' || oStatus === 'S' || oStatus === 'T') kdsStatus = 'COMPLETED';
           else kdsStatus = 'PENDING';
 

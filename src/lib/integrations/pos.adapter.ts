@@ -852,11 +852,15 @@ export async function updateOrderPaymentStatus(
             // (its last step, after every item has been added to Olsera) — so the
             // very first read here can easily land before that write, especially on
             // multi-item orders. Retry briefly instead of printing with 0 items.
+            // Bumped 8->20 (still 1s apart) 2026-09-01: an 8-item order with many
+            // sequential Olsera additem/updatedetail calls under concurrent test
+            // traffic still hadn't written any items after 8s, producing a real
+            // "Cloud Print Job created ... with 0 items" in production.
             let localOrderFull = await prisma.order.findUnique({
               where: { id: orderId },
               include: { items: true }
             });
-            for (let attempt = 1; attempt <= 8 && localOrderFull && localOrderFull.items.length === 0; attempt++) {
+            for (let attempt = 1; attempt <= 20 && localOrderFull && localOrderFull.items.length === 0; attempt++) {
               await new Promise((resolve) => setTimeout(resolve, 1000));
               localOrderFull = await prisma.order.findUnique({
                 where: { id: orderId },
