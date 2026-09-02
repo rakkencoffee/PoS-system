@@ -35,6 +35,7 @@ export async function POST(request: NextRequest) {
     let dbOrderId: string | null = null;
     let dbOrderNo: string | null = null;
     let dbQueueNumber: number | null = null;
+    let itemSyncPromise: Promise<void> | undefined;
     try {
       const posAdapter = await import("@/lib/integrations/pos.adapter");
       const adapterOrder = await posAdapter.createOrder(
@@ -56,6 +57,7 @@ export async function POST(request: NextRequest) {
       dbOrderId = adapterOrder.orderId;
       dbOrderNo = adapterOrder.orderNo || null;
       dbQueueNumber = adapterOrder.queueNumber || null;
+      itemSyncPromise = adapterOrder.itemSyncPromise;
       console.log("Successfully created POS order:", dbOrderId, "orderNo:", dbOrderNo, "queue:", dbQueueNumber);
 
       // Inject discount natively to Olsera if a voucher was applied
@@ -80,6 +82,18 @@ export async function POST(request: NextRequest) {
     // background may not exist yet, so defer to run after the response.
     const { after } = await import("next/server");
     after(async () => {
+      // Wait for items (and any discount) to land on the Olsera order BEFORE
+      // marking it paid — Olsera locks item edits the instant an order is
+      // paid, so settling first races createOrder's background item sync:
+      // best case a harmless 406 in the logs, worst case (an order with a
+      // voucher) the discount silently never reaches Olsera's line items.
+      if (itemSyncPromise) {
+        try {
+          await itemSyncPromise;
+        } catch (syncWaitErr) {
+          console.warn("Item sync promise rejected before settlement (proceeding anyway):", syncWaitErr);
+        }
+      }
       const posAdapter = await import("@/lib/integrations/pos.adapter");
       await posAdapter.updateOrderPaymentStatus(finalOrderId, "paid", finalGrossAmount, "system_simulated");
     });

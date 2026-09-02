@@ -472,7 +472,7 @@ export async function createOrder(
   voucherCode?: string,
   customerPhone?: string,
   station?: string | null,
-): Promise<{ orderId: string; olseraOrderId?: number; orderNo?: string; queueNumber?: number }> {
+): Promise<{ orderId: string; olseraOrderId?: number; orderNo?: string; queueNumber?: number; itemSyncPromise?: Promise<void> }> {
   if (USE_OLSERA) {
     // CRM (F5): if the customer left a phone number, try to match an existing
     // Olsera customer so the order is linked to their profile/history.
@@ -547,9 +547,21 @@ export async function createOrder(
     );
 
     // 3. Offload all heavy synchronization steps to the background
+    // itemSyncPromise resolves once items + their (possibly discounted) prices
+    // are pushed to Olsera. The payment route awaits this before marking the
+    // order paid — Olsera locks an order's items the moment it's paid, so
+    // settling too early races this sync and either (a) 406s harmlessly on
+    // plain orders, or (b) on discounted orders, permanently leaves the
+    // discount unapplied on Olsera's side because updateOrderItemDetail never
+    // gets to run.
+    let resolveItemSync: () => void = () => {};
+    const itemSyncPromise = new Promise<void>((resolve) => {
+      resolveItemSync = resolve;
+    });
+
     runInBackground(async () => {
       console.log(`[Sync] Starting background synchronization for POS order #${orderId}`);
-      
+
       // 3a. Add each item separately (required by Olsera Open API for Open Orders)
       for (const item of items) {
         if (!item.productId) continue;
@@ -697,9 +709,15 @@ export async function createOrder(
         }
       } catch (syncErr: any) {
         console.warn(`[Sync] Failed to synchronize prices/discount details to Olsera Open Order:`, syncErr.message);
+      } finally {
+        resolveItemSync();
       }
+    });
 
-      // 3c. Mirror to local Prisma for Dashboard/Reporting (Sprint 4)
+    // 3c. Mirror to local Prisma for Dashboard/Reporting (Sprint 4) — kept as
+    // its own background task since it never touches Olsera's paid-lock and
+    // doesn't need to block payment settlement.
+    runInBackground(async () => {
       try {
         const { prisma } = await import("@/lib/db");
 
@@ -787,6 +805,7 @@ export async function createOrder(
       olseraOrderId: orderId,
       orderNo: orderNo,
       queueNumber: queueNum,
+      itemSyncPromise,
     };
   }
   // Fallback removed
