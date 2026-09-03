@@ -50,6 +50,9 @@ Semua endpoint di bawah ini: guard `x-api-key` (kecuali disebut lain), request/r
 | 9 | `/api/member/admin/config` | GET/PUT | ✅ DONE | GET: balikin semua `TierRule` + `LoyaltyConfig`. PUT: upsert `TierRule` per level + update `LoyaltyConfig`. |
 | 10 | `/api/member/admin/members` | GET | ✅ DONE | List member (pointBalance/tierLevel/dst) + jumlah order per member. |
 | 11 | `/api/member/admin/members/:id/adjust-points` | POST | ✅ DONE | Body `{amount, note}`. Tulis `PointLedger` ADJUSTMENT (amount boleh negatif buat koreksi), update `Member.pointBalance`. |
+| 12 | `/api/member/rewards` | GET | ✅ DONE (ditambah 2026-09-03, KELEWAT di rencana awal) | List `RewardsCatalog` aktif & masih valid (`validFrom`/`validUntil`) — dibutuhkan Rewards Store page buat nampilin katalog SEBELUM redeem, ketauan pas wiring frontend kalau endpoint ini belum pernah dibikin. |
+
+**Step 5 (frontend `rakken-member-app`) SUDAH DIMULAI &amp; SEBAGIAN BESAR JALAN (2026-09-03)** — proxy layer (`src/lib/pos-api.ts`, `src/lib/member-session.ts`) + halaman Login/Onboarding/Home/Menu/Item/Cart/Checkout/Points/Rewards SUDAH nyambung ke endpoint asli di atas, diverifikasi end-to-end pakai dev server beneran (bukan cuma script): order asli kebuat di Olsera (`OL26090300000471`), PrintJob dispatch, 30.000 poin masuk benar. Styling sengaja dibiarkan apa adanya (user pakai Codex terpisah buat itu).
 
 ## 5. Fungsi Baru yang Dibutuhkan di `olsera.service.ts`
 
