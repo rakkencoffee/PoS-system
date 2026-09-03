@@ -1013,6 +1013,53 @@ export async function findCustomerByPhone(
   }
 }
 
+/**
+ * Create a new customer in Olsera CRM (used by Member App onboarding when
+ * findCustomerByPhone finds no match). Same base path as findCustomerByPhone.
+ *
+ * NOTE: field names (customer_name/customer_email/customer_phone/
+ * customer_type_id) mirror the guest-customer branch of createOrder() above,
+ * which is proven to work — but that call creates a customer as a SIDE EFFECT
+ * of creating an order, not via this standalone endpoint. This has not been
+ * tested independently against Olsera yet; verify with a real call before
+ * relying on it in production (see docs/reference/LOYALTY-MEMBER-APP.md §5).
+ */
+export async function createCustomer(
+  name: string,
+  phone: string,
+  email?: string
+): Promise<{ id: number | string; name: string; phone?: string }> {
+  const digits = phone.replace(/\D/g, '');
+  const formData = new URLSearchParams();
+  formData.append('customer_name', name);
+  formData.append('customer_phone', digits);
+  formData.append('customer_email', email || `${digits}@member.rakkencoffee.com`);
+  formData.append('customer_type_id', '0');
+
+  const res = await olseraFetch('/customersupplier/customer', {
+    method: 'POST',
+    body: formData,
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to create Olsera customer: ${res.status} - ${text}`);
+  }
+
+  const result = await res.json();
+  const data = result.data || result;
+  if (!data || !(data.id ?? data.customer_id)) {
+    throw new Error(`Olsera createCustomer response missing ID: ${JSON.stringify(result)}`);
+  }
+
+  return {
+    id: data.id ?? data.customer_id,
+    name: data.name || name,
+    phone: data.phone || digits,
+  };
+}
+
 // ──────────────────────────────
 // Sales Reports — Olsera as Source of Truth (F4)
 // ──────────────────────────────

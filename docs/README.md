@@ -53,3 +53,4 @@ docs/
 | [APP_ROUTES.md](reference/APP_ROUTES.md) | Daftar semua routes aplikasi: kiosk, KDS, admin, API. Termasuk deskripsi dan parameter. |
 | [BRIEF-EDC.md](reference/BRIEF-EDC.md) | Riset teknis integrasi mesin EDC BRI Verifone X990 untuk pembayaran kartu debit/kredit. |
 | [CLAUDE.md](reference/CLAUDE.md) | Guidelines untuk LLM coding assistant: aturan perilaku, simplicity-first, surgical changes. |
+| [LOYALTY-MEMBER-APP.md](reference/LOYALTY-MEMBER-APP.md) | Kontrak API & keputusan arsitektur untuk fitur loyalty/Member App (repo terpisah `rakken-member-app`) — status implementasi endpoint per tabel. |
