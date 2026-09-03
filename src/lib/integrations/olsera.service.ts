@@ -982,39 +982,53 @@ export async function findCustomerByPhone(
   const digits = (phone || '').replace(/\D/g, '');
   if (digits.length < 8) return null;
 
+  // Olsera's own ?search= is an inconsistent substring match against however
+  // it stores the number (usually "62...") — a leading "0" query sometimes
+  // finds a "62..."-stored number and sometimes doesn't, confirmed against
+  // two different real customers 2026-09-03 (one matched, one didn't, no
+  // discernible pattern — see docs/reference/LOYALTY-MEMBER-APP.md §5). So
+  // try a few query variants instead of trusting any single one to work.
+  const withoutLeadingZero = digits.replace(/^0/, '');
+  const queryVariants = Array.from(
+    new Set([digits, withoutLeadingZero, `62${withoutLeadingZero}`])
+  );
+
+  const norm = (p: unknown) => String(p ?? '').replace(/\D/g, '');
+  // Compare on the last 9 digits only — the national significant number is
+  // the same regardless of whether it's stored/typed with a "0" or "62"
+  // prefix. A prior version compared full strings with .endsWith(), which
+  // silently never matched: "089900000001".endsWith is false against
+  // Olsera's stored "6289900000001" because the digit right before the
+  // shared suffix differs (0 vs 2) — confirmed via a real Olsera customer
+  // 2026-09-03 (docs/reference/LOYALTY-MEMBER-APP.md §5), not a hypothetical.
+  const suffix = (d: string) => d.slice(-9);
+  const digitsSuffix = suffix(digits);
+
   try {
-    const res = await olseraFetch(
-      `/customersupplier/customer?search=${encodeURIComponent(digits)}`,
-      { silent: true }
-    );
-    if (!res.ok) return null;
+    for (const q of queryVariants) {
+      const res = await olseraFetch(`/customersupplier/customer?search=${encodeURIComponent(q)}`, {
+        silent: true,
+      });
+      if (!res.ok) continue;
 
-    const data = await res.json();
-    const list = data.data || data || [];
-    if (!Array.isArray(list) || list.length === 0) return null;
+      const data = await res.json();
+      const list = data.data || data || [];
+      if (!Array.isArray(list) || list.length === 0) continue;
 
-    const norm = (p: unknown) => String(p ?? '').replace(/\D/g, '');
-    // Compare on the last 9 digits only — the national significant number is
-    // the same regardless of whether it's stored/typed with a "0" or "62"
-    // prefix. A prior version compared full strings with .endsWith(), which
-    // silently never matched: "089900000001".endsWith is false against
-    // Olsera's stored "6289900000001" because the digit right before the
-    // shared suffix differs (0 vs 2) — confirmed via a real Olsera customer
-    // 2026-09-03 (docs/reference/LOYALTY-MEMBER-APP.md §5), not a hypothetical.
-    const suffix = (d: string) => d.slice(-9);
-    const digitsSuffix = suffix(digits);
-    const match =
-      list.find((c: any) => {
+      const match = list.find((c: any) => {
         const cp = norm(c.phone || c.mobile_phone || c.hp || c.telp || c.phone_number);
         return cp.length >= 9 && suffix(cp) === digitsSuffix;
-      }) || null;
+      });
 
-    if (!match) return null;
-    return {
-      id: match.id ?? match.customer_id,
-      name: match.name || match.customer_name || '',
-      phone: match.phone || match.mobile_phone || '',
-    };
+      if (match) {
+        return {
+          id: match.id ?? match.customer_id,
+          name: match.name || match.customer_name || '',
+          phone: match.phone || match.mobile_phone || '',
+        };
+      }
+    }
+    return null;
   } catch (err) {
     console.warn('[Olsera API] findCustomerByPhone failed:', (err as Error)?.message);
     return null;
