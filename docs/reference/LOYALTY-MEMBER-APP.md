@@ -62,10 +62,22 @@ Semua endpoint di bawah ini: guard `x-api-key` (kecuali disebut lain), request/r
 - `applyEarnedPoints(tx, memberId, orderTotal, orderId)` — tulis `PointLedger` EARN + update cache `Member` (poin, tier) dalam transaksi yang sama. Kalau tabel `TierRule` masih kosong (belum di-seed admin), fungsi ini cuma gak menaikkan tier (tidak error) — poin tetap ke-earn normal.
 - **`TierRule` BELUM PERNAH DI-SEED** — tabelnya ada tapi kosong, artinya sampai admin isi lewat `/api/member/admin/config` (masih TODO, #8), tier gak akan pernah naik dari Tier 1 walау `tierPeriodSpend` udah gede. Ini bukan bug, cuma belum ada data.
 
+## 5c. Pemisahan Guest vs Member di Olsera CRM (2026-09-03)
+
+**Temuan**: kiosk (`createOrder()`'s guest-customer branch) mengarang `customer_name`/`customer_phone`/`customer_email` palsu tiap kali customer skip isi data di checkout, karena Olsera MEWAJIBKAN field itu di endpoint `/order/openorder` — akibatnya numpuk **396 customer "Guest" palsu** di CRM Olsera (`customer_type_id=0`, dikonfirmasi via `GET /customersupplier/customertype`).
+
+**Keputusan**: pisahkan customer beneran (daftar lewat Member App) dari guest kiosk pakai **Customer Type** Olsera:
+- User bikin tipe baru **"Member"** manual lewat Olsera Dashboard (Pelanggan &amp; Supplier &gt; Tipe Pelanggan) — **gak ada API buat bikin Customer Type baru**, cuma bisa lewat UI Backoffice.
+- ID-nya: **`274110`** ("Member"), vs `0` ("Guest", existing).
+- `createCustomer()` (dipakai onboarding Member App) sekarang pakai `customer_type_id` dari env var **`OLSERA_MEMBER_CUSTOMER_TYPE_ID`** (bukan hardcode `'0'` lagi). **TERVERIFIKASI**: 1 customer test berhasil landing di tipe "Member" (count naik dari 0→1), guest count tetap 396 (gak keganggu).
+- **Opsi A (kiosk pakai 1 akun "Self-Service Guest" bersama, bukan bikin baru tiap order) BELUM diimplementasikan** — masih rencana yang dibahas, prioritas nyusul, bukan bagian dari kerjaan sesi ini.
+- **Dicek juga**: fitur "Catatan Pelanggan"/"Ulasan Pelanggan"/"Kepuasan Pelanggan" yang keliatan di Olsera Dashboard — semua kombinasi nama endpoint yang dicoba (`/customersupplier/customer-note`, `/review`, `/satisfaction`, dst, lihat `testing-dev/scripts/probe_customer_features.ts`) balikin 404. Kemungkinan besar fitur UI-only, gak ada di Open API — belum dikonfirmasi 100% (perlu cek dokumentasi resmi Olsera langsung buat kepastian, bukan cuma tebak nama endpoint).
+
 ## 6. Environment Variables Baru
 
 ```
-MEMBER_APP_API_KEY=      # shared secret, server-to-server only, JANGAN NEXT_PUBLIC_
+MEMBER_APP_API_KEY=                   # shared secret, server-to-server only, JANGAN NEXT_PUBLIC_
+OLSERA_MEMBER_CUSTOMER_TYPE_ID=274110 # ID Customer Type "Member" di Olsera — WAJIB ditambahkan ke Vercel production juga, gak otomatis kesinkron dari .env.local
 ```
 
 ## 7. Changelog Dokumen

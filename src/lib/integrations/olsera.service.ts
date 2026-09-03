@@ -1036,8 +1036,14 @@ export async function findCustomerByPhone(
  * GET /global/country, not a numeric id) — hardcoded to 'ID' since RAKKEN
  * only operates in Indonesia. `gender` isn't collected anywhere in the
  * Member App onboarding form, so it's a guessed default ('L') here —
- * Olsera accepted it without complaint in testing. `customer_type_id: '0'`
- * mirrors the value createOrder()'s guest-customer branch already uses.
+ * Olsera accepted it without complaint in testing.
+ *
+ * `customer_type_id` is set to the "Member" customer type (env var
+ * OLSERA_MEMBER_CUSTOMER_TYPE_ID) that the RAKKEN team created in Olsera's
+ * own Backoffice UI 2026-09-03 specifically to separate real registered
+ * members from anonymous kiosk guests (customer_type_id '0', "Guest",
+ * used by createOrder()'s guest-customer branch above) — a type can only
+ * be created via the dashboard, there's no API for it.
  */
 export async function createCustomer(
   name: string,
@@ -1051,7 +1057,7 @@ export async function createCustomer(
   formData.append('phone', digits);
   formData.append('email', email || `${digits}@member.rakkencoffee.com`);
   formData.append('gender', gender);
-  formData.append('customer_type_id', '0');
+  formData.append('customer_type_id', process.env.OLSERA_MEMBER_CUSTOMER_TYPE_ID || '0');
   formData.append('country_id', 'ID');
 
   const res = await olseraFetch('/customersupplier/customer', {
