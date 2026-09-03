@@ -38,11 +38,11 @@ Semua endpoint di bawah ini: guard `x-api-key` (kecuali disebut lain), request/r
 
 | # | Endpoint | Method | Status | Fungsi |
 |---|---|---|---|---|
-| 1 | `/api/member/lookup` | GET `?neonAuthUserId=` | ⬜ TODO | Cek Member existing by neonAuthUserId. 404 kalau belum ada (→ Member App tampilkan Onboarding). |
-| 2 | `/api/member/onboarding` | POST | ⬜ TODO | Body: `{neonAuthUserId, email, name, phone, birthDate}`. Search Olsera customer by phone (reuse `findCustomerByPhone`) → kalau ketemu link, kalau tidak → `createCustomer()` (BARU, lihat §5) → buat row `Member`. |
+| 1 | `/api/member/lookup` | GET `?neonAuthUserId=` | ✅ DONE | Cek Member existing by neonAuthUserId. 404 kalau belum ada (→ Member App tampilkan Onboarding). |
+| 2 | `/api/member/onboarding` | POST | ✅ DONE (createCustomer belum ditest ke Olsera nyata, lihat §5) | Body: `{neonAuthUserId, email, name, phone, birthDate}`. Search Olsera customer by phone (reuse `findCustomerByPhone`) → kalau ketemu link, kalau tidak → `createCustomer()` (BARU, lihat §5) → buat row `Member`. |
 | 3 | `/api/member/menu` | GET | ⬜ TODO (kemungkinan cuma reuse `getMenuItems()` dari `pos.adapter.ts`, sama persis kiosk) | Data menu. |
-| 4 | `/api/member/orders` | POST | ⬜ TODO | Buat order channel=MEMBER_APP, reuse `pos.adapter.createOrder`. |
-| 5 | `/api/member/orders/:id/simulate-pay` | POST | ⬜ TODO | Set PAID, tulis `PointLedger` EARN, update `Member.tierPeriodSpend`/`pointBalance`/`tierLevel` dalam 1 `$transaction`, trigger print label (skip nota). |
+| 4 | `/api/member/orders` | POST | ✅ DONE | Body `{memberId, items}`. Reuse `pos.adapter.createOrder()` PERSIS (station=null, discountAmount=0 — redeem/diskon belum disambung), lalu tag `channel=MEMBER_APP`+`memberId` di Order row hasilnya (createOrder sendiri gak diubah/gak tau soal member). |
+| 5 | `/api/member/orders/:id/simulate-pay` | POST | ✅ DONE | Body `{totalAmount}` (trusted dari client, sama kayak pola `/api/payment/create` kiosk). Reuse `pos.adapter.updateOrderPaymentStatus()` PERSIS, lalu `applyEarnedPoints()` (baru, `src/lib/loyalty.ts`) dalam `$transaction`: tulis `PointLedger` EARN + update cache Member (poin/tier). **KOREKSI dari rencana awal**: gak ada logic "skip nota" terpisah — codebase ini cuma punya SATU jenis PrintJob (tiket dapur/barista), bukan nota+label terpisah, jadi print job Member App otomatis sama kayak kiosk, gak butuh flag baru. |
 | 6 | `/api/member/:id/points` | GET | ⬜ TODO | Riwayat `PointLedger` + saldo. |
 | 7 | `/api/member/:id/redeem` | POST | ⬜ TODO | Redeem `RewardsCatalog`, tulis `PointLedger` REDEEM, generate Discount Voucher Olsera. |
 | 8 | `/api/member/admin/config` | GET/PUT | ⬜ TODO | CRUD `TierRule`+`LoyaltyConfig`. **WAJIB** `auth()` + role ADMIN (lihat §2 soal observasi keamanan). |
@@ -52,6 +52,12 @@ Semua endpoint di bawah ini: guard `x-api-key` (kecuali disebut lain), request/r
 ## 5. Fungsi Baru yang Dibutuhkan di `olsera.service.ts`
 
 - **`createCustomer(name, phone, email?)`** — BELUM ADA, perlu ditambah. Base path sama dengan `findCustomerByPhone` (`/customersupplier/customer`), method POST. Field form berdasar pola yang SUDAH TERBUKTI jalan di `createOrder()`'s guest-customer branch (`customer_name`, `customer_email`, `customer_phone`, `customer_type_id`) — **belum pernah dites sebagai endpoint create customer berdiri sendiri**, jadi wajib ditest manual dulu (curl/Postman) ke Olsera sebelum dipakai di flow onboarding production, jangan asumsikan langsung benar dari analogi ini.
+
+## 5b. `src/lib/loyalty.ts` (BARU)
+
+- `getLoyaltyConfig(tx)` — baca singleton `LoyaltyConfig`, upsert lazy (auto-create pakai default schema kalau baris belum pernah ada) — TIDAK butuh seed script terpisah.
+- `applyEarnedPoints(tx, memberId, orderTotal, orderId)` — tulis `PointLedger` EARN + update cache `Member` (poin, tier) dalam transaksi yang sama. Kalau tabel `TierRule` masih kosong (belum di-seed admin), fungsi ini cuma gak menaikkan tier (tidak error) — poin tetap ke-earn normal.
+- **`TierRule` BELUM PERNAH DI-SEED** — tabelnya ada tapi kosong, artinya sampai admin isi lewat `/api/member/admin/config` (masih TODO, #8), tier gak akan pernah naik dari Tier 1 walау `tierPeriodSpend` udah gede. Ini bukan bug, cuma belum ada data.
 
 ## 6. Environment Variables Baru
 
