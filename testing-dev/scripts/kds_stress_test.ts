@@ -13,7 +13,7 @@
  * ═══════════════════════════════════════════════════════════════
  */
 
-import * as olsera from '../src/lib/integrations/olsera.service';
+import * as olsera from '../../src/lib/integrations/olsera.service';
 import * as dotenv from 'dotenv';
 dotenv.config();
 

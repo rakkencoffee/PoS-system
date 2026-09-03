@@ -12,7 +12,7 @@
  * ═══════════════════════════════════════════════════════════════
  */
 
-import { updateOrderPaymentStatus } from '../src/lib/integrations/pos.adapter';
+import { updateOrderPaymentStatus } from '../../src/lib/integrations/pos.adapter';
 import * as dotenv from 'dotenv';
 dotenv.config();
 
@@ -26,7 +26,7 @@ async function testDoubleWebhook() {
   // Kita pakai order OLSERA yang sudah dibuat dari test sebelumnya
   // (atau order yang sudah ada di sistem)
   // Pertama, buat order baru dulu agar kita punya ID yang valid
-  const { createOrder } = await import('../src/lib/integrations/pos.adapter');
+  const { createOrder } = await import('../../src/lib/integrations/pos.adapter');
   
   const testItem = {
     productId: '112514750',

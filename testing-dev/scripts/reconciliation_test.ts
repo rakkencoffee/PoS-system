@@ -13,7 +13,7 @@
  * ═══════════════════════════════════════════════════════════════
  */
 
-import { updateOrderPaymentStatus } from '../src/lib/integrations/pos.adapter';
+import { updateOrderPaymentStatus } from '../../src/lib/integrations/pos.adapter';
 import * as dotenv from 'dotenv';
 dotenv.config();
 

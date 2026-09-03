@@ -1,5 +1,5 @@
 
-import { createOrder } from '../src/lib/integrations/pos.adapter';
+import { createOrder } from '../../src/lib/integrations/pos.adapter';
 import * as dotenv from 'dotenv';
 dotenv.config();
 
