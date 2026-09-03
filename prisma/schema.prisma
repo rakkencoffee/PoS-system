@@ -262,6 +262,7 @@ model RewardsCatalog {
   pointCost       Int
   linkedProductId String? // olseraId produk, dipakai kalau category=FREE_ITEM
   stockQuota      Int?
+  timesRedeemed   Int            @default(0) // dibandingkan ke stockQuota (null = tanpa batas)
   isActive        Boolean        @default(true)
   validFrom       DateTime?
   validUntil      DateTime?
