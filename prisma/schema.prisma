@@ -21,33 +21,39 @@ model User {
 }
 
 model Order {
-  id                  String      @id
+  id                  String           @id
   stationId           String
-  printStation        String?     // A/B/C — tablet asal order, buat routing print job ke printer yang benar
+  printStation        String? // A/B/C — tablet asal order, buat routing print job ke printer yang benar
   cashierId           String
   tableNumber         String?
-  queueNumber         Int?        // Daily queue number (001, 002, ...) resets at 00:00 WIB
-  status              OrderStatus @default(PENDING)
-  baristaStatus       OrderStatus @default(PENDING)
-  kitchenStatus       OrderStatus @default(PENDING)
+  queueNumber         Int? // Daily queue number (001, 002, ...) resets at 00:00 WIB
+  status              OrderStatus      @default(PENDING)
+  baristaStatus       OrderStatus      @default(PENDING)
+  kitchenStatus       OrderStatus      @default(PENDING)
   total               Int
   paymentMethod       String?
   cashReceived        Int?
   changeAmount        Int?
   edcTransactionId    String?
-  olseraSynced        Boolean     @default(false)
+  olseraSynced        Boolean          @default(false)
   olseraSyncedAt      DateTime?
   olseraTransactionId String?
-  createdAt           DateTime    @default(now())
-  updatedAt           DateTime    @updatedAt
-  cashier             User        @relation(fields: [cashierId], references: [id])
+  channel             OrderChannel     @default(KIOSK) // KIOSK (existing) vs MEMBER_APP (loyalty, lihat PRD Bab 3)
+  memberId            String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  cashier             User             @relation(fields: [cashierId], references: [id])
+  member              Member?          @relation(fields: [memberId], references: [id])
   items               OrderItem[]
   statusLogs          OrderStatusLog[]
+  pointLedgerEntries  PointLedger[]
 
   @@index([stationId, createdAt])
   @@index([status])
   @@index([createdAt])
   @@index([olseraSynced])
+  @@index([memberId])
+  @@index([channel])
 }
 
 // Jurnal/audit trail setiap perubahan status order (order/barista/kitchen),
@@ -55,12 +61,12 @@ model Order {
 model OrderStatusLog {
   id          String   @id @default(cuid())
   orderId     String
-  statusField String   // "order" | "barista" | "kitchen"
-  fromStatus  String?  // null = entri pertama (order baru dibuat)
+  statusField String // "order" | "barista" | "kitchen"
+  fromStatus  String? // null = entri pertama (order baru dibuat)
   toStatus    String
-  source      String   // order_created | midtrans_webhook | midtrans_manual_verify |
-                        // system_voucher_100 | olsera_settlement | kds_manual |
-                        // olsera_webhook | system_recovery
+  source      String // order_created | midtrans_webhook | midtrans_manual_verify |
+  // system_voucher_100 | olsera_settlement | kds_manual |
+  // olsera_webhook | system_recovery
   actorId     String?
   metadata    Json?
   createdAt   DateTime @default(now())
@@ -152,9 +158,9 @@ enum OrderStatus {
 model PrintJob {
   id           String   @id @default(cuid())
   orderId      String   @unique // one print job per order, ever — enforces the dedup that both create paths (client checkout, server settlement) only check advisorily
-  payload      Json     // PrintReceiptData (orderId, items, total, dll)
+  payload      Json // PrintReceiptData (orderId, items, total, dll)
   status       String   @default("PENDING") // PENDING, PRINTING, PRINTED, FAILED
-  station      String?  // A/B/C — dipakai print-bridge buat routing ke printer yang benar
+  station      String? // A/B/C — dipakai print-bridge buat routing ke printer yang benar
   attempts     Int      @default(0)
   errorMessage String?
   createdAt    DateTime @default(now())
@@ -166,6 +172,150 @@ model PrintJob {
 
 // Daily queue counter — resets at 00:00 WIB each day
 model QueueCounter {
-  date     String @id  // Format: "2026-05-19" (WIB date)
-  counter  Int    @default(0)
+  date    String @id // Format: "2026-05-19" (WIB date)
+  counter Int    @default(0)
+}
+
+// ============================================================
+// LOYALTY — RAKKEN Member App (lihat PRD di project memory
+// project_rakken_loyalty_app). Member App cuma konsumer API,
+// tabel-tabel ini tetap dipegang backend PoS-system ini
+// ("1 backend, 2 frontend").
+// ============================================================
+
+// Member App dibuat setelah login Neon Auth (Google/Email) DAN
+// submit form Onboarding — bukan langsung saat login, biar nomor HP
+// & sinkronisasi Olsera (search-or-create customer) sudah pasti ada.
+model Member {
+  id               String   @id @default(cuid())
+  neonAuthUserId   String   @unique // link ke identitas login Neon Auth
+  email            String   @unique
+  name             String
+  phone            String   @unique
+  birthDate        DateTime
+  olseraCustomerId String   @unique // hasil search-or-create Olsera saat onboarding
+
+  // Kolom cache buat baca cepat — sumber kebenaran tetap PointLedger/akumulasi
+  // Order, WAJIB diupdate bareng dalam satu Prisma $transaction.
+  pointBalance      Int       @default(0)
+  tierLevel         Int       @default(1)
+  tierPeriodStart   DateTime  @default(now())
+  tierPeriodSpend   Int       @default(0)
+  lastTransactionAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders          Order[]
+  pointLedger     PointLedger[]
+  claimedBenefits ClaimedBenefit[]
+
+  @@index([tierLevel])
+}
+
+// Ledger poin (bukan cache) — sumber kebenaran saldo Poin Reward member.
+// Tidak ada kolom expiry per-entry: kadaluarsa dicek dari
+// Member.lastTransactionAt vs LoyaltyConfig.pointExpiryMonths.
+model PointLedger {
+  id        String          @id @default(cuid())
+  memberId  String
+  type      PointLedgerType
+  amount    Int // signed: EARN/ADJUSTMENT(+) positif, REDEEM/EXPIRE negatif
+  orderId   String?
+  note      String?
+  createdAt DateTime        @default(now())
+
+  member Member @relation(fields: [memberId], references: [id])
+  order  Order? @relation(fields: [orderId], references: [id])
+
+  @@index([memberId, createdAt])
+  @@index([orderId])
+}
+
+// 1 baris per tier (bukan JSON blob) biar gampang di-CRUD lewat TanStack
+// Table di admin dashboard Member App.
+model TierRule {
+  id                      String @id @default(cuid())
+  level                   Int    @unique
+  name                    String
+  minSpend                Int // threshold akumulasi Order.total per periode (tierPeriodDays)
+  upgradeVoucherPercent   Int
+  birthdayPointMultiplier Int
+  weeklyDiscountPercent   Int
+}
+
+// Singleton (selalu 1 baris, id tetap "singleton") — semua angka yang bisa
+// diubah admin tanpa deploy ulang.
+model LoyaltyConfig {
+  id                         String @id @default("singleton")
+  pointRatePerRupiah         Float  @default(1) // 1 poin = Rp1 nominal transaksi
+  pointExpiryMonths          Int    @default(12)
+  tierPeriodDays             Int    @default(365)
+  tierUpgradeClaimWindowDays Int    @default(90)
+  weeklyMemberDayOfWeek      Int    @default(3) // 0=Minggu .. 6=Sabtu
+}
+
+model RewardsCatalog {
+  id              String         @id @default(cuid())
+  name            String
+  category        RewardCategory
+  pointCost       Int
+  linkedProductId String? // olseraId produk, dipakai kalau category=FREE_ITEM
+  stockQuota      Int?
+  isActive        Boolean        @default(true)
+  validFrom       DateTime?
+  validUntil      DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([isActive])
+  @@index([category])
+}
+
+// Catatan klaim manual benefit tier (upgrade/ulang tahun/hari member) —
+// beda dari RewardsCatalog yang inisiatif member sendiri kapan saja.
+model ClaimedBenefit {
+  id            String      @id @default(cuid())
+  memberId      String
+  type          ClaimType
+  status        ClaimStatus @default(AVAILABLE)
+  availableAt   DateTime    @default(now())
+  expiresAt     DateTime
+  claimedAt     DateTime?
+  usedInOrderId String?
+  createdAt     DateTime    @default(now())
+
+  member Member @relation(fields: [memberId], references: [id])
+
+  @@index([memberId, status])
+}
+
+enum OrderChannel {
+  KIOSK
+  MEMBER_APP
+}
+
+enum PointLedgerType {
+  EARN
+  REDEEM
+  EXPIRE
+  ADJUSTMENT
+}
+
+enum RewardCategory {
+  VOUCHER
+  FREE_ITEM
+  MERCHANDISE
+}
+
+enum ClaimType {
+  TIER_UPGRADE
+  BIRTHDAY
+  WEEKLY_MEMBER_DAY
+}
+
+enum ClaimStatus {
+  AVAILABLE
+  CLAIMED
+  EXPIRED
 }
