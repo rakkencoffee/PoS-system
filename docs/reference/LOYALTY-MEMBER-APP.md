@@ -73,6 +73,14 @@ Semua endpoint di bawah ini: guard `x-api-key` (kecuali disebut lain), request/r
 - **Opsi A (kiosk pakai 1 akun "Self-Service Guest" bersama, bukan bikin baru tiap order) BELUM diimplementasikan** — masih rencana yang dibahas, prioritas nyusul, bukan bagian dari kerjaan sesi ini.
 - **Dicek juga**: fitur "Catatan Pelanggan"/"Ulasan Pelanggan"/"Kepuasan Pelanggan" yang keliatan di Olsera Dashboard — semua kombinasi nama endpoint yang dicoba (`/customersupplier/customer-note`, `/review`, `/satisfaction`, dst, lihat `testing-dev/scripts/probe_customer_features.ts`) balikin 404. Kemungkinan besar fitur UI-only, gak ada di Open API — belum dikonfirmasi 100% (perlu cek dokumentasi resmi Olsera langsung buat kepastian, bukan cuma tebak nama endpoint).
 
+## 5d. KEPUTUSAN FINAL: `balance_points` Olsera TIDAK disinkronkan (2026-09-03)
+
+Data mentah customer Olsera (`GET /customersupplier/customer?search=`) ternyata punya field native `balance_points` ("Total Loyalty Point" di UI Dashboard) &amp; `deposit_balance` ("Jumlah Deposit") — fitur poin/deposit bawaan Olsera sendiri, TERPISAH TOTAL dari `Member.pointBalance`/`PointLedger` kita.
+
+**Keputusan (disetujui user): JANGAN disinkronkan.** `balance_points` di Olsera akan SELAMANYA nunjukkin `0` buat member Member App — ini SENGAJA, bukan bug. Sumber kebenaran poin yang benar buat staff/admin adalah endpoint kita sendiri (`/api/member/admin/members`, `/api/member/:id/points`), BUKAN dashboard Olsera. Alasan: nyambungin ke `balance_points` butuh riset+test endpoint UPDATE yang belum pernah dicoba (resiko sama kayak `createCustomer` di awal), buat manfaat yang tipis (cuma "biar keliatan konsisten di 2 tempat") — gak ada fitur nyata yang bergantung ke situ karena SEMUA redeem/checkout selalu lewat Member App, gak pernah lewat kasir Olsera langsung.
+
+**JANGAN buka lagi topik ini di masa depan kecuali user eksplisit minta** — ini keputusan final yang udah dipertimbangkan, bukan celah yang kelewatan.
+
 ## 6. Environment Variables Baru
 
 ```
