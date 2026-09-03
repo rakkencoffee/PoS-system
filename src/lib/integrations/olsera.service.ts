@@ -994,11 +994,19 @@ export async function findCustomerByPhone(
     if (!Array.isArray(list) || list.length === 0) return null;
 
     const norm = (p: unknown) => String(p ?? '').replace(/\D/g, '');
+    // Compare on the last 9 digits only — the national significant number is
+    // the same regardless of whether it's stored/typed with a "0" or "62"
+    // prefix. A prior version compared full strings with .endsWith(), which
+    // silently never matched: "089900000001".endsWith is false against
+    // Olsera's stored "6289900000001" because the digit right before the
+    // shared suffix differs (0 vs 2) — confirmed via a real Olsera customer
+    // 2026-09-03 (docs/reference/LOYALTY-MEMBER-APP.md §5), not a hypothetical.
+    const suffix = (d: string) => d.slice(-9);
+    const digitsSuffix = suffix(digits);
     const match =
       list.find((c: any) => {
         const cp = norm(c.phone || c.mobile_phone || c.hp || c.telp || c.phone_number);
-        // Tolerate 08xxx vs 628xxx prefixes by matching on the trailing digits.
-        return cp && (cp === digits || cp.endsWith(digits) || digits.endsWith(cp));
+        return cp.length >= 9 && suffix(cp) === digitsSuffix;
       }) || null;
 
     if (!match) return null;
@@ -1017,24 +1025,34 @@ export async function findCustomerByPhone(
  * Create a new customer in Olsera CRM (used by Member App onboarding when
  * findCustomerByPhone finds no match). Same base path as findCustomerByPhone.
  *
- * NOTE: field names (customer_name/customer_email/customer_phone/
- * customer_type_id) mirror the guest-customer branch of createOrder() above,
- * which is proven to work — but that call creates a customer as a SIDE EFFECT
- * of creating an order, not via this standalone endpoint. This has not been
- * tested independently against Olsera yet; verify with a real call before
- * relying on it in production (see docs/reference/LOYALTY-MEMBER-APP.md §5).
+ * Field names verified against the real Olsera API 2026-09-03 (see
+ * testing-dev/scripts/test_create_customer.ts) — first attempt used the
+ * customer_* prefixed fields from createOrder()'s guest-customer branch,
+ * which Olsera rejected (406: name/phone/gender required). This endpoint
+ * (standalone customer creation) takes bare `name`/`phone`/`email`/`gender`
+ * PLUS `customer_type_id` (this one keeps the customer_ prefix even here —
+ * Olsera's field naming isn't fully consistent between the two endpoints)
+ * PLUS `country_id`, which is the country's 2-letter code (confirmed via
+ * GET /global/country, not a numeric id) — hardcoded to 'ID' since RAKKEN
+ * only operates in Indonesia. `gender` isn't collected anywhere in the
+ * Member App onboarding form, so it's a guessed default ('L') here —
+ * Olsera accepted it without complaint in testing. `customer_type_id: '0'`
+ * mirrors the value createOrder()'s guest-customer branch already uses.
  */
 export async function createCustomer(
   name: string,
   phone: string,
-  email?: string
+  email?: string,
+  gender: 'L' | 'P' = 'L'
 ): Promise<{ id: number | string; name: string; phone?: string }> {
   const digits = phone.replace(/\D/g, '');
   const formData = new URLSearchParams();
-  formData.append('customer_name', name);
-  formData.append('customer_phone', digits);
-  formData.append('customer_email', email || `${digits}@member.rakkencoffee.com`);
+  formData.append('name', name);
+  formData.append('phone', digits);
+  formData.append('email', email || `${digits}@member.rakkencoffee.com`);
+  formData.append('gender', gender);
   formData.append('customer_type_id', '0');
+  formData.append('country_id', 'ID');
 
   const res = await olseraFetch('/customersupplier/customer', {
     method: 'POST',
