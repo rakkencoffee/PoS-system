@@ -3,62 +3,6 @@
 import { useEffect, useState, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Receipt } from '@/components/pos/Receipt';
-import { type PrintReceiptData } from '@/lib/print-bridge';
-import { getStation } from '@/lib/station';
-
-function buildReceiptData(
-  orderNo: string,
-  orderId: string | null,
-  queue: string,
-  orderData: any,
-): PrintReceiptData {
-  const displayOrderNo = (orderNo || orderData?.orderNo) || orderId || '';
-
-  // Enrich API items with sessionStorage data saved by checkout before cart was cleared.
-  // This covers the race condition where the Prisma background mirror hasn't finished yet
-  // when the receipt is built (~2s), causing empty notes.
-  let items = orderData?.items || [];
-  if (typeof window !== 'undefined' && orderId) {
-    try {
-      const cached = sessionStorage.getItem(`print_${orderId}`);
-      if (cached) {
-        const cachedItems: { name: string; quantity: number; price: number; notes: string; size: string }[] = JSON.parse(cached);
-        const remaining = [...cachedItems];
-        items = items.map((item: any) => {
-          const name = (item.menuItem?.name || item.name || '').toLowerCase();
-          const matchIdx = remaining.findIndex(c => c.name.toLowerCase() === name);
-          if (matchIdx !== -1) {
-            const match = remaining.splice(matchIdx, 1)[0];
-            return {
-              ...item,
-              notes: item.notes || match.notes,
-              size: (item.size && item.size !== '-') ? item.size : (match.size !== '-' ? match.size : item.size),
-              // Fall back to the price the customer actually paid (known at
-              // checkout) when the API's price is missing/0 — happens when
-              // this order's background Olsera price-sync (per item) hasn't
-              // finished for this item yet by the time the receipt is built.
-              price: item.price || match.price,
-            };
-          }
-          return item;
-        });
-        sessionStorage.removeItem(`print_${orderId}`);
-      }
-    } catch (_) {}
-  }
-
-  return {
-    orderId: displayOrderNo,
-    dbOrderId: orderId || undefined,
-    queueNumber: queue,
-    customerName: orderData?.customerName || '',
-    items,
-    total: orderData?.totalAmount || 0,
-    discount: orderData?.discount || 0,
-    paymentMethod: orderData?.paymentMethod || 'E-Wallet',
-    station: getStation(),
-  };
-}
 
 function SuccessContent() {
   const router = useRouter();
@@ -79,10 +23,15 @@ function SuccessContent() {
     return numericId.length > 3 ? numericId.slice(-3) : numericId;
   })();
   
+  // Receipt printing happens at checkout time, straight over the kiosk
+  // tablet's own paired Bluetooth printer (see checkout/page.tsx
+  // printViaBluetooth) — this page only reflects whether that succeeded.
+  // No cloud/WiFi print queue fallback anymore (deliberately dropped in
+  // favor of BLE-only, see project memory).
+  const printedViaBle = searchParams.get('printed') === 'ble';
+
   const [countdown, setCountdown] = useState(isOffline ? 30 : 15);
   const [orderData, setOrderData] = useState<any>(null);
-  const hasPrinted = useRef(false);
-  const [printStatus, setPrintStatus] = useState<'idle' | 'printing' | 'success' | 'fallback' | 'error'>('idle');
 
   // Auto-verify payment & Fetch order detail for receipt
   useEffect(() => {
@@ -116,112 +65,6 @@ function SuccessContent() {
 
     return () => clearTimeout(timeoutId);
   }, [orderId, isOffline]);
-
-  /**
-   * Submit a print job to the Cloud Print Queue and poll for completion.
-   */
-  const submitCloudPrintJob = async (receiptData: PrintReceiptData) => {
-    try {
-      // 1. Create print job in the cloud database
-      console.log('[CloudPrint] Submitting print job to /api/print-jobs...');
-      const createRes = await fetch('/api/print-jobs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(receiptData),
-      });
-
-      if (!createRes.ok) {
-        throw new Error(`Failed to create print job: ${createRes.status}`);
-      }
-
-      const { jobId, status: initialStatus } = await createRes.json();
-      console.log(`[CloudPrint] Job created: ${jobId}, status: ${initialStatus}`);
-
-      if (initialStatus === 'PRINTED') {
-        // Job was already printed (duplicate request)
-        return 'success';
-      }
-
-      // 2. Poll for print completion (max 15 seconds)
-      const maxPollTime = 15000;
-      const pollInterval = 2000;
-      const startTime = Date.now();
-
-      while (Date.now() - startTime < maxPollTime) {
-        await new Promise(r => setTimeout(r, pollInterval));
-
-        const statusRes = await fetch(`/api/print-jobs/status?orderId=${receiptData.orderId}`);
-        if (!statusRes.ok) continue;
-
-        const statusData = await statusRes.json();
-        console.log(`[CloudPrint] Poll status: ${statusData.status}`);
-
-        if (statusData.status === 'PRINTED') {
-          return 'success';
-        }
-        if (statusData.status === 'FAILED' && statusData.attempts >= 3) {
-          return 'error';
-        }
-      }
-
-      // Timed out — the daemon might be offline
-      console.warn('[CloudPrint] Polling timed out. Daemon may be offline.');
-      return 'timeout';
-
-    } catch (err) {
-      console.error('[CloudPrint] Error:', err);
-      return 'error';
-    }
-  };
-
-  // Auto-print logic — uses Cloud Print Queue
-  useEffect(() => {
-    if (orderData && orderData.items?.length > 0 && !hasPrinted.current) {
-      
-      const triggerPrint = async () => {
-        if (hasPrinted.current) return;
-        hasPrinted.current = true;
-        setPrintStatus('printing');
-
-        try {
-          const receiptData = buildReceiptData(orderNo, orderId, queue, orderData);
-          const result = await submitCloudPrintJob(receiptData);
-
-          if (result === 'success') {
-            setPrintStatus('success');
-          } else if (result === 'timeout') {
-            console.warn('[Success] Cloud print timed out. Daemon may be offline.');
-            setPrintStatus('fallback');
-          } else {
-            setPrintStatus('error');
-            hasPrinted.current = false; // Allow retry
-          }
-        } catch (err) {
-          console.error('[Success] Print error:', err);
-          setPrintStatus('error');
-          hasPrinted.current = false;
-        }
-      };
-
-      const timer = setTimeout(triggerPrint, 300);
-      return () => clearTimeout(timer);
-    }
-  }, [orderData, orderId, queue, orderNo]);
-
-  const handlePrint = async () => {
-    setPrintStatus('printing');
-    try {
-      const receiptData = buildReceiptData(orderNo, orderId, queue, orderData);
-      const result = await submitCloudPrintJob(receiptData);
-      if (result === 'success') {
-        setPrintStatus('success');
-      } else {
-        setPrintStatus('fallback');
-      }
-    } catch {
-      setPrintStatus('error');
-    }
-  };
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -307,38 +150,23 @@ function SuccessContent() {
         {/* Buttons */}
         <div className="space-y-2 animate-fade-in delay-4" style={{ opacity: 0 }}>
           {!isOffline && (
-            <>
-              <button
-                onClick={handlePrint}
-                disabled={printStatus === 'printing'}
-                className="w-full py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-95 border border-white/10 disabled:opacity-50"
-              >
-                {printStatus === 'printing' ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Printing...
-                  </>
-                ) : printStatus === 'success' ? (
-                  <>
-                    <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Struk Tercetak
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                    </svg>
-                    Cetak Struk
-                  </>
-                )}
-              </button>
-
-              {printStatus === 'fallback' && (
-                <p className="text-xs text-amber-400 text-center">Print Bridge offline — menggunakan browser print</p>
+            <div className="flex items-center justify-center gap-2 text-xs text-(--text-secondary)">
+              {printedViaBle ? (
+                <>
+                  <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Struk tercetak
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                  </svg>
+                  Printer belum terhubung — hubungi kasir
+                </>
               )}
-            </>
+            </div>
           )}
 
           <button

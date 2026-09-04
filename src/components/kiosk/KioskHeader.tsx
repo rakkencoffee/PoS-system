@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { KioskPrinterPairing } from './KioskPrinterPairing';
 
 const JKT = { fontFamily: 'var(--font-plus-jakarta-sans)' };
 
@@ -65,6 +66,8 @@ export function KioskHeader({
           )}
         </div>
       </div>
+
+      <KioskPrinterPairing />
 
       {/* Cart */}
       <button

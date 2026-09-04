@@ -22,6 +22,23 @@ export function useBlePrinter() {
   const [deviceName, setDeviceName] = useState<string | null>(null);
   const characteristicRef = useRef<BluetoothRemoteGATTCharacteristic | null>(null);
 
+  const bindDevice = useCallback(async (device: BluetoothDevice) => {
+    const server = await device.gatt?.connect();
+    if (!server) throw new Error('Gagal connect ke printer.');
+
+    const service = await server.getPrimaryService(BARISTA_PRINTER_SERVICE_UUID);
+    const characteristic = await service.getCharacteristic(BARISTA_PRINTER_CHARACTERISTIC_UUID);
+
+    characteristicRef.current = characteristic;
+    setDeviceName(device.name || 'Printer');
+    setConnected(true);
+
+    device.addEventListener('gattserverdisconnected', () => {
+      characteristicRef.current = null;
+      setConnected(false);
+    });
+  }, []);
+
   const connect = useCallback(async () => {
     if (!navigator.bluetooth) {
       throw new Error('Browser ini tidak mendukung Web Bluetooth. Pakai Chrome di Android.');
@@ -38,21 +55,32 @@ export function useBlePrinter() {
       optionalServices: [BARISTA_PRINTER_SERVICE_UUID],
     });
 
-    const server = await device.gatt?.connect();
-    if (!server) throw new Error('Gagal connect ke printer.');
+    await bindDevice(device);
+  }, [bindDevice]);
 
-    const service = await server.getPrimaryService(BARISTA_PRINTER_SERVICE_UUID);
-    const characteristic = await service.getCharacteristic(BARISTA_PRINTER_CHARACTERISTIC_UUID);
+  /**
+   * Silently reconnect to a printer the browser already has permission for
+   * (from a previous requestDevice() pairing) -- no picker, no click needed.
+   * Chrome persists that permission per-origin, so this is what lets a kiosk
+   * tablet come back online after a page reload/reboot without staff
+   * touching the hidden pairing control again. Resolves to false (not an
+   * error) if there's nothing to reconnect to yet, or the browser doesn't
+   * support the persistent-permissions API (navigator.bluetooth.getDevices).
+   */
+  const tryAutoReconnect = useCallback(async () => {
+    if (!navigator.bluetooth?.getDevices) return false;
 
-    characteristicRef.current = characteristic;
-    setDeviceName(device.name || 'Printer');
-    setConnected(true);
-
-    device.addEventListener('gattserverdisconnected', () => {
-      characteristicRef.current = null;
-      setConnected(false);
-    });
-  }, []);
+    const devices = await navigator.bluetooth.getDevices();
+    for (const device of devices) {
+      try {
+        await bindDevice(device);
+        return true;
+      } catch {
+        // try the next previously-paired device, if any
+      }
+    }
+    return false;
+  }, [bindDevice]);
 
   const disconnect = useCallback(() => {
     characteristicRef.current = null;
@@ -71,5 +99,5 @@ export function useBlePrinter() {
     }
   }, []);
 
-  return { connected, deviceName, connect, disconnect, writeBytes };
+  return { connected, deviceName, connect, tryAutoReconnect, disconnect, writeBytes };
 }

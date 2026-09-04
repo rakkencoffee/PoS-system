@@ -8,6 +8,7 @@ import { db, encryptPendingOrder } from '@/lib/dexie';
 import { CartItem } from '@/lib/types';
 import { KioskHeader } from '@/components/kiosk/KioskHeader';
 import { EdcPaymentFlow } from '@/components/kiosk/EdcPaymentFlow';
+import { getKioskPrinter } from '@/components/kiosk/KioskPrinterPairing';
 import { getStation } from '@/lib/station';
 import { buildBagOrderItems, calculateBagTotal } from '@/lib/bag-options';
 import * as Sentry from "@sentry/nextjs";
@@ -51,19 +52,26 @@ function formatItemNotes(item: CartItem): string {
   return parts.join(', ');
 }
 
+function buildPrintItems(cartItems: CartItem[], bagItems: { name: string; quantity: number; price: number }[] = []) {
+  return [
+    ...cartItems.map(item => ({
+      name: item.name,
+      quantity: item.quantity,
+      price: item.subtotal / item.quantity,
+      notes: formatItemNotes(item),
+      size: item.size || '-',
+    })),
+    ...bagItems.map(b => ({ name: b.name, quantity: b.quantity, price: b.price, notes: '', size: '-' })),
+  ];
+}
+
+// Cached for the cloud-print-queue fallback path (success/page.tsx) — it
+// re-fetches order items from the API and only has this to enrich notes/size
+// that background Olsera sync hasn't finished by then. Not needed for the
+// direct BLE print below, which already has everything from buildPrintItems().
 function savePrintData(cartItems: CartItem[], orderId: string, bagItems: { name: string; quantity: number; price: number }[] = []) {
   try {
-    const data = [
-      ...cartItems.map(item => ({
-        name: item.name,
-        quantity: item.quantity,
-        price: item.subtotal / item.quantity,
-        notes: formatItemNotes(item),
-        size: item.size || '-',
-      })),
-      ...bagItems.map(b => ({ name: b.name, quantity: b.quantity, price: b.price, notes: '', size: '-' })),
-    ];
-    sessionStorage.setItem(`print_${orderId}`, JSON.stringify(data));
+    sessionStorage.setItem(`print_${orderId}`, JSON.stringify(buildPrintItems(cartItems, bagItems)));
   } catch (_) {}
 }
 
@@ -110,13 +118,48 @@ export default function CheckoutNewPage() {
     }
   }, [itemCount, router]);
 
-  const finalizeOrder = (data: { orderId: string; queueNumber?: number; orderNo?: string }) => {
+  const printViaBluetooth = async (data: { orderId: string; queueNumber?: number; orderNo?: string }) => {
+    const printer = getKioskPrinter();
+    if (!printer) return false; // not paired on this tablet — success page's cloud queue fallback handles it
+
+    try {
+      const res = await fetch('/api/kiosk/receipt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: data.orderNo || data.orderId,
+          queueNumber: data.queueNumber || 0,
+          customerName,
+          items: buildPrintItems(items, buildBagOrderItems(bagQuantities)),
+          total,
+          discount: appliedDiscount,
+          paymentMethod: paymentMethod === 'EDC_CARD' ? 'Kartu EDC' : 'Simulasi',
+        }),
+      });
+      if (!res.ok) return false;
+
+      const { bytes } = await res.json();
+      const binary = atob(bytes);
+      const raw = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) raw[i] = binary.charCodeAt(i);
+
+      await printer.writeBytes(raw);
+      return true;
+    } catch (err) {
+      console.warn('[Checkout] BLE print failed, falling back to cloud print queue:', err);
+      return false;
+    }
+  };
+
+  const finalizeOrder = async (data: { orderId: string; queueNumber?: number; orderNo?: string }) => {
     setPaymentStatus('Pesanan berhasil!');
     savePrintData(items, data.orderId, buildBagOrderItems(bagQuantities));
+    const printedViaBle = await printViaBluetooth(data);
     clearCart();
     const queueNum = (data.queueNumber || 0).toString();
     const orderNoParam = data.orderNo ? `&orderNo=${data.orderNo}` : '';
-    router.push(`/success?orderId=${data.orderId}&queue=${queueNum}${orderNoParam}`);
+    const printedParam = printedViaBle ? '&printed=ble' : '';
+    router.push(`/success?orderId=${data.orderId}&queue=${queueNum}${orderNoParam}${printedParam}`);
   };
 
   const handleCheckout = async () => {
