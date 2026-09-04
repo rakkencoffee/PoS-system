@@ -48,8 +48,8 @@ internal static class Program
             cts.Cancel();
         };
 
-        using var dialogCloser = config.AutoCloseDialogs ? new DialogAutoCloser() : null;
         using var hiddenForm = CreateHiddenForm();
+        using var dialogCloser = config.AutoCloseDialogs ? new DialogAutoCloser(hiddenForm) : null;
         hiddenForm.Shown += async (_, _) =>
         {
             var daemon = new EdcDaemon(config, new EdcClient());
@@ -77,8 +77,8 @@ internal static class Program
         EdcResult? cardResult = null;
         EdcQrisResult? qrisResult = null;
 
-        using var dialogCloser = new DialogAutoCloser();
         using var hiddenForm = CreateHiddenForm();
+        using var dialogCloser = new DialogAutoCloser(hiddenForm);
         hiddenForm.Shown += (_, _) =>
         {
             var client = new EdcClient();

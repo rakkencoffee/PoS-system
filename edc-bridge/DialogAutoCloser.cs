@@ -1,41 +1,50 @@
+using System.ComponentModel;
+using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Windows.Forms;
 
 namespace EdcBridge;
 
-// Hides (does NOT click/close) every #32770 dialog this DLL creates, so nothing is ever
-// visible on the kiosk screen -- without ever sending the dialog any input.
+// Covers (does NOT click/close/hide) every #32770 dialog this DLL creates, so the customer
+// never sees it on the kiosk screen -- without ever touching the real dialog window at all.
 //
-// Three earlier attempts all clicked/closed the dialog programmatically (skip-empty-title,
-// require-IDOK-button, exact-body-text allow-list) and ALL of them broke real transactions,
-// including the exact-text match clicking ONLY the confirmed-legitimate "Please check EDC
-// display" dialog -- confirmed live, the very next COMStatus call returned a garbage code
-// and the job failed within ~100ms of the click.
+// Four earlier attempts all interacted with the dialog directly and every one of them broke
+// real transactions: clicking OK (even matched to the confirmed-legitimate "Please check EDC
+// display" text) made the very next COMStatus call return a garbage code within ~100ms;
+// ShowWindow(SW_HIDE) on it made the daemon hang forever (confirmed live: card tapped, PIN
+// entered, cancelled -- zero further output). The vendor's own POS4EDC User Guide (section
+// 2.1.2) confirms why: POS4EDC_COMStatus() itself "display[s] windows message[s] for status
+// of EDC and POS4EDC module" as an intentional, undocumented-as-optional part of its blocking
+// wait loop -- there is no silent/unattended-mode flag anywhere in the SDK (checked pos4cat.ini
+// and the full API reference). The dialog is owned end-to-end by COMStatus()'s own internal
+// state machine; anything we do TO it desyncs that.
 //
-// Conclusion: these dialogs are owned entirely by POS4CAT_Ctl.dll's own state machine and
-// it decides itself when to dismiss them (e.g. once the terminal actually responds to a
-// card tap) -- clicking OK on its behalf short-circuits that internal flow no matter how
-// carefully the target dialog is identified. The only safe intervention is therefore
-// non-interactive: hide the window so the customer never sees it, but leave its message
-// loop and button completely untouched so the DLL's own logic still drives it end to end.
+// So instead of touching the dialog, this creates a separate TOPMOST, non-activating overlay
+// window of our own and positions it exactly over the dialog's screen rect -- visually hiding
+// it from the customer while leaving its message loop, timers, and button completely
+// untouched. The real dialog keeps running exactly as the DLL expects; we just paint over it.
 //
-// Runs on its OWN background thread, deliberately NOT a System.Windows.Forms.Timer -- a
-// first attempt using one shared the same WM_TIMER-driven message queue that
+// Runs its polling on its OWN background thread, deliberately NOT a System.Windows.Forms.Timer
+// -- a first attempt using one shared the same WM_TIMER-driven message queue that
 // POS4CAT_Ctl.dll's fragile internal state machine depends on (see Program.cs), and
 // transactions started failing within 2-4 seconds the moment that timer was added.
-// EnumWindows/ShowWindow are safe to call cross-thread against another thread's window, so
-// a plain polling thread avoids touching that queue.
+// EnumWindows/GetWindowRect are safe to call cross-thread; actually creating/moving/closing the
+// overlay Form is marshaled onto the UI thread (via uiThread) since Forms must live on the
+// thread that pumps their messages -- that thread is already running Application.Run() for the
+// hidden host form, so overlay windows share that same pump.
 public sealed class DialogAutoCloser : IDisposable
 {
-    private const string MessageBoxClassName = "#32770"; // standard Win32 dialog/MessageBox class
-    private const int SW_HIDE = 0;
+    private const string DialogClassName = "#32770"; // standard Win32 dialog/MessageBox class
 
+    private readonly ISynchronizeInvoke _uiThread;
     private readonly Thread _thread;
+    private readonly Dictionary<IntPtr, Form> _overlays = new();
     private volatile bool _stop;
-    private readonly HashSet<IntPtr> _hidden = new();
 
-    public DialogAutoCloser(int pollIntervalMs = 100)
+    public DialogAutoCloser(ISynchronizeInvoke uiThread, int pollIntervalMs = 100)
     {
+        _uiThread = uiThread;
         _thread = new Thread(() => PollLoop(pollIntervalMs)) { IsBackground = true };
         _thread.Start();
     }
@@ -46,72 +55,118 @@ public sealed class DialogAutoCloser : IDisposable
         {
             Thread.Sleep(pollIntervalMs);
             if (_stop) return;
-            HideOwnDialogs();
+            SyncOverlays();
         }
     }
 
-    private void HideOwnDialogs()
+    private void SyncOverlays()
     {
         var ownProcessId = (uint)Environment.ProcessId;
-        var seenThisPoll = new HashSet<IntPtr>();
+        var seen = new HashSet<IntPtr>();
 
         EnumWindows((hWnd, _) =>
         {
             GetWindowThreadProcessId(hWnd, out var windowProcessId);
-            if (windowProcessId != ownProcessId) return true; // only touch our own process's windows
+            if (windowProcessId != ownProcessId) return true; // only cover our own process's windows
 
             var classBuf = new StringBuilder(256);
             GetClassName(hWnd, classBuf, classBuf.Capacity);
-            if (classBuf.ToString() != MessageBoxClassName) return true;
+            if (classBuf.ToString() != DialogClassName) return true;
 
-            if (!IsWindowVisible(hWnd)) return true; // already hidden (by us, or never shown)
+            if (!IsWindowVisible(hWnd)) return true;
+            if (!GetWindowRect(hWnd, out var rect)) return true;
 
-            seenThisPoll.Add(hWnd);
-            if (_hidden.Add(hWnd))
+            seen.Add(hWnd);
+            var bounds = Rectangle.FromLTRB(rect.Left, rect.Top, rect.Right, rect.Bottom);
+
+            if (!_overlays.ContainsKey(hWnd))
             {
-                // First time seeing this window -- log what it says, purely for debugging,
-                // then hide it. No click, no PostMessage, no WM_CLOSE: the DLL's own code
-                // is left completely free to dismiss it whenever it decides to.
-                Console.WriteLine($"[DialogAutoCloser] Hiding dialog (not closing): \"{GetChildText(hWnd)}\"");
+                Console.WriteLine("[DialogAutoCloser] Covering native dialog on screen (not touching it)");
+                var handle = hWnd;
+                _uiThread.Invoke(new Action(() =>
+                {
+                    var overlay = CreateOverlay(bounds);
+                    _overlays[handle] = overlay;
+                }), null);
             }
-            ShowWindow(hWnd, SW_HIDE);
+            else
+            {
+                var overlay = _overlays[hWnd];
+                _uiThread.Invoke(new Action(() =>
+                {
+                    if (overlay.Bounds != bounds) overlay.Bounds = bounds;
+                }), null);
+            }
+
             return true;
         }, IntPtr.Zero);
+
+        foreach (var goneHandle in _overlays.Keys.Where(h => !seen.Contains(h)).ToList())
+        {
+            var overlay = _overlays[goneHandle];
+            _overlays.Remove(goneHandle);
+            _uiThread.Invoke(new Action(overlay.Close), null);
+        }
     }
 
-    // Concatenates the text of every child control (Static labels, buttons, etc.) --
-    // logging only, this dialog's own title bar is always blank.
-    private static string GetChildText(IntPtr hParent)
+    private static Form CreateOverlay(Rectangle bounds)
     {
-        var sb = new StringBuilder();
-        EnumChildWindows(hParent, (hChild, _) =>
+        var overlay = new NonActivatingForm
         {
-            var buf = new StringBuilder(512);
-            GetWindowText(hChild, buf, buf.Capacity);
-            if (buf.Length > 0) sb.Append(buf).Append(' ');
-            return true;
-        }, IntPtr.Zero);
-        return sb.ToString().Trim();
+            FormBorderStyle = FormBorderStyle.None,
+            StartPosition = FormStartPosition.Manual,
+            Bounds = bounds,
+            TopMost = true,
+            ShowInTaskbar = false,
+            BackColor = Color.White,
+        };
+        overlay.Show();
+        return overlay;
     }
 
     public void Dispose()
     {
         _stop = true;
+        foreach (var overlay in _overlays.Values)
+        {
+            try { _uiThread.Invoke(new Action(overlay.Close), null); }
+            catch { /* UI thread may already be gone during shutdown */ }
+        }
+        _overlays.Clear();
+    }
+
+    // Plain WS_EX_NOACTIVATE + ShowWithoutActivation so covering the dialog never steals
+    // window activation/focus away from it -- the overlay is purely a visual patch.
+    private sealed class NonActivatingForm : Form
+    {
+        private const int WS_EX_NOACTIVATE = 0x08000000;
+
+        protected override bool ShowWithoutActivation => true;
+
+        protected override CreateParams CreateParams
+        {
+            get
+            {
+                var cp = base.CreateParams;
+                cp.ExStyle |= WS_EX_NOACTIVATE;
+                return cp;
+            }
+        }
     }
 
     private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT
+    {
+        public int Left, Top, Right, Bottom;
+    }
 
     [DllImport("user32.dll")]
     private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
 
     [DllImport("user32.dll")]
-    private static extern bool EnumChildWindows(IntPtr hWndParent, EnumWindowsProc lpEnumFunc, IntPtr lParam);
-
-    [DllImport("user32.dll")]
     private static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
-
-    [DllImport("user32.dll")]
-    private static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
 
     [DllImport("user32.dll")]
     private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
@@ -120,5 +175,5 @@ public sealed class DialogAutoCloser : IDisposable
     private static extern bool IsWindowVisible(IntPtr hWnd);
 
     [DllImport("user32.dll")]
-    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 }
