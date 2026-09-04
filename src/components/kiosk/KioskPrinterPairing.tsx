@@ -19,7 +19,7 @@ export function KioskPrinterPairing() {
   const { connected, connect, tryAutoReconnect, writeBytes } = useBlePrinter();
 
   useEffect(() => {
-    tryAutoReconnect().catch(() => {});
+    tryAutoReconnect().catch((err) => console.warn('[KioskPrinterPairing] Auto-reconnect failed:', err));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -32,7 +32,7 @@ export function KioskPrinterPairing() {
 
   const handleClick = () => {
     if (connected) return; // already paired — nothing for staff to do here
-    connect().catch(() => {});
+    connect().catch((err) => console.warn('[KioskPrinterPairing] Pairing failed/cancelled:', err));
   };
 
   return (
