@@ -4,11 +4,13 @@ import { useEffect } from 'react';
 import { useBlePrinter } from '@/hooks/useBlePrinter';
 
 /**
- * Invisible tap target for pairing the kiosk's own receipt printer over
- * Web Bluetooth — deliberately has no visible label/icon so customers never
- * notice it; staff know it sits here (next to the cart button) for initial
- * setup. Auto-reconnects silently on every page load once paired once, so
- * this only needs a real tap the first time or after a printer power-cycle.
+ * Small, low-key tap target for pairing the kiosk's own receipt printer over
+ * Web Bluetooth — a muted dot next to the cart button, not a fully invisible
+ * hitbox (that made it impossible for staff to find/tap reliably on a real
+ * touchscreen during setup). Still easy to overlook for customers who aren't
+ * looking for it. Auto-reconnects silently on every page load once paired
+ * once, so this only needs a real tap the first time or after a printer
+ * power-cycle.
  *
  * The BLE connection itself is owned here and exposed via a tiny global so
  * the checkout/success flow (a different route/component tree) can print
@@ -38,11 +40,15 @@ export function KioskPrinterPairing() {
   return (
     <button
       onClick={handleClick}
-      aria-hidden="true"
-      tabIndex={-1}
-      className="w-10 h-10 opacity-0 cursor-default"
-      title=""
-    />
+      className="w-10 h-10 flex items-center justify-center shrink-0"
+      title={connected ? 'Printer terhubung' : 'Hubungkan printer struk'}
+    >
+      <span
+        className={`material-symbols-outlined text-[18px] ${connected ? 'text-green-500' : 'text-[#e5e5e5]'}`}
+      >
+        bluetooth
+      </span>
+    </button>
   );
 }
 
