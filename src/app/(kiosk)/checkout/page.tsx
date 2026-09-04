@@ -7,6 +7,7 @@ import { useCreateOrder, useValidateVoucher } from '@/hooks/useOrders';
 import { db, encryptPendingOrder } from '@/lib/dexie';
 import { CartItem } from '@/lib/types';
 import { KioskHeader } from '@/components/kiosk/KioskHeader';
+import { EdcPaymentFlow } from '@/components/kiosk/EdcPaymentFlow';
 import { getStation } from '@/lib/station';
 import { buildBagOrderItems, calculateBagTotal } from '@/lib/bag-options';
 import * as Sentry from "@sentry/nextjs";
@@ -87,6 +88,8 @@ export default function CheckoutNewPage() {
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<string>('');
+  const [paymentMethod, setPaymentMethod] = useState<'SIMULATED' | 'EDC_CARD'>('SIMULATED');
+  const [edcOrder, setEdcOrder] = useState<{ orderId: string; amount: number; queueNumber?: number; orderNo?: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const goSearch = (value: string) => router.push(`/menu?search=${encodeURIComponent(value)}`);
   const checkoutInProgress = useRef(false);
@@ -107,6 +110,15 @@ export default function CheckoutNewPage() {
     }
   }, [itemCount, router]);
 
+  const finalizeOrder = (data: { orderId: string; queueNumber?: number; orderNo?: string }) => {
+    setPaymentStatus('Pesanan berhasil!');
+    savePrintData(items, data.orderId, buildBagOrderItems(bagQuantities));
+    clearCart();
+    const queueNum = (data.queueNumber || 0).toString();
+    const orderNoParam = data.orderNo ? `&orderNo=${data.orderNo}` : '';
+    router.push(`/success?orderId=${data.orderId}&queue=${queueNum}${orderNoParam}`);
+  };
+
   const handleCheckout = async () => {
     checkoutInProgress.current = true;
     setIsProcessing(true);
@@ -121,16 +133,20 @@ export default function CheckoutNewPage() {
         customerPhone: customerPhone,
         voucherCode: appliedDiscount > 0 ? voucherCode : undefined,
         station: getStation(),
+        paymentMethod,
       });
+
+      if (paymentMethod === 'EDC_CARD') {
+        // Order created but stays unpaid — EdcPaymentFlow polls the EDC job
+        // and settlement happens server-side once the daemon reports APPROVED.
+        setEdcOrder({ orderId: data.orderId, amount: total, queueNumber: data.queueNumber, orderNo: data.orderNo });
+        setIsProcessing(false);
+        return;
+      }
 
       // No payment gateway wired up yet — server marks the order paid
       // immediately (simulated), so there's no popup/redirect to wait on here.
-      setPaymentStatus('Pesanan berhasil!');
-      savePrintData(items, data.orderId, buildBagOrderItems(bagQuantities));
-      clearCart();
-      const queueNum = (data.queueNumber || 0).toString();
-      const orderNoParam = data.orderNo ? `&orderNo=${data.orderNo}` : '';
-      router.push(`/success?orderId=${data.orderId}&queue=${queueNum}${orderNoParam}`);
+      finalizeOrder(data);
     } catch (error: any) {
       handleCheckoutError(error);
     }
@@ -396,11 +412,33 @@ export default function CheckoutNewPage() {
                   </div>
                 </div>
 
+                {/* Payment Method */}
+                <div className="grid grid-cols-2 gap-standard mt-section-item">
+                  <button
+                    onClick={() => setPaymentMethod('SIMULATED')}
+                    disabled={isProcessing}
+                    className={`py-compact rounded-xl border font-h4 text-body-md cursor-pointer transition-colors disabled:opacity-50 ${
+                      paymentMethod === 'SIMULATED' ? 'active-payment' : 'border-surface-variant text-taupe'
+                    }`}
+                  >
+                    Bayar Sekarang
+                  </button>
+                  <button
+                    onClick={() => setPaymentMethod('EDC_CARD')}
+                    disabled={isProcessing}
+                    className={`py-compact rounded-xl border font-h4 text-body-md cursor-pointer transition-colors disabled:opacity-50 ${
+                      paymentMethod === 'EDC_CARD' ? 'active-payment' : 'border-surface-variant text-taupe'
+                    }`}
+                  >
+                    Card Payment
+                  </button>
+                </div>
+
                 {/* Pay Button */}
                 <button
                   onClick={handleCheckout}
                   disabled={isProcessing || createOrderMutation.isPending}
-                  className="w-full mt-section-sep py-standard bg-primary text-white font-display text-h3 rounded-2xl transition-all active:scale-95 shadow-lg shadow-primary/20 hover:bg-red-dark cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="w-full mt-section-item py-standard bg-primary text-white font-display text-h3 rounded-2xl transition-all active:scale-95 shadow-lg shadow-primary/20 hover:bg-red-dark cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {isProcessing || createOrderMutation.isPending ? (
                     <>
@@ -408,7 +446,7 @@ export default function CheckoutNewPage() {
                       <span className="text-body-lg font-bold">{paymentStatus || 'Processing...'}</span>
                     </>
                   ) : (
-                    <span>Pay {formatCurrency(total)}</span>
+                    <span>{paymentMethod === 'EDC_CARD' ? 'Card Payment' : 'Pay'} {formatCurrency(total)}</span>
                   )}
                 </button>
                 
@@ -611,6 +649,28 @@ export default function CheckoutNewPage() {
               <span className="font-price text-price text-primary font-bold">{formatCurrency(total)}</span>
             </div>
           </section>
+
+          {/* Payment Method */}
+          <section className="grid grid-cols-2 gap-standard">
+            <button
+              onClick={() => setPaymentMethod('SIMULATED')}
+              disabled={isProcessing}
+              className={`py-compact rounded-xl border font-h4 text-body-md cursor-pointer transition-colors disabled:opacity-50 ${
+                paymentMethod === 'SIMULATED' ? 'active-payment' : 'border-surface-variant text-taupe bg-surface'
+              }`}
+            >
+              Bayar Sekarang
+            </button>
+            <button
+              onClick={() => setPaymentMethod('EDC_CARD')}
+              disabled={isProcessing}
+              className={`py-compact rounded-xl border font-h4 text-body-md cursor-pointer transition-colors disabled:opacity-50 ${
+                paymentMethod === 'EDC_CARD' ? 'active-payment' : 'border-surface-variant text-taupe bg-surface'
+              }`}
+            >
+              Card Payment
+            </button>
+          </section>
         </main>
 
         {/* Sticky Bottom Bar */}
@@ -640,13 +700,25 @@ export default function CheckoutNewPage() {
               </>
             ) : (
               <>
-                <span>Bayar Sekarang</span>
+                <span>{paymentMethod === 'EDC_CARD' ? 'Card Payment' : 'Bayar Sekarang'}</span>
                 <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
               </>
             )}
           </button>
         </div>
       </div>
+
+      {edcOrder && (
+        <EdcPaymentFlow
+          orderId={edcOrder.orderId}
+          amount={edcOrder.amount}
+          onApproved={() => finalizeOrder(edcOrder)}
+          onCancel={() => {
+            setEdcOrder(null);
+            checkoutInProgress.current = false;
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -17,8 +17,9 @@ import { NextRequest, NextResponse } from "next/server";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { items, totalAmount, customerName, customerPhone, discountAmount, voucherCode, station } =
+    const { items, totalAmount, customerName, customerPhone, discountAmount, voucherCode, station, paymentMethod } =
       body;
+    const isEdcCard = paymentMethod === "EDC_CARD";
 
     if (!items || !items.length || typeof totalAmount !== "number") {
       return NextResponse.json(
@@ -76,6 +77,27 @@ export async function POST(request: NextRequest) {
 
     const finalOrderId = dbOrderId ? String(dbOrderId) : orderId;
     const finalGrossAmount = Math.max(0, totalAmount - (discountAmount || 0));
+
+    if (isEdcCard) {
+      // Payment goes through the physical EDC (see edc-bridge/) instead of
+      // being auto-settled. The order stays PENDING/unpaid — the local
+      // edc-bridge daemon polls /api/edc-jobs, pushes the amount to the
+      // terminal, and PATCHing the job APPROVED is what actually settles
+      // the order (see /api/edc-jobs/[id] PATCH handler).
+      const { prisma } = await import("@/lib/db");
+      const edcJob = await prisma.edcJob.create({
+        data: { orderId: finalOrderId, amount: finalGrossAmount, status: "PENDING" },
+      });
+
+      return NextResponse.json({
+        simulated: false,
+        paymentMethod: "EDC_CARD",
+        orderId: finalOrderId,
+        orderNo: dbOrderNo || '',
+        queueNumber: dbQueueNumber || 0,
+        edcJobId: edcJob.id,
+      });
+    }
 
     // Payment gateway isn't wired up yet — settle immediately as a simulated
     // payment. The local Prisma mirror row createOrder() writes in the

@@ -47,6 +47,7 @@ model Order {
   items               OrderItem[]
   statusLogs          OrderStatusLog[]
   pointLedgerEntries  PointLedger[]
+  edcJobs             EdcJob[]
 
   @@index([stationId, createdAt])
   @@index([status])
@@ -166,6 +167,35 @@ model PrintJob {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  @@index([status])
+  @@index([createdAt])
+}
+
+// Cloud EDC Payment Queue — job dibuat saat checkout pilih "Bayar Kartu EDC", ditarik &
+// diproses oleh daemon lokal yang USB-connect ke terminal Ingenico fisik (lihat edc-bridge/),
+// hasil (approved/rejected) dilaporkan balik lewat PATCH. Beda dari PrintJob: orderId TIDAK
+// unik — customer bisa cancel/gagal lalu retry, tiap percobaan jadi row baru. Dedup cuma
+// mencegah 2 job PENDING/PROCESSING/APPROVED aktif bersamaan untuk order yang sama (lihat
+// POST /api/edc-jobs), bukan larangan permanen di level DB.
+model EdcJob {
+  id              String   @id @default(cuid())
+  orderId         String
+  amount          Int
+  status          String   @default("PENDING") // PENDING, PROCESSING, APPROVED, REJECTED, FAILED
+  approvalCode    String?
+  traceNumber     String?
+  cardType        String?
+  pan             String? // masked PAN dari EDC (mis. 553210************5437), bukan PAN penuh
+  responseCode    String?
+  rawResponseData String?
+  errorMessage    String?
+  attempts        Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
   @@index([status])
   @@index([createdAt])
 }

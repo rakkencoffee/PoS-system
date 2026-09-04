@@ -1,0 +1,12 @@
+# Copy this file to "daemon.config" (same folder) and fill in the values below.
+# daemon.config is gitignored — it holds a secret API key, never commit it.
+
+ApiBaseUrl=http://localhost:3000
+ApiKey=paste-EDC_BRIDGE_API_KEY-value-from-.env.local-here
+PollIntervalMs=3000
+
+# Set to false only for manual debugging when you want to actually SEE a native
+# Windows dialog from POS4CAT_Ctl.dll (e.g. "Error response from Host") instead of
+# it auto-closing. Keep true for unattended/production use — a blocking dialog
+# with no one to click OK freezes the daemon forever.
+AutoCloseDialogs=true

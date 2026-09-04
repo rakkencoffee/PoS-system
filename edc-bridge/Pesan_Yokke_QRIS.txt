@@ -1,0 +1,19 @@
+Halo tim Yokke,
+
+Kami sedang bangun aplikasi ECR sendiri (custom app C#/.NET) buat EDC Axium DX8000 kami, manggil langsung POS4CAT_Ctl.dll sesuai urutan resmi dari POS4EDC User Guide (COMCreate -> request -> COMStatus -> GetResponseCode/GetResponseData -> ServiceTerminate).
+
+MASALAH UTAMA: koneksi ECR-nya tidak stabil, terjadi bahkan pas kami test pakai POS4EDC_Test.exe (aplikasi resmi dari Yokke, bukan cuma aplikasi kami). Polanya:
+- Kadang ENQ terkirim tapi EDC tidak pernah balas ACK ("ACK Timeout" di catlog).
+- Kadang COMStatus() gagal dengan ret=-1 ("communication channel create fail") walau COM port/USB/driver semua normal di Device Manager.
+- Kami sempat berhasil dapat approval penuh (transaksi kartu approved, nota keluar) beberapa kali, tapi sesudahnya koneksi balik lagi tidak merespon tanpa perubahan apapun di sisi kami (kabel sama, PC sama, aplikasi sama).
+- "Fix" yang kami temukan sementara: masuk ke menu EDC Electronic Cash Register > Integrasi ECR Kabel, Disconnect lalu Connect lagi. Tapi ini juga tidak selalu berhasil — kadang tetap gagal walau sudah di-reconnect.
+
+Apakah ada yang bisa dicek dari sisi bank/terminal terkait stabilitas koneksi ECR ini? Atau ada setting/firmware/konfigurasi tertentu yang perlu disesuaikan?
+
+MASALAH KEDUA (QRIS): saat koneksi lagi stabil, kami coba generate QRIS (COMCreate -> MTIQRIS_MenuDomestic -> COMStatus -> GenQRIS -> COMStatus/GetResponseCode/GetResponseData -> ServiceTerminate), muncul "Error response from Host" dengan data:
+
+R86004906|72195653412||||||04 Sep 2026|14:15:34||0
+
+Field Status Transaksi kosong (bukan SUKSES), field Acquirer/Issuer/Merchant PAN juga kosong. Apakah QRIS memang belum diaktifkan/di-provisioning buat terminal ini?
+
+Terima kasih.

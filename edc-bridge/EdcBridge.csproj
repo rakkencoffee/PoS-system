@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PlatformTarget>x86</PlatformTarget>
+    <RootNamespace>EdcBridge</RootNamespace>
+    <UseWindowsForms>true</UseWindowsForms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="POS4CAT_Ctl.dll" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Property.dll" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="pos4cat.ini" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="daemon.config" CopyToOutputDirectory="PreserveNewest" Condition="Exists('daemon.config')" />
+    <None Include="daemon.config.example" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

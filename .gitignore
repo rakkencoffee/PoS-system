@@ -54,3 +54,15 @@ next-env.d.ts
 # credentials testing files
 test_env_fetch.mjs
 test_olsera_fetch.mjs
+
+# destructive one-time-use scripts (never commit)
+testing-dev/scripts/clear_test_data.ts
+
+# edc-bridge (.NET build artifacts + vendor DLLs + secret daemon config)
+edc-bridge/bin/
+edc-bridge/obj/
+edc-bridge/publish/
+edc-bridge/daemon.config
+edc-bridge/*.dll
+edc-bridge/pos4cat.ini
+edc-bridge/catlog/
