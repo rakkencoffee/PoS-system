@@ -14,11 +14,14 @@ namespace EdcBridge;
 // moment that timer was added. EnumWindows/PostMessage are safe to call cross-thread against
 // another thread's window, so a plain polling thread avoids touching that queue at all.
 //
-// Closes ANY #32770 dialog belonging to our own process — not just ones whose title
-// mentions "error". The DLL isn't only showing error dialogs (confirmed live: a plain
-// "Response Time Out" box, no "error" in its title, was seen slipping past the earlier
-// title filter). A background thread targeting only our own process's windows carries no
-// real risk of closing something unrelated.
+// Closes #32770 dialogs belonging to our own process that have an actual title — e.g.
+// "Error response from Host" or "Response Time Out". Deliberately skips untitled #32770
+// windows: closing ALL of them (no title filter at all) turned out to also catch a
+// title-less window the DLL creates as part of its normal internal wait/processing —
+// confirmed live, every single transaction started failing with a garbage COMStatus code
+// within ~100ms the moment that untitled window got closed, before the customer could ever
+// tap a card. A background thread targeting only our own process's windows carries no real
+// risk of closing something unrelated to this daemon.
 public sealed class DialogAutoCloser : IDisposable
 {
     private const string MessageBoxClassName = "#32770"; // standard Win32 dialog/MessageBox class
@@ -58,7 +61,10 @@ public sealed class DialogAutoCloser : IDisposable
 
             var titleBuf = new StringBuilder(256);
             GetWindowText(hWnd, titleBuf, titleBuf.Capacity);
-            Console.WriteLine($"[DialogAutoCloser] Auto-closing native dialog: \"{titleBuf}\"");
+            var title = titleBuf.ToString();
+            if (string.IsNullOrWhiteSpace(title)) return true; // internal/status window, not a real message
+
+            Console.WriteLine($"[DialogAutoCloser] Auto-closing native dialog: \"{title}\"");
             PostMessage(hWnd, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
             return true;
         }, IntPtr.Zero);
