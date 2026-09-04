@@ -409,15 +409,11 @@ async function createAndDispatchPrintJob(params: {
 
     console.log(`[PrintDispatch] Cloud Print Job created for ${orderId} with ${itemsPayload.length} items (from checkout data, ahead of Olsera sync).`);
 
-    try {
-      const { tryDirectPrint } = await import("@/lib/print/direct-print");
-      const printed = await tryDirectPrint(createdJob.station, printPayload);
-      if (printed) {
-        await prisma.printJob.update({ where: { id: createdJob.id }, data: { status: "PRINTED" } });
-      }
-    } catch (directPrintErr) {
-      console.warn("[PrintDispatch] Direct print attempt failed (non-blocking):", directPrintErr);
-    }
+    // No WiFi/direct-print send here anymore -- the kiosk receipt now prints
+    // straight over the tablet's own paired Bluetooth printer (checkout page,
+    // printViaBluetooth). This PrintJob row + the NEW_JOB broadcast below
+    // still has to happen: KDS Barista/Kitchen read PrintJob.payload for
+    // their own sticker printing, unrelated to this row's WiFi status.
 
     try {
       const { pusherServer } = await import("@/lib/pusher");
