@@ -11,9 +11,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Full ECR module per POS4EDC User Guide section 4 ("INFORMATION FOR ECR DEVELOPER"):
+         catlog, POS4CAT.exe, pos4cat.ini, POS4CAT_Ctl.dll, Property.dll must all ship together.
+         POS4CAT.exe and catlog/ were missing from every build before this one. -->
+    <None Include="POS4CAT.exe" CopyToOutputDirectory="PreserveNewest" />
     <None Include="POS4CAT_Ctl.dll" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Property.dll" CopyToOutputDirectory="PreserveNewest" />
     <None Include="pos4cat.ini" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="catlog\**" CopyToOutputDirectory="PreserveNewest" Condition="Exists('catlog')" />
     <None Include="daemon.config" CopyToOutputDirectory="PreserveNewest" Condition="Exists('daemon.config')" />
     <None Include="daemon.config.example" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
