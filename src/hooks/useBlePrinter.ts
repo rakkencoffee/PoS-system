@@ -47,11 +47,14 @@ export function useBlePrinter() {
     // Filtering by services: [UUID] would require the printer to advertise that
     // GATT service in its BLE advertisement packet -- confirmed via
     // src/app/debug/ble-test (since deleted) that neither the QPOS nor the
-    // iWare unit does this, they only advertise their local name. Filter by
-    // that name instead; optionalServices still grants access to the service
-    // once connected.
+    // iWare unit does this, they only advertise their local name. A
+    // namePrefix filter worked for the Kitchen/Barista iWare units (both
+    // "RPP...") but a second iWare unit bought for kiosk receipts turned out
+    // not to show up under that filter -- rather than guess at every
+    // possible BLE local name, show every nearby BLE device and let staff
+    // pick the right one by eye during pairing.
     const device = await navigator.bluetooth.requestDevice({
-      filters: [{ namePrefix: 'RPP' }],
+      acceptAllDevices: true,
       optionalServices: [BARISTA_PRINTER_SERVICE_UUID],
     });
 

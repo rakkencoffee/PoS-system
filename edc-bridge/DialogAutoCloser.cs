@@ -14,9 +14,11 @@ namespace EdcBridge;
 // moment that timer was added. EnumWindows/PostMessage are safe to call cross-thread against
 // another thread's window, so a plain polling thread avoids touching that queue at all.
 //
-// Only closes dialogs whose title contains "error" — narrower than "any #32770 window
-// belonging to us" so we don't risk closing some other dialog that's part of a normal,
-// legitimate step in the DLL's flow.
+// Closes ANY #32770 dialog belonging to our own process — not just ones whose title
+// mentions "error". The DLL isn't only showing error dialogs (confirmed live: a plain
+// "Response Time Out" box, no "error" in its title, was seen slipping past the earlier
+// title filter). A background thread targeting only our own process's windows carries no
+// real risk of closing something unrelated.
 public sealed class DialogAutoCloser : IDisposable
 {
     private const string MessageBoxClassName = "#32770"; // standard Win32 dialog/MessageBox class
@@ -25,7 +27,7 @@ public sealed class DialogAutoCloser : IDisposable
     private readonly Thread _thread;
     private volatile bool _stop;
 
-    public DialogAutoCloser(int pollIntervalMs = 250)
+    public DialogAutoCloser(int pollIntervalMs = 100)
     {
         _thread = new Thread(() => PollLoop(pollIntervalMs)) { IsBackground = true };
         _thread.Start();
@@ -37,11 +39,11 @@ public sealed class DialogAutoCloser : IDisposable
         {
             Thread.Sleep(pollIntervalMs);
             if (_stop) return;
-            CloseErrorDialogs();
+            CloseOwnDialogs();
         }
     }
 
-    private static void CloseErrorDialogs()
+    private static void CloseOwnDialogs()
     {
         var ownProcessId = (uint)Environment.ProcessId;
 
@@ -56,10 +58,7 @@ public sealed class DialogAutoCloser : IDisposable
 
             var titleBuf = new StringBuilder(256);
             GetWindowText(hWnd, titleBuf, titleBuf.Capacity);
-            var title = titleBuf.ToString();
-            if (!title.Contains("error", StringComparison.OrdinalIgnoreCase)) return true;
-
-            Console.WriteLine($"[DialogAutoCloser] Auto-closing native dialog: \"{title}\"");
+            Console.WriteLine($"[DialogAutoCloser] Auto-closing native dialog: \"{titleBuf}\"");
             PostMessage(hWnd, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
             return true;
         }, IntPtr.Zero);
