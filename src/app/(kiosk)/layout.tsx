@@ -1,8 +1,12 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { captureStationFromUrl, getStation } from '@/lib/station';
+import { useCartStore } from '@/stores/useCartStore';
+
+const IDLE_TIMEOUT_MS = 2 * 60 * 1000;
+const IDLE_EVENTS = ['pointerdown', 'touchstart', 'keydown'] as const;
 
 export default function KioskLayout({
   children,
@@ -10,13 +14,40 @@ export default function KioskLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const isLandingPage = pathname === '/';
   const [station, setStation] = useState<string | null>(null);
+  const clearCart = useCartStore((state) => state.clearCart);
 
   useEffect(() => {
     captureStationFromUrl();
     setStation(getStation());
   }, []);
+
+  // Return an idle customer to the welcome screen so the next customer never
+  // inherits an abandoned cart. Skipped on /checkout — an EDC transaction can
+  // sit waiting on the physical terminal for a while with zero screen touches,
+  // and navigating away mid-payment would abandon it.
+  useEffect(() => {
+    if (isLandingPage || pathname === '/checkout') return;
+
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const resetTimer = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        clearCart();
+        router.push('/');
+      }, IDLE_TIMEOUT_MS);
+    };
+
+    IDLE_EVENTS.forEach((event) => window.addEventListener(event, resetTimer));
+    resetTimer();
+
+    return () => {
+      clearTimeout(timeoutId);
+      IDLE_EVENTS.forEach((event) => window.removeEventListener(event, resetTimer));
+    };
+  }, [pathname, isLandingPage, clearCart, router]);
 
   return (
     <>
