@@ -326,9 +326,8 @@ async function createAndDispatchPrintJob(params: {
     options?: any;
   }[];
   discountAmount?: number;
-  station?: string | null;
 }): Promise<void> {
-  const { orderId, queueNumber, customerName, items, discountAmount = 0, station } = params;
+  const { orderId, queueNumber, customerName, items, discountAmount = 0 } = params;
   const { prisma } = await import("@/lib/db");
 
   try {
@@ -396,7 +395,6 @@ async function createAndDispatchPrintJob(params: {
           orderId,
           payload: printPayload,
           status: "PENDING",
-          station: station || null,
         },
       });
     } catch (createErr) {
@@ -467,7 +465,6 @@ export async function createOrder(
   discountAmount: number = 0,
   voucherCode?: string,
   customerPhone?: string,
-  station?: string | null,
 ): Promise<{ orderId: string; olseraOrderId?: number; orderNo?: string; queueNumber?: number; itemSyncPromise?: Promise<void> }> {
   if (USE_OLSERA) {
     // CRM (F5): if the customer left a phone number, try to match an existing
@@ -517,7 +514,6 @@ export async function createOrder(
         data: {
           id: `OLSERA-${orderId}`,
           stationId: "KIOSK",
-          printStation: station || null,
           cashierId: "cmo83g6140000vq5g10u03858",
           queueNumber: queueNum || null,
           total: 0,
@@ -538,7 +534,6 @@ export async function createOrder(
         customerName,
         items,
         discountAmount,
-        station,
       })
     );
 
@@ -771,7 +766,6 @@ export async function createOrder(
           create: {
             id: `OLSERA-${orderId}`,
             stationId: "KIOSK", // Kiosk self-service
-            printStation: station || null,
             cashierId: "cmo83g6140000vq5g10u03858", // Valid system user for Kiosk sync
             queueNumber: queueNum || null,
             total: finalTotal,

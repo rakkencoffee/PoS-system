@@ -9,7 +9,6 @@ import { CartItem } from '@/lib/types';
 import { KioskHeader } from '@/components/kiosk/KioskHeader';
 import { EdcPaymentFlow } from '@/components/kiosk/EdcPaymentFlow';
 import { getKioskPrinter } from '@/components/kiosk/KioskPrinterPairing';
-import { getStation } from '@/lib/station';
 import { buildBagOrderItems, calculateBagTotal } from '@/lib/bag-options';
 import * as Sentry from "@sentry/nextjs";
 
@@ -175,7 +174,6 @@ export default function CheckoutNewPage() {
         customerName: customerName,
         customerPhone: customerPhone,
         voucherCode: appliedDiscount > 0 ? voucherCode : undefined,
-        station: getStation(),
         paymentMethod,
       });
 

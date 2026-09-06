@@ -17,7 +17,7 @@ import { NextRequest, NextResponse } from "next/server";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { items, totalAmount, customerName, customerPhone, discountAmount, voucherCode, station, paymentMethod } =
+    const { items, totalAmount, customerName, customerPhone, discountAmount, voucherCode, paymentMethod } =
       body;
     const isEdcCard = paymentMethod === "EDC_CARD";
 
@@ -52,8 +52,7 @@ export async function POST(request: NextRequest) {
         customerName,
         discountAmount || 0,
         voucherCode,
-        customerPhone,
-        station
+        customerPhone
       );
       dbOrderId = adapterOrder.orderId;
       dbOrderNo = adapterOrder.orderNo || null;

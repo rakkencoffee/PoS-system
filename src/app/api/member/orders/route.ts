@@ -36,8 +36,7 @@ export async function POST(request: NextRequest) {
       member.name,
       0, // discountAmount — reward redemption (Bab 5) not wired to this endpoint yet
       undefined, // voucherCode
-      member.phone,
-      null // station — no physical kiosk tablet for Member App orders
+      member.phone
     );
 
     // createOrder() creates the local Order row without knowing about

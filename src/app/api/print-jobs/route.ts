@@ -51,7 +51,6 @@ export async function POST(request: NextRequest) {
           orderId: dbOrderId,
           payload: payload, // Store entire PrintReceiptData as JSON
           status: 'PENDING',
-          station: payload.station || null,
         }
       });
     } catch (createErr) {
@@ -71,18 +70,6 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`[PrintQueue] ✅ Job created: ${job.id} for order ${payload.orderId}`);
-
-    // Stations configured in STATION_PRINTER_MAP skip the local daemon
-    // entirely — send straight from the server.
-    try {
-      const { tryDirectPrint } = await import('@/lib/print/direct-print');
-      const printed = await tryDirectPrint(job.station, payload);
-      if (printed) {
-        await prisma.printJob.update({ where: { id: job.id }, data: { status: 'PRINTED' } });
-      }
-    } catch (directPrintErr) {
-      console.warn('[PrintQueue] Direct print attempt failed (non-blocking):', directPrintErr);
-    }
 
     // Nudge the print-bridge daemon to check right away instead of waiting
     // for its next poll tick. Non-fatal — the daemon's own polling loop is
