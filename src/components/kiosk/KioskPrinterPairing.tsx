@@ -1,36 +1,22 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useBlePrinter } from '@/hooks/useBlePrinter';
+import { useKioskPrinterContext } from './KioskPrinterProvider';
 
 /**
  * Small, low-key tap target for pairing the kiosk's own receipt printer over
  * Web Bluetooth — a muted dot next to the cart button, not a fully invisible
  * hitbox (that made it impossible for staff to find/tap reliably on a real
  * touchscreen during setup). Still easy to overlook for customers who aren't
- * looking for it. Auto-reconnects silently on every page load once paired
- * once, so this only needs a real tap the first time or after a printer
- * power-cycle.
+ * looking for it.
  *
- * The BLE connection itself is owned here and exposed via a tiny global so
- * the checkout/success flow (a different route/component tree) can print
- * through the SAME live GATT connection without re-pairing or lifting this
- * state into a page-level provider.
+ * This component itself remounts on every page (menu/cart/checkout each
+ * render their own KioskHeader), so it must NOT own the BLE connection —
+ * the actual useBlePrinter() instance lives once in KioskPrinterProvider
+ * (mounted in (kiosk)/layout.tsx, which survives navigation), and this is
+ * just a presentational consumer of that shared, persistent connection.
  */
 export function KioskPrinterPairing() {
-  const { connected, connect, tryAutoReconnect, writeBytes } = useBlePrinter();
-
-  useEffect(() => {
-    tryAutoReconnect().catch((err) => console.warn('[KioskPrinterPairing] Auto-reconnect failed:', err));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Read via getKioskPrinter() from the checkout page's own submit handler,
-  // BEFORE navigating to /success — this component only lives on pages that
-  // render KioskHeader, so the print attempt must happen while still here.
-  useEffect(() => {
-    (window as any).__kioskPrinter = connected ? { writeBytes } : null;
-  }, [connected, writeBytes]);
+  const { connected, connect } = useKioskPrinterContext();
 
   const handleClick = () => {
     if (connected) return; // already paired — nothing for staff to do here

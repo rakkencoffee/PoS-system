@@ -67,24 +67,26 @@ export function KioskHeader({
         </div>
       </div>
 
-      <KioskPrinterPairing />
+      {/* Printer pairing + Cart, grouped together at the far right */}
+      <div className="flex items-center gap-3">
+        <KioskPrinterPairing />
 
-      {/* Cart */}
-      <button
-        onClick={() => router.push('/cart')}
-        className="relative flex items-center gap-2 px-4 py-2 rounded-xl border border-[#e5e5e5] bg-white hover:bg-[#F5F5F5] transition-colors active:scale-95 text-[#323131] font-[500] text-[14px]"
-        style={JKT}
-      >
-        <svg className="w-5 h-5" style={{ color: '#78000f' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
-        </svg>
-        Cart
-        {itemCount > 0 && (
-          <span className="bg-[#78000f] text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full" style={JKT}>
-            {itemCount}
-          </span>
-        )}
-      </button>
+        <button
+          onClick={() => router.push('/cart')}
+          className="relative flex items-center gap-2 px-4 py-2 rounded-xl border border-[#e5e5e5] bg-white hover:bg-[#F5F5F5] transition-colors active:scale-95 text-[#323131] font-[500] text-[14px]"
+          style={JKT}
+        >
+          <svg className="w-5 h-5" style={{ color: '#78000f' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
+          </svg>
+          Cart
+          {itemCount > 0 && (
+            <span className="bg-[#78000f] text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full" style={JKT}>
+              {itemCount}
+            </span>
+          )}
+        </button>
+      </div>
     </header>
   );
 }

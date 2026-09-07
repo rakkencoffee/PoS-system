@@ -4,6 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { useCartStore } from '@/stores/useCartStore';
 import { getKioskDeviceId } from '@/lib/kiosk-device';
+import { KioskPrinterProvider } from '@/components/kiosk/KioskPrinterProvider';
 
 const IDLE_TIMEOUT_MS = 2 * 60 * 1000;
 const IDLE_EVENTS = ['pointerdown', 'touchstart', 'keydown'] as const;
@@ -65,7 +66,7 @@ export default function KioskLayout({
         }}
       >
         <div className="relative z-10">
-          {children}
+          <KioskPrinterProvider>{children}</KioskPrinterProvider>
         </div>
       </div>
     </>
