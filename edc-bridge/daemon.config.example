@@ -5,6 +5,13 @@ ApiBaseUrl=http://localhost:3000
 ApiKey=paste-EDC_BRIDGE_API_KEY-value-from-.env.local-here
 PollIntervalMs=3000
 
+# Which kiosk device this daemon belongs to — must match the ?device= value
+# in that device's kiosk URL (e.g. https://menu.rakkencoffee.com/menu?device=A).
+# Required once more than one physical EDC is in use, otherwise two daemons
+# can grab the same pending job and prompt two different terminals for the
+# same order. Leave blank only when there is a single EDC in play (testing).
+DeviceId=A
+
 # Set to false only for manual debugging when you want to actually SEE a native
 # Windows dialog from POS4CAT_Ctl.dll (e.g. "Error response from Host") instead of
 # it auto-closing. Keep true for unattended/production use — a blocking dialog

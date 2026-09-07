@@ -17,7 +17,7 @@ import { NextRequest, NextResponse } from "next/server";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { items, totalAmount, customerName, customerPhone, discountAmount, voucherCode, paymentMethod } =
+    const { items, totalAmount, customerName, customerPhone, discountAmount, voucherCode, paymentMethod, deviceId } =
       body;
     const isEdcCard = paymentMethod === "EDC_CARD";
 
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
       // the order (see /api/edc-jobs/[id] PATCH handler).
       const { prisma } = await import("@/lib/db");
       const edcJob = await prisma.edcJob.create({
-        data: { orderId: finalOrderId, amount: finalGrossAmount, status: "PENDING" },
+        data: { orderId: finalOrderId, amount: finalGrossAmount, status: "PENDING", deviceId: deviceId || null },
       });
 
       return NextResponse.json({

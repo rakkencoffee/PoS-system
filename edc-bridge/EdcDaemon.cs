@@ -53,8 +53,12 @@ public sealed class EdcDaemon
 
     private async Task PollOnceAsync(CancellationToken cancellationToken)
     {
+        var query = "/api/edc-jobs?status=PENDING&limit=1";
+        if (!string.IsNullOrEmpty(_config.DeviceId))
+            query += $"&deviceId={Uri.EscapeDataString(_config.DeviceId)}";
+
         var response = await _http.GetFromJsonAsync<EdcJobsResponse>(
-            "/api/edc-jobs?status=PENDING&limit=1", JsonOptions, cancellationToken);
+            query, JsonOptions, cancellationToken);
 
         var job = response?.Jobs?.FirstOrDefault();
         if (job is null) return;

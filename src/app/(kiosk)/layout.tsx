@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { useCartStore } from '@/stores/useCartStore';
+import { getKioskDeviceId } from '@/lib/kiosk-device';
 
 const IDLE_TIMEOUT_MS = 2 * 60 * 1000;
 const IDLE_EVENTS = ['pointerdown', 'touchstart', 'keydown'] as const;
@@ -16,6 +17,14 @@ export default function KioskLayout({
   const router = useRouter();
   const isLandingPage = pathname === '/';
   const clearCart = useCartStore((state) => state.clearCart);
+
+  // Capture ?device=A/B/C once so it survives client-side navigation to
+  // routes (like /checkout) that don't carry the query string — this is what
+  // lets the EDC job land on this device's own physical terminal instead of
+  // whichever of the 3 daemons happens to poll first.
+  useEffect(() => {
+    getKioskDeviceId();
+  }, []);
 
   // Return an idle customer to the welcome screen so the next customer never
   // inherits an abandoned cart. Skipped on /checkout — an EDC transaction can

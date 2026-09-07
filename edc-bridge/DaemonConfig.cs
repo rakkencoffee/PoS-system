@@ -7,6 +7,14 @@ public sealed record DaemonConfig
     public int PollIntervalMs { get; init; } = 3000;
     public bool AutoCloseDialogs { get; init; } = true;
 
+    // Which physical kiosk device (and therefore which physical EDC terminal)
+    // this daemon instance belongs to — must match the ?device= value that
+    // device's kiosk browser sends. Null = accept jobs from any device (fine
+    // when there's only one EDC in play, e.g. local testing); once more than
+    // one EDC is live, every daemon.config needs its own DeviceId or two
+    // daemons can end up racing for the same job.
+    public string? DeviceId { get; init; }
+
     private const string FileName = "daemon.config";
 
     // Simple KEY=VALUE lines, one per line — same spirit as pos4cat.ini, no extra
@@ -46,12 +54,15 @@ public sealed record DaemonConfig
         if (values.TryGetValue("AutoCloseDialogs", out var autoCloseStr) && bool.TryParse(autoCloseStr, out var autoCloseParsed))
             autoCloseDialogs = autoCloseParsed;
 
+        values.TryGetValue("DeviceId", out var deviceId);
+
         return new DaemonConfig
         {
             ApiBaseUrl = apiBaseUrl.TrimEnd('/'),
             ApiKey = apiKey,
             PollIntervalMs = pollIntervalMs,
             AutoCloseDialogs = autoCloseDialogs,
+            DeviceId = string.IsNullOrWhiteSpace(deviceId) ? null : deviceId,
         };
     }
 }

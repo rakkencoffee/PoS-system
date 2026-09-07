@@ -10,6 +10,7 @@ import { KioskHeader } from '@/components/kiosk/KioskHeader';
 import { EdcPaymentFlow } from '@/components/kiosk/EdcPaymentFlow';
 import { getKioskPrinter } from '@/components/kiosk/KioskPrinterPairing';
 import { buildBagOrderItems, calculateBagTotal } from '@/lib/bag-options';
+import { getKioskDeviceId } from '@/lib/kiosk-device';
 import * as Sentry from "@sentry/nextjs";
 
 function buildOrderItems(items: CartItem[]) {
@@ -175,6 +176,7 @@ export default function CheckoutNewPage() {
         customerPhone: customerPhone,
         voucherCode: appliedDiscount > 0 ? voucherCode : undefined,
         paymentMethod,
+        deviceId: getKioskDeviceId(),
       });
 
       if (paymentMethod === 'EDC_CARD') {

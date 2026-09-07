@@ -11,11 +11,11 @@ const EDC_BRIDGE_API_KEY = process.env.EDC_BRIDGE_API_KEY || '';
  * daemon (USB-connected to the physical Ingenico terminal) polls for it,
  * pushes the amount to the EDC, and reports the result back via PATCH.
  *
- * Body: { orderId: string, amount: number }
+ * Body: { orderId: string, amount: number, deviceId?: string }
  */
 export async function POST(request: NextRequest) {
   try {
-    const { orderId, amount } = await request.json();
+    const { orderId, amount, deviceId } = await request.json();
 
     if (!orderId || typeof amount !== 'number' || amount <= 0) {
       return NextResponse.json(
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     }
 
     const job = await prisma.edcJob.create({
-      data: { orderId, amount, status: 'PENDING' },
+      data: { orderId, amount, status: 'PENDING', deviceId: deviceId || null },
     });
 
     console.log(`[EdcQueue] Job created: ${job.id} for order ${orderId} (Rp${amount})`);
@@ -58,6 +58,11 @@ export async function POST(request: NextRequest) {
  * Query params:
  *   status (optional) — filter by status, defaults to "PENDING"
  *   limit (optional) — max number of jobs to return, defaults to 5
+ *   deviceId (optional) — only jobs created by this kiosk device. Each
+ *     daemon.config sets its own DeviceId so a device with 3 independent
+ *     EDC terminals doesn't have its 3 daemons race each other for the
+ *     same job (see edc-bridge/EdcDaemon.cs). Omitted = any device (used
+ *     for local single-EDC testing).
  */
 export async function GET(request: NextRequest) {
   const apiKey = request.headers.get('x-api-key');
@@ -69,9 +74,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') || 'PENDING';
     const limit = parseInt(searchParams.get('limit') || '5');
+    const deviceId = searchParams.get('deviceId');
 
     const jobs = await prisma.edcJob.findMany({
-      where: { status },
+      where: deviceId ? { status, deviceId } : { status },
       orderBy: { createdAt: 'asc' }, // FIFO — oldest first
       take: limit,
     });
