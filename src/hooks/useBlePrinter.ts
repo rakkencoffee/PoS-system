@@ -33,10 +33,15 @@ export function useBlePrinter() {
     setDeviceName(device.name || 'Printer');
     setConnected(true);
 
+    // { once: true } so this doesn't accumulate a fresh listener on every
+    // reconnect -- relevant now that KioskPrinterProvider retries
+    // tryAutoReconnect() every 30s while disconnected, which could otherwise
+    // pile up listeners over a kiosk's all-day uptime if the printer cycles
+    // disconnect/reconnect repeatedly.
     device.addEventListener('gattserverdisconnected', () => {
       characteristicRef.current = null;
       setConnected(false);
-    });
+    }, { once: true });
   }, []);
 
   const connect = useCallback(async () => {

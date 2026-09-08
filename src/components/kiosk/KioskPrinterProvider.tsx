@@ -31,6 +31,22 @@ export function KioskPrinterProvider({ children }: { children: React.ReactNode }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Background self-heal: a BLE printer left idle (e.g. the 2-minute
+  // idle-timeout that returns the kiosk to the welcome screen, see
+  // (kiosk)/layout.tsx) commonly disconnects on its own -- confirmed live
+  // 2026-09-08, header icon goes grey. Without this, `connected` just stays
+  // false until the next checkout's printViaBluetooth() retries it right
+  // before printing (still there as a fallback) -- this instead keeps
+  // retrying every 30s in the background so the printer is very likely
+  // already reconnected well before the next customer reaches checkout.
+  useEffect(() => {
+    if (connected) return;
+    const interval = setInterval(() => {
+      tryAutoReconnect().catch(() => {});
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [connected, tryAutoReconnect]);
+
   // Read via getKioskPrinter() from the checkout page's own submit handler,
   // before navigating to /success.
   useEffect(() => {
