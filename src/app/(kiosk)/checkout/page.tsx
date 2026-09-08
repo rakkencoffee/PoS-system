@@ -8,7 +8,7 @@ import { db, encryptPendingOrder } from '@/lib/dexie';
 import { CartItem } from '@/lib/types';
 import { KioskHeader } from '@/components/kiosk/KioskHeader';
 import { EdcPaymentFlow } from '@/components/kiosk/EdcPaymentFlow';
-import { getKioskPrinter } from '@/components/kiosk/KioskPrinterPairing';
+import { getKioskPrinter, tryReconnectKioskPrinter } from '@/components/kiosk/KioskPrinterPairing';
 import { buildBagOrderItems, calculateBagTotal } from '@/lib/bag-options';
 import { getKioskDeviceId } from '@/lib/kiosk-device';
 import * as Sentry from "@sentry/nextjs";
@@ -119,8 +119,15 @@ export default function CheckoutNewPage() {
   }, [itemCount, router]);
 
   const printViaBluetooth = async (data: { orderId: string; queueNumber?: number; orderNo?: string }) => {
-    const printer = getKioskPrinter();
-    if (!printer) return false; // not paired on this tablet — success page's cloud queue fallback handles it
+    let printer = getKioskPrinter();
+    if (!printer) {
+      // GATT connection may have dropped from sitting idle (e.g. a long EDC
+      // troubleshooting wait) even though the tablet was paired earlier this
+      // session — try one silent reconnect before giving up.
+      await tryReconnectKioskPrinter();
+      printer = getKioskPrinter();
+    }
+    if (!printer) return false; // still not connected — success page's fallback message handles it
 
     try {
       const res = await fetch('/api/kiosk/receipt', {

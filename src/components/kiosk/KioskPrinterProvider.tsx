@@ -37,6 +37,19 @@ export function KioskPrinterProvider({ children }: { children: React.ReactNode }
     (window as any).__kioskPrinter = connected ? { writeBytes } : null;
   }, [connected, writeBytes]);
 
+  // Exposed so checkout's printViaBluetooth() can attempt one silent
+  // reconnect right before printing, not just at initial page load. A BLE
+  // GATT connection left idle for several minutes (e.g. an EDC transaction
+  // that needed manual troubleshooting) can disconnect on its own --
+  // confirmed live 2026-09-08: the printer showed "paired" in the header,
+  // but writeBytes() failed because `connected` had already flipped to
+  // false via the gattserverdisconnected listener in useBlePrinter, and
+  // this component's own auto-reconnect only ever runs once (didAutoReconnect
+  // guard above), so nothing brought the connection back before that print.
+  useEffect(() => {
+    (window as any).__kioskPrinterReconnect = tryAutoReconnect;
+  }, [tryAutoReconnect]);
+
   return (
     <KioskPrinterContext.Provider value={{ connected, connect }}>
       {children}
