@@ -63,6 +63,13 @@ export function EdcPaymentFlow({ orderId, amount, method = 'CARD', onApproved, o
   const [isChecking, setIsChecking] = useState(false);
   const [recheckMessage, setRecheckMessage] = useState<string | null>(null);
   const stopPollingRef = useRef(false);
+  const hasApprovedRef = useRef(false);
+
+  const handleApproved = () => {
+    if (hasApprovedRef.current) return; // poll() and the Pusher push can both fire
+    hasApprovedRef.current = true;
+    onApproved();
+  };
 
   const poll = async () => {
     stopPollingRef.current = false;
@@ -79,7 +86,7 @@ export function EdcPaymentFlow({ orderId, amount, method = 'CARD', onApproved, o
         const data: EdcJobStatusResponse = await res.json();
 
         if (data.status === 'APPROVED') {
-          onApproved();
+          handleApproved();
           return;
         }
         if (data.status === 'REJECTED' || data.status === 'FAILED') {
@@ -106,6 +113,30 @@ export function EdcPaymentFlow({ orderId, amount, method = 'CARD', onApproved, o
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
 
+  // Independent of poll() -- which exits permanently on the first
+  // FAILED/REJECTED read (see FAILURE_COPY comment above) -- so staff
+  // flipping a job to APPROVED afterward via ResolveEdcJob.ps1 (once
+  // they've confirmed the physical EDC receipt) still reaches this tab
+  // instantly, without needing the "Cek Status Lagi" fallback button.
+  useEffect(() => {
+    let channel: ReturnType<import('pusher-js').default['subscribe']> | null = null;
+    let pusher: import('pusher-js').default | null = null;
+
+    (async () => {
+      const { getPusherClient } = await import('@/lib/pusher');
+      pusher = getPusherClient();
+      channel = pusher.subscribe(`edc-job-${orderId}`);
+      channel.bind('STATUS_UPDATE', (data: { status: EdcJobStatus }) => {
+        if (data.status === 'APPROVED') handleApproved();
+      });
+    })();
+
+    return () => {
+      channel?.unsubscribe();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderId]);
+
   // One-shot re-check of the SAME job's status -- unlike handleRetry, this never
   // creates a new EdcJob (no re-charge risk). For staff to use after manually
   // resolving a job via ResolveEdcJob.ps1 once they've confirmed the physical
@@ -120,7 +151,7 @@ export function EdcPaymentFlow({ orderId, amount, method = 'CARD', onApproved, o
       if (res.ok) {
         const data: EdcJobStatusResponse = await res.json();
         if (data.status === 'APPROVED') {
-          onApproved();
+          handleApproved();
           return;
         }
       }

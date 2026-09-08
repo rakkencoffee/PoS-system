@@ -69,6 +69,20 @@ export async function PATCH(
       await posAdapter.updateOrderPaymentStatus(job.orderId, 'paid', job.amount, 'edc_bridge');
     }
 
+    // Push the new status straight to whatever kiosk tab is showing this
+    // job's EdcPaymentFlow. Its own poll() loop exits permanently the first
+    // time it reads FAILED/REJECTED (see EdcPaymentFlow.tsx) -- without this,
+    // staff manually flipping a genuinely-successful job to APPROVED via
+    // ResolveEdcJob.ps1 had no way to reach that tab except a manual "Cek
+    // Status Lagi" click. Best-effort: if this fails, the manual recheck
+    // button is still there as a fallback.
+    try {
+      const { pusherServer } = await import('@/lib/pusher');
+      await pusherServer.trigger(`edc-job-${job.orderId}`, 'STATUS_UPDATE', { status: job.status });
+    } catch (err) {
+      console.warn(`[EdcQueue] Failed to broadcast STATUS_UPDATE for job ${id}:`, err);
+    }
+
     return NextResponse.json({
       id: job.id,
       status: job.status,
