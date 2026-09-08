@@ -120,12 +120,15 @@ export default function CheckoutNewPage() {
 
   const printViaBluetooth = async (data: { orderId: string; queueNumber?: number; orderNo?: string }) => {
     let printer = getKioskPrinter();
-    if (!printer) {
-      // GATT connection may have dropped from sitting idle (e.g. a long EDC
-      // troubleshooting wait) even though the tablet was paired earlier this
-      // session — try one silent reconnect before giving up.
+    // GATT connection may have dropped from sitting idle (idle-timeout wait,
+    // a long EDC troubleshooting wait, etc.) even though the tablet was
+    // paired earlier this session — retry a few times (a single attempt
+    // right when a real BLE reconnect is still settling can lose the race)
+    // before giving up on this print.
+    for (let attempt = 0; !printer && attempt < 3; attempt++) {
       await tryReconnectKioskPrinter();
       printer = getKioskPrinter();
+      if (!printer) await new Promise((r) => setTimeout(r, 1500));
     }
     if (!printer) return false; // still not connected — success page's fallback message handles it
 

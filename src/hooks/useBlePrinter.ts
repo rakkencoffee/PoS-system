@@ -21,6 +21,14 @@ export function useBlePrinter() {
   const [connected, setConnected] = useState(false);
   const [deviceName, setDeviceName] = useState<string | null>(null);
   const characteristicRef = useRef<BluetoothRemoteGATTCharacteristic | null>(null);
+  // Guards against two reconnect attempts racing each other -- e.g.
+  // KioskPrinterProvider's 30s background retry and checkout's print-time
+  // retry both firing close together. Two concurrent device.gatt.connect()
+  // calls on the same device commonly both fail with "GATT operation
+  // already in progress" on real hardware -- confirmed live 2026-09-08 as
+  // the likely cause of a reconnect silently failing right when a customer
+  // was mid-checkout. Every caller now shares one in-flight attempt instead.
+  const reconnectingRef = useRef<Promise<boolean> | null>(null);
 
   const bindDevice = useCallback(async (device: BluetoothDevice) => {
     const server = await device.gatt?.connect();
@@ -76,18 +84,29 @@ export function useBlePrinter() {
    * support the persistent-permissions API (navigator.bluetooth.getDevices).
    */
   const tryAutoReconnect = useCallback(async () => {
-    if (!navigator.bluetooth?.getDevices) return false;
+    if (reconnectingRef.current) return reconnectingRef.current;
 
-    const devices = await navigator.bluetooth.getDevices();
-    for (const device of devices) {
-      try {
-        await bindDevice(device);
-        return true;
-      } catch {
-        // try the next previously-paired device, if any
+    const attempt = (async () => {
+      if (!navigator.bluetooth?.getDevices) return false;
+
+      const devices = await navigator.bluetooth.getDevices();
+      for (const device of devices) {
+        try {
+          await bindDevice(device);
+          return true;
+        } catch (err) {
+          console.warn(`[useBlePrinter] Reconnect failed for "${device.name}":`, err);
+        }
       }
+      return false;
+    })();
+
+    reconnectingRef.current = attempt;
+    try {
+      return await attempt;
+    } finally {
+      reconnectingRef.current = null;
     }
-    return false;
   }, [bindDevice]);
 
   const disconnect = useCallback(() => {

@@ -42,8 +42,8 @@ export function KioskPrinterProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     if (connected) return;
     const interval = setInterval(() => {
-      tryAutoReconnect().catch(() => {});
-    }, 30_000);
+      tryAutoReconnect().catch((err) => console.warn('[KioskPrinterProvider] Background reconnect failed:', err));
+    }, 10_000);
     return () => clearInterval(interval);
   }, [connected, tryAutoReconnect]);
 
