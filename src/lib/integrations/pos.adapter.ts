@@ -405,23 +405,41 @@ async function createAndDispatchPrintJob(params: {
       throw createErr;
     }
 
-    console.log(`[PrintDispatch] Cloud Print Job created for ${orderId} with ${itemsPayload.length} items (from checkout data, ahead of Olsera sync).`);
+    console.log(`[PrintDispatch] Print job row created for ${orderId} with ${itemsPayload.length} items (from checkout data, ahead of Olsera sync).`);
 
-    // No WiFi/direct-print send here anymore -- the kiosk receipt now prints
-    // straight over the tablet's own paired Bluetooth printer (checkout page,
-    // printViaBluetooth). This PrintJob row + the NEW_JOB broadcast below
-    // still has to happen: KDS Barista/Kitchen read PrintJob.payload for
-    // their own sticker printing, unrelated to this row's WiFi status.
-
-    try {
-      const { pusherServer } = await import("@/lib/pusher");
-      await pusherServer.trigger("print-queue", "NEW_JOB", { jobId: createdJob.id });
-      console.log(`[PrintDispatch] NEW_JOB broadcast sent for job ${createdJob.id}`);
-    } catch (printPusherErr) {
-      console.warn("[PrintDispatch] Failed to broadcast NEW_JOB (non-blocking):", printPusherErr);
-    }
+    // Deliberately NOT broadcasting NEW_JOB here -- this runs at checkout
+    // time, before EDC_CARD/EDC_QRIS payment has even started, and
+    // StationPrinterPanel prints the instant it receives this event. Creating
+    // the row now (so it's ready with full item/customization data) is
+    // harmless; broadcasting from here would print a sticker for an order
+    // nobody has paid for yet (confirmed live 2026-09-08). The broadcast is
+    // sent separately by triggerPrintJobBroadcast(), called only once
+    // updateOrderPaymentStatus() confirms the order actually got paid.
   } catch (err) {
     console.warn(`[PrintDispatch] Failed to create/dispatch print job for ${orderId}:`, err);
+  }
+}
+
+// Fires the NEW_JOB broadcast for an already-created PrintJob row -- the
+// actual trigger StationPrinterPanel (Barista/Kitchen) reacts to by printing.
+// Split out from createAndDispatchPrintJob() so the row can be prepared at
+// checkout time (full item/customization data on hand) while the broadcast
+// itself waits until payment is actually confirmed. Called from
+// updateOrderPaymentStatus()'s "paid" branch, which covers both the
+// immediate-settle and EDC/QRIS-approved paths.
+export async function triggerPrintJobBroadcast(orderId: string): Promise<void> {
+  const { prisma } = await import("@/lib/db");
+  try {
+    const job = await prisma.printJob.findFirst({ where: { orderId, status: "PENDING" } });
+    if (!job) {
+      console.warn(`[PrintDispatch] No pending print job found for ${orderId} to broadcast.`);
+      return;
+    }
+    const { pusherServer } = await import("@/lib/pusher");
+    await pusherServer.trigger("print-queue", "NEW_JOB", { jobId: job.id });
+    console.log(`[PrintDispatch] NEW_JOB broadcast sent for job ${job.id} (order ${orderId} confirmed paid)`);
+  } catch (err) {
+    console.warn(`[PrintDispatch] Failed to broadcast NEW_JOB for ${orderId}:`, err);
   }
 }
 
@@ -995,11 +1013,12 @@ export async function updateOrderPaymentStatus(
             metadata: { paymentAmount, olseraOrderId, ...extraMetadata },
           });
 
-          // Print job creation used to happen here, after waiting for
-          // createOrder's background Olsera item sync to land locally --
-          // moved to createAndDispatchPrintJob(), fired right after order
-          // creation instead (see createOrder, step 2.6), since printing
-          // never actually needed Olsera-synced data in the first place.
+          // The print job row itself was already created at checkout time
+          // (createOrder, step 2.6) so it has full item/customization data —
+          // this is the actual print trigger, fired only now that payment is
+          // confirmed (covers both the instant-settle and EDC/QRIS-approved
+          // paths, since both call updateOrderPaymentStatus).
+          await triggerPrintJobBroadcast(orderId);
         } catch (dbUpdateErr) {
           console.warn(
             `[Sync] Failed to update local order status:`,
