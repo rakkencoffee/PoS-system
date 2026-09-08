@@ -51,15 +51,6 @@ export function KioskHeader({
         <h1 className="text-[22px] font-extrabold text-[#78000f] tracking-tight" style={JKT}>
           RAKKEN COFFEE
         </h1>
-        {deviceId && (
-          <span
-            className="text-[11px] font-bold text-[#998075] bg-[#F5F5F5] rounded-full px-2 py-0.5"
-            style={JKT}
-            title="Kiosk ini terhubung ke mesin EDC berikut"
-          >
-            Mesin {deviceId}
-          </span>
-        )}
       </button>
 
       {/* Centre search */}
@@ -109,6 +100,16 @@ export function KioskHeader({
           )}
         </button>
       </div>
+
+      {deviceId && (
+        <span
+          className="fixed bottom-2 left-2 z-50 text-[10px] font-bold text-white/70 bg-black/30 rounded px-1.5 py-0.5"
+          style={JKT}
+          title="Kiosk ini terhubung ke mesin EDC berikut"
+        >
+          {deviceId}
+        </span>
+      )}
     </header>
   );
 }
