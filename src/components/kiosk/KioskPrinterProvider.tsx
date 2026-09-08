@@ -121,14 +121,25 @@ export function KioskPrinterProvider({ children }: { children: React.ReactNode }
       const channel = pusher.subscribe(`edc-job-${entry.orderId}`);
       channels.push(channel);
 
+      console.log(`[KioskPrinterProvider] Watching order ${entry.orderId} for payment approval...`);
+
       channel.bind('STATUS_UPDATE', async (data: { status: string }) => {
+        console.log(`[KioskPrinterProvider] STATUS_UPDATE for ${entry.orderId}:`, data.status);
+        // Deliberately does NOT stop watching on REJECTED/FAILED -- the
+        // known EDC bug means the daemon's own first attempt almost always
+        // reports FAILED even when the transaction genuinely succeeded, and
+        // staff manually flip it to APPROVED afterward via ResolveEdcJob.ps1
+        // once they've confirmed the physical receipt. An earlier version of
+        // this watcher unsubscribed on that first FAILED, so the later
+        // manual APPROVED had nobody left listening -- confirmed live
+        // 2026-09-08 as the reason nota printing silently stopped working
+        // even though KDS (which re-checks fresh on every PATCH, not a
+        // long-lived subscription) kept working fine.
         if (data.status === 'APPROVED') {
+          console.log(`[KioskPrinterProvider] Printing receipt for ${entry.orderId}...`);
           const success = await printPendingReceipt(entry.orderId);
+          console.log(`[KioskPrinterProvider] Print ${success ? 'succeeded' : 'failed'} for ${entry.orderId}`);
           setKioskPrintResult(entry.orderId, success ? 'ok' : 'failed');
-          removePendingKioskPrint(entry.orderId);
-          channel.unsubscribe();
-          watching.delete(entry.orderId);
-        } else if (data.status === 'REJECTED' || data.status === 'FAILED') {
           removePendingKioskPrint(entry.orderId);
           channel.unsubscribe();
           watching.delete(entry.orderId);
@@ -136,9 +147,15 @@ export function KioskPrinterProvider({ children }: { children: React.ReactNode }
       });
     };
 
-    readPendingKioskPrints().forEach(watch);
+    const pending = readPendingKioskPrints();
+    console.log(`[KioskPrinterProvider] Print watcher mounted, ${pending.length} pending order(s) from storage.`);
+    pending.forEach(watch);
 
-    const onQueued = (e: Event) => watch((e as CustomEvent<PendingKioskPrint>).detail);
+    const onQueued = (e: Event) => {
+      const entry = (e as CustomEvent<PendingKioskPrint>).detail;
+      console.log(`[KioskPrinterProvider] New order queued for printing: ${entry.orderId}`);
+      watch(entry);
+    };
     window.addEventListener(PENDING_PRINT_EVENT, onQueued);
 
     return () => {

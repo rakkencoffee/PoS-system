@@ -159,7 +159,7 @@ export default function CheckoutNewPage() {
       // Queue nota printing now, not after EdcPaymentFlow sees APPROVED --
       // KioskPrinterProvider watches this independently of whether this
       // checkout page stays mounted until the payment actually resolves.
-      queueKioskPrint({ orderId: data.orderId });
+      queueKioskPrint(data.orderId);
       setIsProcessing(false);
     } catch (error: any) {
       handleCheckoutError(error);

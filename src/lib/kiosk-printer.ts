@@ -54,10 +54,21 @@ export const PENDING_PRINT_EVENT = 'kiosk-pending-print';
 
 export interface PendingKioskPrint {
   orderId: string;
+  queuedAt: number;
 }
 
-export function queueKioskPrint(entry: PendingKioskPrint): void {
+// How long an order's manual-resolve is still worth watching for before this
+// tablet gives up on it -- generous, since staff may not get to a stuck EDC
+// job right away. Also doubles as garbage collection for the localStorage
+// list itself: without this, an order that's genuinely abandoned (customer
+// walked away, no manual resolve ever coming) would sit here forever,
+// re-subscribing its Pusher channel on every page reload for the rest of
+// this kiosk's uptime.
+const PENDING_PRINT_MAX_AGE_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+export function queueKioskPrint(orderId: string): void {
   if (typeof window === 'undefined') return;
+  const entry: PendingKioskPrint = { orderId, queuedAt: Date.now() };
   try {
     const list = readPendingKioskPrints();
     if (!list.some((p) => p.orderId === entry.orderId)) {
@@ -74,7 +85,12 @@ export function readPendingKioskPrints(): PendingKioskPrint[] {
   if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(PENDING_PRINTS_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const list: PendingKioskPrint[] = raw ? JSON.parse(raw) : [];
+    const fresh = list.filter((p) => Date.now() - p.queuedAt < PENDING_PRINT_MAX_AGE_MS);
+    if (fresh.length !== list.length) {
+      localStorage.setItem(PENDING_PRINTS_KEY, JSON.stringify(fresh));
+    }
+    return fresh;
   } catch {
     return [];
   }
