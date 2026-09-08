@@ -14,6 +14,7 @@ interface EdcJobStatusResponse {
 interface EdcPaymentFlowProps {
   orderId: string;
   amount: number;
+  method?: 'CARD' | 'QRIS';
   onApproved: () => void;
   onCancel: () => void;
 }
@@ -56,7 +57,7 @@ const FAILURE_COPY: Record<FailurePhase, { icon: string; title: string; message:
   },
 };
 
-export function EdcPaymentFlow({ orderId, amount, onApproved, onCancel }: EdcPaymentFlowProps) {
+export function EdcPaymentFlow({ orderId, amount, method = 'CARD', onApproved, onCancel }: EdcPaymentFlowProps) {
   const [phase, setPhase] = useState<'waiting' | FailurePhase>('waiting');
   const [isRetrying, setIsRetrying] = useState(false);
   const stopPollingRef = useRef(false);
@@ -109,7 +110,7 @@ export function EdcPaymentFlow({ orderId, amount, onApproved, onCancel }: EdcPay
       const res = await fetch('/api/edc-jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId, amount, deviceId: getKioskDeviceId() }),
+        body: JSON.stringify({ orderId, amount, deviceId: getKioskDeviceId(), method }),
       });
       if (!res.ok) throw new Error('Gagal membuat ulang job EDC');
       await poll();
@@ -126,7 +127,9 @@ export function EdcPaymentFlow({ orderId, amount, onApproved, onCancel }: EdcPay
       <div className="bg-background rounded-3xl shadow-2xl max-w-sm w-full p-page-gutter flex flex-col items-center gap-standard">
         {phase === 'waiting' && (
           <>
-            <h2 className="font-tag text-tag text-taupe uppercase tracking-wide text-center">Card Payment</h2>
+            <h2 className="font-tag text-tag text-taupe uppercase tracking-wide text-center">
+              {method === 'QRIS' ? 'QRIS Payment' : 'Card Payment'}
+            </h2>
             <span className="font-display text-h1 text-primary font-extrabold text-center">
               {formatCurrency(amount)}
             </span>
@@ -134,7 +137,7 @@ export function EdcPaymentFlow({ orderId, amount, onApproved, onCancel }: EdcPay
             <EdcPaymentAnimation className="py-section-item" />
 
             <p className="text-near-black text-center font-body-lg font-semibold">
-              Tap kartu atau masukan kartu
+              {method === 'QRIS' ? 'Scan QR di layar mesin EDC' : 'Tap kartu atau masukan kartu'}
             </p>
             <button
               onClick={onCancel}

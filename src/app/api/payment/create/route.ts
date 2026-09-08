@@ -20,6 +20,7 @@ export async function POST(request: NextRequest) {
     const { items, totalAmount, customerName, customerPhone, discountAmount, voucherCode, paymentMethod, deviceId } =
       body;
     const isEdcCard = paymentMethod === "EDC_CARD";
+    const isEdcQris = paymentMethod === "EDC_QRIS";
 
     if (!items || !items.length || typeof totalAmount !== "number") {
       return NextResponse.json(
@@ -77,20 +78,27 @@ export async function POST(request: NextRequest) {
     const finalOrderId = dbOrderId ? String(dbOrderId) : orderId;
     const finalGrossAmount = Math.max(0, totalAmount - (discountAmount || 0));
 
-    if (isEdcCard) {
+    if (isEdcCard || isEdcQris) {
       // Payment goes through the physical EDC (see edc-bridge/) instead of
       // being auto-settled. The order stays PENDING/unpaid — the local
       // edc-bridge daemon polls /api/edc-jobs, pushes the amount to the
-      // terminal, and PATCHing the job APPROVED is what actually settles
-      // the order (see /api/edc-jobs/[id] PATCH handler).
+      // terminal (Purchase for card, GenQRIS for QRIS — see EdcJob.method),
+      // and PATCHing the job APPROVED is what actually settles the order
+      // (see /api/edc-jobs/[id] PATCH handler).
       const { prisma } = await import("@/lib/db");
       const edcJob = await prisma.edcJob.create({
-        data: { orderId: finalOrderId, amount: finalGrossAmount, status: "PENDING", deviceId: deviceId || null },
+        data: {
+          orderId: finalOrderId,
+          amount: finalGrossAmount,
+          status: "PENDING",
+          deviceId: deviceId || null,
+          method: isEdcQris ? "QRIS" : "CARD",
+        },
       });
 
       return NextResponse.json({
         simulated: false,
-        paymentMethod: "EDC_CARD",
+        paymentMethod: isEdcQris ? "EDC_QRIS" : "EDC_CARD",
         orderId: finalOrderId,
         orderNo: dbOrderNo || '',
         queueNumber: dbQueueNumber || 0,

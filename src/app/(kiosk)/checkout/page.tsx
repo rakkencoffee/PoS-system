@@ -96,7 +96,7 @@ export default function CheckoutNewPage() {
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<string>('');
-  const [paymentMethod, setPaymentMethod] = useState<'SIMULATED' | 'EDC_CARD'>('SIMULATED');
+  const [paymentMethod, setPaymentMethod] = useState<'EDC_QRIS' | 'EDC_CARD'>('EDC_QRIS');
   const [edcOrder, setEdcOrder] = useState<{ orderId: string; amount: number; queueNumber?: number; orderNo?: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const goSearch = (value: string) => router.push(`/menu?search=${encodeURIComponent(value)}`);
@@ -133,7 +133,7 @@ export default function CheckoutNewPage() {
           items: buildPrintItems(items, buildBagOrderItems(bagQuantities)),
           total,
           discount: appliedDiscount,
-          paymentMethod: paymentMethod === 'EDC_CARD' ? 'Kartu EDC' : 'Simulasi',
+          paymentMethod: paymentMethod === 'EDC_CARD' ? 'Kartu EDC' : 'QRIS',
         }),
       });
       if (!res.ok) return false;
@@ -179,17 +179,11 @@ export default function CheckoutNewPage() {
         deviceId: getKioskDeviceId(),
       });
 
-      if (paymentMethod === 'EDC_CARD') {
-        // Order created but stays unpaid — EdcPaymentFlow polls the EDC job
-        // and settlement happens server-side once the daemon reports APPROVED.
-        setEdcOrder({ orderId: data.orderId, amount: total, queueNumber: data.queueNumber, orderNo: data.orderNo });
-        setIsProcessing(false);
-        return;
-      }
-
-      // No payment gateway wired up yet — server marks the order paid
-      // immediately (simulated), so there's no popup/redirect to wait on here.
-      finalizeOrder(data);
+      // Both go through the physical EDC — order stays unpaid, EdcPaymentFlow
+      // polls the job, settlement happens server-side once the daemon reports
+      // APPROVED (Purchase for card, GenQRIS for QRIS — see EdcJob.method).
+      setEdcOrder({ orderId: data.orderId, amount: total, queueNumber: data.queueNumber, orderNo: data.orderNo });
+      setIsProcessing(false);
     } catch (error: any) {
       handleCheckoutError(error);
     }
@@ -458,13 +452,13 @@ export default function CheckoutNewPage() {
                 {/* Payment Method */}
                 <div className="grid grid-cols-2 gap-standard mt-section-item">
                   <button
-                    onClick={() => setPaymentMethod('SIMULATED')}
+                    onClick={() => setPaymentMethod('EDC_QRIS')}
                     disabled={isProcessing}
                     className={`py-compact rounded-xl border font-h4 text-body-md cursor-pointer transition-colors disabled:opacity-50 ${
-                      paymentMethod === 'SIMULATED' ? 'active-payment' : 'border-surface-variant text-taupe'
+                      paymentMethod === 'EDC_QRIS' ? 'active-payment' : 'border-surface-variant text-taupe'
                     }`}
                   >
-                    Bayar Sekarang
+                    QRIS
                   </button>
                   <button
                     onClick={() => setPaymentMethod('EDC_CARD')}
@@ -489,7 +483,7 @@ export default function CheckoutNewPage() {
                       <span className="text-body-lg font-bold">{paymentStatus || 'Processing...'}</span>
                     </>
                   ) : (
-                    <span>{paymentMethod === 'EDC_CARD' ? 'Card Payment' : 'Pay'} {formatCurrency(total)}</span>
+                    <span>{paymentMethod === 'EDC_CARD' ? 'Card Payment' : 'QRIS Payment'} {formatCurrency(total)}</span>
                   )}
                 </button>
                 
@@ -696,13 +690,13 @@ export default function CheckoutNewPage() {
           {/* Payment Method */}
           <section className="grid grid-cols-2 gap-standard">
             <button
-              onClick={() => setPaymentMethod('SIMULATED')}
+              onClick={() => setPaymentMethod('EDC_QRIS')}
               disabled={isProcessing}
               className={`py-compact rounded-xl border font-h4 text-body-md cursor-pointer transition-colors disabled:opacity-50 ${
-                paymentMethod === 'SIMULATED' ? 'active-payment' : 'border-surface-variant text-taupe bg-surface'
+                paymentMethod === 'EDC_QRIS' ? 'active-payment' : 'border-surface-variant text-taupe bg-surface'
               }`}
             >
-              Bayar Sekarang
+              QRIS
             </button>
             <button
               onClick={() => setPaymentMethod('EDC_CARD')}
@@ -743,7 +737,7 @@ export default function CheckoutNewPage() {
               </>
             ) : (
               <>
-                <span>{paymentMethod === 'EDC_CARD' ? 'Card Payment' : 'Bayar Sekarang'}</span>
+                <span>{paymentMethod === 'EDC_CARD' ? 'Card Payment' : 'QRIS Payment'}</span>
                 <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
               </>
             )}
@@ -755,6 +749,7 @@ export default function CheckoutNewPage() {
         <EdcPaymentFlow
           orderId={edcOrder.orderId}
           amount={edcOrder.amount}
+          method={paymentMethod === 'EDC_QRIS' ? 'QRIS' : 'CARD'}
           onApproved={() => finalizeOrder(edcOrder)}
           onCancel={() => {
             setEdcOrder(null);

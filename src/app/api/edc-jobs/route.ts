@@ -11,11 +11,11 @@ const EDC_BRIDGE_API_KEY = process.env.EDC_BRIDGE_API_KEY || '';
  * daemon (USB-connected to the physical Ingenico terminal) polls for it,
  * pushes the amount to the EDC, and reports the result back via PATCH.
  *
- * Body: { orderId: string, amount: number, deviceId?: string }
+ * Body: { orderId: string, amount: number, deviceId?: string, method?: "CARD" | "QRIS" }
  */
 export async function POST(request: NextRequest) {
   try {
-    const { orderId, amount, deviceId } = await request.json();
+    const { orderId, amount, deviceId, method } = await request.json();
 
     if (!orderId || typeof amount !== 'number' || amount <= 0) {
       return NextResponse.json(
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     }
 
     const job = await prisma.edcJob.create({
-      data: { orderId, amount, status: 'PENDING', deviceId: deviceId || null },
+      data: { orderId, amount, status: 'PENDING', deviceId: deviceId || null, method: method === 'QRIS' ? 'QRIS' : 'CARD' },
     });
 
     console.log(`[EdcQueue] Job created: ${job.id} for order ${orderId} (Rp${amount})`);

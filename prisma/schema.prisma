@@ -179,6 +179,7 @@ model EdcJob {
   id              String   @id @default(cuid())
   orderId         String
   deviceId        String? // Kiosk device asal ("A"/"B"/"C", dari ?device= di URL) — dipakai daemon buat cuma ambil job dari EDC fisik miliknya sendiri, wajib sejak ada >1 EDC fisik
+  method          String   @default("CARD") // CARD (Purchase/tap kartu) atau QRIS (GenQRIS) — daemon manggil fungsi DLL yang beda tergantung ini
   amount          Int
   status          String   @default("PENDING") // PENDING, PROCESSING, APPROVED, REJECTED, FAILED
   approvalCode    String?
