@@ -38,26 +38,7 @@ export function KioskPrinterPairing() {
   );
 }
 
-/** Read from the checkout/success flow — see KioskPrinterPairing for why this is a window global. */
-export function getKioskPrinter(): { writeBytes: (bytes: Uint8Array) => Promise<void> } | null {
-  if (typeof window === 'undefined') return null;
-  return (window as any).__kioskPrinter ?? null;
-}
-
-/**
- * Silent reconnect attempt for checkout's printViaBluetooth() to call right
- * before printing, in case the GATT connection dropped from being idle
- * during a long wait (e.g. EDC troubleshooting) — see the comment in
- * KioskPrinterProvider. Resolves to whether a device was actually
- * reconnected; never throws.
- */
-export async function tryReconnectKioskPrinter(): Promise<boolean> {
-  if (typeof window === 'undefined') return false;
-  const reconnect = (window as any).__kioskPrinterReconnect as (() => Promise<boolean>) | undefined;
-  if (!reconnect) return false;
-  try {
-    return await reconnect();
-  } catch {
-    return false;
-  }
-}
+// getKioskPrinter, tryReconnectKioskPrinter, and the print-queue helpers
+// moved to @/lib/kiosk-printer -- a plain module both this component and
+// KioskPrinterProvider can import from without a circular import between
+// the two of them.

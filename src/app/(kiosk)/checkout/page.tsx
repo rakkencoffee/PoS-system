@@ -8,7 +8,7 @@ import { db, encryptPendingOrder } from '@/lib/dexie';
 import { CartItem } from '@/lib/types';
 import { KioskHeader } from '@/components/kiosk/KioskHeader';
 import { EdcPaymentFlow } from '@/components/kiosk/EdcPaymentFlow';
-import { getKioskPrinter, tryReconnectKioskPrinter } from '@/components/kiosk/KioskPrinterPairing';
+import { queueKioskPrint } from '@/lib/kiosk-printer';
 import { buildBagOrderItems, calculateBagTotal } from '@/lib/bag-options';
 import { getKioskDeviceId } from '@/lib/kiosk-device';
 import * as Sentry from "@sentry/nextjs";
@@ -118,58 +118,21 @@ export default function CheckoutNewPage() {
     }
   }, [itemCount, router]);
 
-  const printViaBluetooth = async (data: { orderId: string; queueNumber?: number; orderNo?: string }) => {
-    let printer = getKioskPrinter();
-    // GATT connection may have dropped from sitting idle (idle-timeout wait,
-    // a long EDC troubleshooting wait, etc.) even though the tablet was
-    // paired earlier this session — retry a few times (a single attempt
-    // right when a real BLE reconnect is still settling can lose the race)
-    // before giving up on this print.
-    for (let attempt = 0; !printer && attempt < 3; attempt++) {
-      await tryReconnectKioskPrinter();
-      printer = getKioskPrinter();
-      if (!printer) await new Promise((r) => setTimeout(r, 1500));
-    }
-    if (!printer) return false; // still not connected — success page's fallback message handles it
-
-    try {
-      const res = await fetch('/api/kiosk/receipt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId: data.orderNo || data.orderId,
-          queueNumber: data.queueNumber || 0,
-          customerName,
-          items: buildPrintItems(items, buildBagOrderItems(bagQuantities)),
-          total,
-          discount: appliedDiscount,
-          paymentMethod: paymentMethod === 'EDC_CARD' ? 'Kartu EDC' : 'QRIS',
-        }),
-      });
-      if (!res.ok) return false;
-
-      const { bytes } = await res.json();
-      const binary = atob(bytes);
-      const raw = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) raw[i] = binary.charCodeAt(i);
-
-      await printer.writeBytes(raw);
-      return true;
-    } catch (err) {
-      console.warn('[Checkout] BLE print failed, falling back to cloud print queue:', err);
-      return false;
-    }
-  };
-
-  const finalizeOrder = async (data: { orderId: string; queueNumber?: number; orderNo?: string }) => {
+  // Nota printing itself now happens in KioskPrinterProvider (queued via
+  // queueKioskPrint() below, right when the EDC job is created) -- it pulls
+  // receipt data from the server-side PrintJob row and watches for APPROVED
+  // independently of this page staying mounted, the same server-driven
+  // pattern KDS printing already uses. See @/lib/kiosk-printer for why:
+  // a customer navigating away, cancelling, or a slow QRIS approval used to
+  // mean the receipt silently never printed even though the KDS sticker
+  // (server-driven, no tab required) still came out fine.
+  const finalizeOrder = (data: { orderId: string; queueNumber?: number; orderNo?: string }) => {
     setPaymentStatus('Pesanan berhasil!');
     savePrintData(items, data.orderId, buildBagOrderItems(bagQuantities));
-    const printedViaBle = await printViaBluetooth(data);
     clearCart();
     const queueNum = (data.queueNumber || 0).toString();
     const orderNoParam = data.orderNo ? `&orderNo=${data.orderNo}` : '';
-    const printedParam = printedViaBle ? '&printed=ble' : '';
-    router.push(`/success?orderId=${data.orderId}&queue=${queueNum}${orderNoParam}${printedParam}`);
+    router.push(`/success?orderId=${data.orderId}&queue=${queueNum}${orderNoParam}`);
   };
 
   const handleCheckout = async () => {
@@ -193,6 +156,10 @@ export default function CheckoutNewPage() {
       // polls the job, settlement happens server-side once the daemon reports
       // APPROVED (Purchase for card, GenQRIS for QRIS — see EdcJob.method).
       setEdcOrder({ orderId: data.orderId, amount: total, queueNumber: data.queueNumber, orderNo: data.orderNo });
+      // Queue nota printing now, not after EdcPaymentFlow sees APPROVED --
+      // KioskPrinterProvider watches this independently of whether this
+      // checkout page stays mounted until the payment actually resolves.
+      queueKioskPrint({ orderId: data.orderId });
       setIsProcessing(false);
     } catch (error: any) {
       handleCheckoutError(error);

@@ -2,6 +2,14 @@
 
 import { createContext, useContext, useEffect, useRef } from 'react';
 import { useBlePrinter } from '@/hooks/useBlePrinter';
+import {
+  getKioskPrinter,
+  PENDING_PRINT_EVENT,
+  readPendingKioskPrints,
+  removePendingKioskPrint,
+  setKioskPrintResult,
+  type PendingKioskPrint,
+} from '@/lib/kiosk-printer';
 
 interface KioskPrinterContextValue {
   connected: boolean;
@@ -65,6 +73,80 @@ export function KioskPrinterProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     (window as any).__kioskPrinterReconnect = tryAutoReconnect;
   }, [tryAutoReconnect]);
+
+  // Server-driven nota printing -- mirrors how KDS printing works instead of
+  // depending on checkout's own component staying mounted until APPROVED
+  // arrives (see @/lib/kiosk-printer for the full story). Watches every
+  // order queued via queueKioskPrint(), including ones already pending from
+  // before a page reload (read from localStorage on mount), plus any queued
+  // later in this session (via the PENDING_PRINT_EVENT window event, since
+  // this provider and the checkout page are separate component trees).
+  useEffect(() => {
+    const watching = new Set<string>();
+    const channels: ReturnType<import('pusher-js').default['subscribe']>[] = [];
+    let pusher: import('pusher-js').default | null = null;
+
+    const printPendingReceipt = async (orderId: string): Promise<boolean> => {
+      let printer = getKioskPrinter();
+      for (let attempt = 0; !printer && attempt < 3; attempt++) {
+        await tryAutoReconnect().catch(() => false);
+        printer = getKioskPrinter();
+        if (!printer) await new Promise((r) => setTimeout(r, 1500));
+      }
+      if (!printer) return false;
+
+      try {
+        const res = await fetch(`/api/kiosk/receipt/${encodeURIComponent(orderId)}`);
+        if (!res.ok) return false;
+        const { bytes } = await res.json();
+        const binary = atob(bytes);
+        const raw = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) raw[i] = binary.charCodeAt(i);
+        await printer.writeBytes(raw);
+        return true;
+      } catch (err) {
+        console.warn(`[KioskPrinterProvider] Failed to print receipt for ${orderId}:`, err);
+        return false;
+      }
+    };
+
+    const watch = async (entry: PendingKioskPrint) => {
+      if (watching.has(entry.orderId)) return;
+      watching.add(entry.orderId);
+
+      if (!pusher) {
+        const { getPusherClient } = await import('@/lib/pusher');
+        pusher = getPusherClient();
+      }
+      const channel = pusher.subscribe(`edc-job-${entry.orderId}`);
+      channels.push(channel);
+
+      channel.bind('STATUS_UPDATE', async (data: { status: string }) => {
+        if (data.status === 'APPROVED') {
+          const success = await printPendingReceipt(entry.orderId);
+          setKioskPrintResult(entry.orderId, success ? 'ok' : 'failed');
+          removePendingKioskPrint(entry.orderId);
+          channel.unsubscribe();
+          watching.delete(entry.orderId);
+        } else if (data.status === 'REJECTED' || data.status === 'FAILED') {
+          removePendingKioskPrint(entry.orderId);
+          channel.unsubscribe();
+          watching.delete(entry.orderId);
+        }
+      });
+    };
+
+    readPendingKioskPrints().forEach(watch);
+
+    const onQueued = (e: Event) => watch((e as CustomEvent<PendingKioskPrint>).detail);
+    window.addEventListener(PENDING_PRINT_EVENT, onQueued);
+
+    return () => {
+      window.removeEventListener(PENDING_PRINT_EVENT, onQueued);
+      channels.forEach((c) => c.unsubscribe());
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <KioskPrinterContext.Provider value={{ connected, connect }}>

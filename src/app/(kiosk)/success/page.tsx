@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Receipt } from '@/components/pos/Receipt';
+import { readKioskPrintResult } from '@/lib/kiosk-printer';
 
 function SuccessContent() {
   const router = useRouter();
@@ -23,12 +24,29 @@ function SuccessContent() {
     return numericId.length > 3 ? numericId.slice(-3) : numericId;
   })();
   
-  // Receipt printing happens at checkout time, straight over the kiosk
-  // tablet's own paired Bluetooth printer (see checkout/page.tsx
-  // printViaBluetooth) — this page only reflects whether that succeeded.
-  // No cloud/WiFi print queue fallback anymore (deliberately dropped in
-  // favor of BLE-only, see project memory).
-  const printedViaBle = searchParams.get('printed') === 'ble';
+  // Receipt printing is driven by KioskPrinterProvider (queued at checkout
+  // time via queueKioskPrint(), watched independently of this page) instead
+  // of finishing synchronously before navigating here — see
+  // @/lib/kiosk-printer. So the outcome isn't known yet when this page first
+  // renders; poll the short-lived per-order flag it writes once printing
+  // actually resolves, for a few seconds, before settling on a final state.
+  const [printResult, setPrintResult] = useState<'ok' | 'failed' | 'pending'>('pending');
+
+  useEffect(() => {
+    if (isOffline || !orderId) return;
+    let attempts = 0;
+    const interval = setInterval(() => {
+      const result = readKioskPrintResult(orderId);
+      if (result) {
+        setPrintResult(result);
+        clearInterval(interval);
+      } else if (++attempts >= 10) {
+        setPrintResult('failed'); // gave up waiting — matches the existing "hubungi kasir" fallback copy
+        clearInterval(interval);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [orderId, isOffline]);
 
   const [countdown, setCountdown] = useState(isOffline ? 30 : 15);
   const [orderData, setOrderData] = useState<any>(null);
@@ -151,14 +169,24 @@ function SuccessContent() {
         <div className="space-y-2 animate-fade-in delay-4" style={{ opacity: 0 }}>
           {!isOffline && (
             <div className="flex items-center justify-center gap-2 text-xs text-(--text-secondary)">
-              {printedViaBle ? (
+              {printResult === 'ok' && (
                 <>
                   <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                   Struk tercetak
                 </>
-              ) : (
+              )}
+              {printResult === 'pending' && (
+                <>
+                  <svg className="w-4 h-4 text-(--text-muted) animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                  </svg>
+                  Struk sedang dicetak...
+                </>
+              )}
+              {printResult === 'failed' && (
                 <>
                   <svg className="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
