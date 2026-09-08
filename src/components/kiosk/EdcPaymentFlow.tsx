@@ -60,6 +60,8 @@ const FAILURE_COPY: Record<FailurePhase, { icon: string; title: string; message:
 export function EdcPaymentFlow({ orderId, amount, method = 'CARD', onApproved, onCancel }: EdcPaymentFlowProps) {
   const [phase, setPhase] = useState<'waiting' | FailurePhase>('waiting');
   const [isRetrying, setIsRetrying] = useState(false);
+  const [isChecking, setIsChecking] = useState(false);
+  const [recheckMessage, setRecheckMessage] = useState<string | null>(null);
   const stopPollingRef = useRef(false);
 
   const poll = async () => {
@@ -103,6 +105,32 @@ export function EdcPaymentFlow({ orderId, amount, method = 'CARD', onApproved, o
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
+
+  // One-shot re-check of the SAME job's status -- unlike handleRetry, this never
+  // creates a new EdcJob (no re-charge risk). For staff to use after manually
+  // resolving a job via ResolveEdcJob.ps1 once they've confirmed the physical
+  // EDC receipt: poll() already exited permanently on the first FAILED/REJECTED
+  // read (see the effect below), so nothing else in this component will ever
+  // notice the backend flipping to APPROVED without this.
+  const handleRecheckStatus = async () => {
+    setIsChecking(true);
+    setRecheckMessage(null);
+    try {
+      const res = await fetch(`/api/edc-jobs/status?orderId=${orderId}`);
+      if (res.ok) {
+        const data: EdcJobStatusResponse = await res.json();
+        if (data.status === 'APPROVED') {
+          onApproved();
+          return;
+        }
+      }
+      setRecheckMessage('Status belum berubah — masih belum dikonfirmasi.');
+    } catch {
+      setRecheckMessage('Gagal cek status, coba lagi.');
+    } finally {
+      setIsChecking(false);
+    }
+  };
 
   const handleRetry = async () => {
     setIsRetrying(true);
@@ -160,19 +188,33 @@ export function EdcPaymentFlow({ orderId, amount, method = 'CARD', onApproved, o
             <div className="flex gap-standard w-full mt-standard">
               <button
                 onClick={onCancel}
-                disabled={isRetrying}
+                disabled={isRetrying || isChecking}
                 className="flex-1 py-standard rounded-xl border border-surface-variant text-near-black font-h4 cursor-pointer disabled:opacity-50"
               >
                 Batalkan
               </button>
               <button
                 onClick={handleRetry}
-                disabled={isRetrying}
+                disabled={isRetrying || isChecking}
                 className="flex-1 py-standard rounded-xl bg-primary text-white font-h4 cursor-pointer disabled:opacity-50"
               >
                 {isRetrying ? 'Mencoba...' : 'Coba Lagi'}
               </button>
             </div>
+            {(phase === 'failed' || phase === 'timeout') && (
+              <>
+                <button
+                  onClick={handleRecheckStatus}
+                  disabled={isRetrying || isChecking}
+                  className="text-taupe font-body-md underline cursor-pointer disabled:opacity-50"
+                >
+                  {isChecking ? 'Mengecek...' : 'Cek Status Lagi'}
+                </button>
+                {recheckMessage && (
+                  <p className="text-taupe text-center font-body-sm">{recheckMessage}</p>
+                )}
+              </>
+            )}
           </>
         )}
       </div>

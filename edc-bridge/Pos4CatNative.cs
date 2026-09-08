@@ -5,6 +5,13 @@ namespace EdcBridge;
 
 // P/Invoke signatures per POS4EDC User Guide v108 (DLL), section 3.1 "VISUAL C#" sample.
 // POS4CAT_Ctl.dll is 32-bit — this project must build with PlatformTarget=x86.
+//
+// Tried CallingConvention.Cdecl on every entry point (2026-09-08) as a hypothesis for the
+// huge, closely-clustered garbage COMStatus()/GetResponseCode() values (e.g. 47704772,
+// 51899420 -- spec only documents 0/-1/-2) that don't match any documented return code.
+// Live-tested and DISPROVEN: garbage persisted unchanged with Cdecl (just a different
+// range), so reverted to the default StdCall the vendor's own sample uses. Root cause of
+// the garbage values is still unknown -- see Pesan_Yokke_ResponseTimeout.txt.
 internal static class Pos4CatNative
 {
     [DllImport("POS4CAT_Ctl.dll")]
