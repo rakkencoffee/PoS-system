@@ -32,7 +32,9 @@ public sealed record EdcQrisResult
     public string? ErrorMessage { get; init; }
     public string? RawResponseData { get; init; }
 
-    // Parsed from RawResponseData (pipe-delimited), QRIS Generate field order per user guide 2.4.26.
+    // Parsed from RawResponseData (pipe-delimited), 16-field order per
+    // POS4EDC Mandiri User Guide v1.12 sections 2.4.18-2.4.20 (Generate and
+    // both Inquiry variants share this same format).
     public string? TerminalId { get; init; }
     public string? MerchantId { get; init; }
     public string? AcquirerName { get; init; }
@@ -47,6 +49,8 @@ public sealed record EdcQrisResult
     public string? CustomerPan { get; init; }
     public string? ReferenceId { get; init; }
     public string? SaleAmount { get; init; }
+    public string? Tip { get; init; }
+    public string? TotalAmount { get; init; }
 }
 
 // Thin wrapper around POS4CAT_Ctl.dll. Every service request is its own full
@@ -67,6 +71,30 @@ public sealed class EdcClient
             Buf(), Buf(), Buf(),
             Buf(), Buf(), Buf()));
 
+        return ParseCardResult(cycle);
+    }
+
+    // "Resend Last Transaction" (Mandiri v1.12 guide section 2.2.16, POS4EDC_ReqLastReSend()
+    // in the compilable C# sample). Candidate fix for the confirmed bug where COMStatus()
+    // reports "Response Timeout" even though the EDC's own screen/printed receipt show the
+    // transaction genuinely APPROVED (reproduced live 2026-09-07, both card Purchase and
+    // QRIS): call this right after a Purchase() that came back FAILED/timed-out, to see if
+    // it can retrieve the real result the original call's COMStatus() failed to relay.
+    // UNTESTED -- the guide's own response-data table for this function (2.4.9) just says
+    // "Status: OK|SUCCESS", so whether GetResponseData() actually returns full Purchase-shaped
+    // detail (card type, approval code, trace number) or only that bare status string is
+    // unconfirmed until tried live.
+    public EdcResult GetLastTransaction()
+    {
+        var cycle = RunCycle(() => Pos4CatNative.POS4EDC_ReqLastReSend());
+        return ParseCardResult(cycle);
+    }
+
+    // Shared by Purchase and GetLastTransaction -- both return the same pipe-delimited
+    // format per guide section 2.4.1 (assuming GetLastTransaction really does mirror
+    // Purchase's own format -- unconfirmed, see caveat above).
+    private static EdcResult ParseCardResult((bool Approved, string ResponseCode, string? RawData, string? Error) cycle)
+    {
         if (cycle.Error is not null)
             return new EdcResult { Approved = false, ResponseCode = cycle.ResponseCode, ErrorMessage = cycle.Error, RawResponseData = cycle.RawData };
 
@@ -94,24 +122,58 @@ public sealed class EdcClient
         };
     }
 
-    public EdcQrisResult GenerateQris(string amountRupiah)
+    // Per POS4EDC Mandiri User Guide v1.12 section 2.2.21: GenQRIS is called
+    // directly, no MenuDomestic prerequisite (that function isn't documented
+    // anywhere in the Mandiri-specific guide -- it was carried over from an
+    // older, generic MTI doc and is a likely culprit behind past QRIS
+    // failures, alongside the GenQRIS arity mismatch fixed in Pos4CatNative).
+    public EdcQrisResult GenerateQris(string amountRupiah, string cashoutAmount = "0")
     {
-        var menuCycle = RunCycle(() => Pos4CatNative.POS4EDC_MTIQRIS_MenuDomestic());
-        if (menuCycle.Error is not null)
-            return new EdcQrisResult { Approved = false, ResponseCode = menuCycle.ResponseCode, ErrorMessage = $"MenuDomestic: {menuCycle.Error}", RawResponseData = menuCycle.RawData };
+        var cycle = RunCycle(() => Pos4CatNative.POS4EDC_GenQRIS(Buf(amountRupiah), Buf(cashoutAmount)));
+        return ParseQrisResult(cycle);
+    }
 
-        var genCycle = RunCycle(() => Pos4CatNative.POS4EDC_GenQRIS(Buf(amountRupiah)));
-        if (genCycle.Error is not null)
-            return new EdcQrisResult { Approved = false, ResponseCode = genCycle.ResponseCode, ErrorMessage = genCycle.Error, RawResponseData = genCycle.RawData };
+    // QRIS payment is asynchronous -- the customer pays via their own
+    // e-wallet/m-banking app after scanning, so GenerateQris() alone never
+    // confirms settlement. Call one of these afterward (poll on an interval)
+    // to find out whether the customer actually completed payment. UNTESTED
+    // -- section 2.2.22/2.2.23 of the v1.12 guide, never exercised live.
+    public EdcQrisResult InquiryQrisLastTransaction()
+    {
+        var cycle = RunCycle(() => Pos4CatNative.POS4EDC_QRISInqLastTrans());
+        return ParseQrisResult(cycle);
+    }
 
-        var fields = genCycle.RawData!.Split('|');
+    public EdcQrisResult InquiryQrisAnyTransaction()
+    {
+        var cycle = RunCycle(() => Pos4CatNative.POS4EDC_QRISInqAnyTrans());
+        return ParseQrisResult(cycle);
+    }
+
+    // UNTESTED -- see the parameter-meaning caveat on
+    // Pos4CatNative.POS4EDC_RefundQRIS (doc's narrative text and C# sample
+    // disagree on whether this takes a Reff No or an amount).
+    public EdcQrisResult RefundQris(string amountOrReffNo)
+    {
+        var cycle = RunCycle(() => Pos4CatNative.POS4EDC_RefundQRIS(Buf(amountOrReffNo)));
+        return ParseQrisResult(cycle);
+    }
+
+    // Shared by Generate and both Inquiry variants -- all three return the
+    // same 16-field pipe-delimited format per guide sections 2.4.18-2.4.20.
+    private static EdcQrisResult ParseQrisResult((bool Approved, string ResponseCode, string? RawData, string? Error) cycle)
+    {
+        if (cycle.Error is not null)
+            return new EdcQrisResult { Approved = false, ResponseCode = cycle.ResponseCode, ErrorMessage = cycle.Error, RawResponseData = cycle.RawData };
+
+        var fields = cycle.RawData!.Split('|');
         string? At(int i) => i < fields.Length ? fields[i] : null;
 
         return new EdcQrisResult
         {
-            Approved = genCycle.Approved,
-            ResponseCode = genCycle.ResponseCode,
-            RawResponseData = genCycle.RawData,
+            Approved = cycle.Approved,
+            ResponseCode = cycle.ResponseCode,
+            RawResponseData = cycle.RawData,
             TerminalId = At(0),
             MerchantId = At(1),
             AcquirerName = At(2),
@@ -126,6 +188,8 @@ public sealed class EdcClient
             CustomerPan = At(11),
             ReferenceId = At(12),
             SaleAmount = At(13),
+            Tip = At(14),
+            TotalAmount = At(15),
         };
     }
 

@@ -1,0 +1,43 @@
+Halo tim Yokke,
+
+Ini follow-up dari laporan kami sebelumnya (Pesan_Yokke_QRIS.txt) soal koneksi ECR yang tidak stabil. Update dulu soal masalah QRIS yang kami laporkan waktu itu ("Error response from Host", field Status Transaksi/Acquirer/Issuer kosong): sudah kami temukan sendiri akar masalahnya — kode kami salah jumlah parameter saat manggil POS4EDC_GenQRIS() (cuma kirim 1 parameter "amount", padahal di POS4EDC Mandiri User Guide v1.12 fungsinya butuh 2 parameter "amount" dan "cashout"). Sudah kami perbaiki, QRIS sekarang bisa generate QR dengan benar. Jadi masalah itu BUKAN dari sisi provisioning/bank seperti dugaan kami sebelumnya — mohon diabaikan pertanyaan soal itu.
+
+MASALAH BARU yang jauh lebih penting, mohon bantuannya:
+
+Kami menemukan pola yang konsisten dan sudah kami buktikan dengan bukti fisik (struk EDC): transaksi BERHASIL SUKSES di sisi bank/terminal (uang terpotong, struk approved keluar dari EDC), tapi aplikasi kami (yang manggil POS4CAT_Ctl.dll sesuai urutan resmi COMCreate -> request -> COMStatus -> GetResponseCode -> GetResponseData -> ServiceTerminate) tetap melaporkan GAGAL, karena COMStatus() mengembalikan kode yang tidak terdokumentasi/tidak valid, bukan kode sukses (00) maupun kode decline yang jelas.
+
+CONTOH KASUS 1 — QRIS, Rp15.000 (07 September 2026):
+- Struk fisik EDC: Status Transaksi SUKSES, Reff No 625050370369, Nama Customer MOCH FERDIANSYAH, Issuer BCA, Acquirer MANDIRI, jam 16:43:43.
+- catlog kami di jam yang sama:
+  16:43:15  [POS->CAT] = [02], [30] bytes sent (GenQRIS amount+cashout, 2 parameter sesuai v1.12)
+  16:43:15  Succes send data to EDC
+  16:43:16  [CAT->POS] ACK   <- EDC mengonfirmasi terima
+  16:43:16  Already sent request message to EDC.
+  16:43:18  [OnTimer] wParam == TIMER_ACK_LISTEN
+  16:45:05  ServiceTerminate  <- ~1 menit 47 detik kemudian, TANPA pesan sukses/gagal yang jelas
+  Hasil di aplikasi kami: COMStatus failed (ret=45607888) -- angka acak, bukan kode terdokumentasi manapun.
+
+CONTOH KASUS 2 — Kartu (Purchase), Rp1.000 (07 September 2026):
+- Struk fisik EDC: APPROVED.
+- catlog kami:
+  17:14:56  [POS->CAT] = [02], [18] bytes sent (Purchase, format sudah sesuai contoh C# di guide)
+  17:14:57  [CAT->POS] ACK   <- EDC mengonfirmasi terima
+  17:14:59  [OnTimer] wParam == TIMER_ACK_LISTEN
+  17:19:56  [OnTimer] wParam == TIMER_RES_LISTEN
+  17:19:56  [Set_ResponseTimeOut] Response Timeout   <- ini pesan BARU yang belum pernah kami lihat sebelumnya, beda dari "ACK Timeout"
+  17:19:56  Response message timeout status.
+  Hasil di aplikasi kami: GAGAL, tanpa data transaksi (padahal struk approved sudah keluar 5 menit sebelumnya).
+
+YANG SUDAH KAMI COBA untuk mengambil ulang hasil transaksi yang "hilang" ini, keduanya JUGA GAGAL:
+1. POS4EDC_QRISInqLastTrans() / POS4EDC_QRISInqAnyTrans() (guide v1.12 section 2.2.22/2.2.23) -- dipanggil setelah kasus QRIS di atas, hasilnya kadang "ACK Timeout", kadang COMStatus gagal dengan ret=-1 disertai dialog native "Please check EDC display" yang muncul sendiri tanpa ada transaksi baru berjalan.
+2. POS4EDC_ReqLastReSend() (guide v1.12 section 2.2.16, "Resend Last Transaction") -- dipanggil setelah kasus kartu di atas. ACK diterima (EDC merespon), tapi setelah ~26 detik menunggu, COMStatus() tetap mengembalikan kode tidak valid (ret=49801288), tanpa data apapun.
+
+PERTANYAAN KAMI:
+1. Apakah "Response Timeout" (Set_ResponseTimeOut) ini bug/keterbatasan yang sudah diketahui di POS4CAT_Ctl.dll? Adakah versi DLL yang lebih baru yang memperbaiki ini?
+2. Fungsi mana yang SEHARUSNYA berhasil mengambil hasil transaksi yang sudah sukses tapi gagal ter-relay lewat COMStatus() di request aslinya? Kami sudah coba QRISInqLastTrans dan ReqLastReSend, keduanya belum berhasil.
+3. Apakah ada syarat/urutan pemanggilan khusus untuk fungsi-fungsi inquiry/resend ini yang tidak tercantum di guide (misal: jeda waktu tertentu, harus reconnect ECR dulu, dll)?
+4. Ini konsisten terjadi di 2 jenis transaksi berbeda (Purchase kartu dan GenQRIS) -- apakah ini menunjukkan masalah di level koneksi ECR yang sama dengan yang kami laporkan sebelumnya, atau masalah terpisah?
+
+Ini masalah kritis untuk kami karena beresiko pelanggan sudah terbayar tapi sistem kami mengira belum, berpotensi menyebabkan pelanggan diminta membayar dua kali. Mohon bantuannya secepatnya.
+
+Terima kasih banyak.

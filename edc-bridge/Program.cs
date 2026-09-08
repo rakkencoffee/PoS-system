@@ -5,6 +5,11 @@ using EdcBridge;
 //        EdcBridge.exe daemon                        (same, explicit)
 //        EdcBridge.exe <amount_in_rupiah>            (one-shot manual test — card Purchase)
 //        EdcBridge.exe qris <amount_in_rupiah>        (one-shot manual test — QRIS Generate)
+//        EdcBridge.exe qris-inquiry                   (one-shot manual test — QRIS Inquiry Last Trans,
+//                                                       call after qris to check if the customer paid)
+//        EdcBridge.exe last-transaction                (one-shot manual test — Resend Last Transaction,
+//                                                       call after a card Purchase that timed out to see
+//                                                       if the real APPROVED/DECLINED result is retrievable)
 //
 // Why a hidden WinForms host: POS4CAT_Ctl.dll drives its request/COMStatus state machine
 // with Win32 SetTimer/WM_TIMER (confirmed via catlog — POS4EDC_Test.exe, a WinForms app
@@ -64,25 +69,51 @@ internal static class Program
     private static int RunOneShotTest(string[] args)
     {
         var isQris = args[0].Equals("qris", StringComparison.OrdinalIgnoreCase);
-        var amountArg = isQris ? args.ElementAtOrDefault(1) : args.ElementAtOrDefault(0);
+        var isQrisInquiry = args[0].Equals("qris-inquiry", StringComparison.OrdinalIgnoreCase);
+        var isLastTransaction = args[0].Equals("last-transaction", StringComparison.OrdinalIgnoreCase);
+        var needsNoAmount = isQrisInquiry || isLastTransaction;
 
-        if (amountArg is null || !int.TryParse(amountArg, out var amount) || amount <= 0)
+        int amount = 0;
+        if (!needsNoAmount)
         {
-            Console.WriteLine("Usage: EdcBridge.exe                          (daemon)");
-            Console.WriteLine("       EdcBridge.exe <amount_in_rupiah>       (card Purchase test)");
-            Console.WriteLine("       EdcBridge.exe qris <amount_in_rupiah>  (QRIS Generate test)");
-            return 1;
+            var amountArg = isQris ? args.ElementAtOrDefault(1) : args.ElementAtOrDefault(0);
+            if (amountArg is null || !int.TryParse(amountArg, out amount) || amount <= 0)
+            {
+                Console.WriteLine("Usage: EdcBridge.exe                          (daemon)");
+                Console.WriteLine("       EdcBridge.exe <amount_in_rupiah>       (card Purchase test)");
+                Console.WriteLine("       EdcBridge.exe qris <amount_in_rupiah>  (QRIS Generate test)");
+                Console.WriteLine("       EdcBridge.exe qris-inquiry             (QRIS Inquiry Last Trans test)");
+                Console.WriteLine("       EdcBridge.exe last-transaction         (Resend Last Transaction test)");
+                return 1;
+            }
         }
 
         EdcResult? cardResult = null;
         EdcQrisResult? qrisResult = null;
 
         using var hiddenForm = CreateHiddenForm();
-        using var dialogCloser = new DialogAutoCloser(hiddenForm);
+        // No DialogAutoCloser here (unlike the daemon) -- one-shot manual tests are
+        // for developer debugging, so every native dialog stays fully visible and
+        // un-clicked. This matters especially for QRIS right now: the "safe to
+        // auto-click" finding for "Initialize EDC communicate" was only ever
+        // validated against the Purchase (card) flow, never QRIS -- if that click
+        // fires at the wrong point in QRIS's own state machine it could be exactly
+        // what's corrupting the QR render, the same way clicking "Please check EDC
+        // display" once broke real card transactions.
         hiddenForm.Shown += (_, _) =>
         {
             var client = new EdcClient();
-            if (isQris)
+            if (isLastTransaction)
+            {
+                Console.WriteLine("Mengambil ulang hasil transaksi terakhir (Resend Last Transaction)...");
+                cardResult = client.GetLastTransaction();
+            }
+            else if (isQrisInquiry)
+            {
+                Console.WriteLine("Mengecek status transaksi QRIS terakhir...");
+                qrisResult = client.InquiryQrisLastTransaction();
+            }
+            else if (isQris)
             {
                 Console.WriteLine($"Generate QRIS amount={amount} di EDC...");
                 Console.WriteLine("(cek layar EDC — minta pelanggan scan QR pakai e-wallet/m-banking)");
@@ -101,7 +132,7 @@ internal static class Program
         Application.Run(hiddenForm);
 
         Console.WriteLine();
-        return isQris ? PrintQrisResult(qrisResult) : PrintCardResult(cardResult);
+        return isQris || isQrisInquiry ? PrintQrisResult(qrisResult) : PrintCardResult(cardResult);
     }
 
     private static Form CreateHiddenForm() => new()
@@ -161,6 +192,8 @@ internal static class Program
             Console.WriteLine($"ReferenceId     : {result.ReferenceId}");
             Console.WriteLine($"CustomerName    : {result.CustomerName}");
             Console.WriteLine($"SaleAmount      : {result.SaleAmount}");
+            Console.WriteLine($"TIP             : {result.Tip}");
+            Console.WriteLine($"TotalAmount     : {result.TotalAmount}");
             Console.WriteLine($"Date/Time       : {result.TransactionDate} {result.TransactionTime}");
         }
         else
