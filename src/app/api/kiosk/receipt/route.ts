@@ -20,7 +20,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'total is required' }, { status: 400 });
     }
 
-    const buffer = formatReceipt(data, 48, false);
+    // Auto-cut via software GS V command -- confirmed working cleanly on the
+    // IW-J300H (see format-receipt.ts), unlike the printer's own firmware
+    // "Auto Append Cut Function" which jammed. Was left off here (likely an
+    // oversight from when this endpoint was first built), so kiosk receipts
+    // never got cut even though the mechanism already worked.
+    const buffer = formatReceipt(data, 48, true);
     return NextResponse.json({ bytes: buffer.toString('base64') });
   } catch (error) {
     console.error('[KioskReceipt] Failed to format receipt:', error);
