@@ -42,7 +42,14 @@ export async function GET(request: NextRequest) {
           const localActiveOrders = await prisma.order.findMany({
             where: {
               createdAt: { gte: startOfTodayWIB() },
-              status: { not: 'CANCELLED' },
+              // PENDING = payment not confirmed yet (order row is created
+              // synchronously at checkout, before the EDC/QRIS job even
+              // starts) -- excluding only CANCELLED let unpaid orders reach
+              // the KDS board the instant checkout was submitted, letting
+              // staff start making a drink nobody had paid for yet
+              // (confirmed live 2026-09-08). Only PAID (and later
+              // PROCESSING/PREPARING/READY) orders belong on the board.
+              status: { notIn: ['CANCELLED', 'PENDING'] },
               NOT: { baristaStatus: 'COMPLETED', kitchenStatus: 'COMPLETED' },
             },
             include: { items: true },
