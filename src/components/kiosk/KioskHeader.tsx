@@ -1,7 +1,9 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { KioskPrinterPairing } from './KioskPrinterPairing';
+import { getKioskDeviceId } from '@/lib/kiosk-device';
 
 const JKT = { fontFamily: 'var(--font-plus-jakarta-sans)' };
 
@@ -27,6 +29,17 @@ export function KioskHeader({
   searchPlaceholder = 'Search your favorite coffee...',
 }: KioskHeaderProps) {
   const router = useRouter();
+  const [deviceId, setDeviceId] = useState<string | null>(null);
+
+  // Read client-side only (localStorage) so staff can glance at the header
+  // instead of needing DevTools to confirm which physical EDC terminal this
+  // tablet is bound to -- the ?device=A query param disappears from the URL
+  // bar after the first client-side navigation (see kiosk-device.ts), which
+  // understandably looked broken to non-technical staff even though routing
+  // itself was working fine underneath.
+  useEffect(() => {
+    setDeviceId(getKioskDeviceId());
+  }, []);
 
   return (
     <header className="sticky top-0 z-50 flex justify-between items-center px-12 py-3 bg-white shadow-sm border-b border-[#f3e0be]/40">
@@ -38,6 +51,15 @@ export function KioskHeader({
         <h1 className="text-[22px] font-extrabold text-[#78000f] tracking-tight" style={JKT}>
           RAKKEN COFFEE
         </h1>
+        {deviceId && (
+          <span
+            className="text-[11px] font-bold text-[#998075] bg-[#F5F5F5] rounded-full px-2 py-0.5"
+            style={JKT}
+            title="Kiosk ini terhubung ke mesin EDC berikut"
+          >
+            Mesin {deviceId}
+          </span>
+        )}
       </button>
 
       {/* Centre search */}
