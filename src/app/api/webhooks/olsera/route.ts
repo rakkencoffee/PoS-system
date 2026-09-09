@@ -198,6 +198,19 @@ export async function POST(req: Request) {
         };
         await pusherServer.trigger('kitchen', 'ORDER_UPDATED', { order: orderPayload });
 
+        // 2b. Also broadcast on the per-order channel the Member App
+        // Tracking page subscribes to (see src/app/api/orders/[id]/route.ts
+        // for the same pattern on the kiosk-staff-update path).
+        try {
+          await pusherServer.trigger(`order-${localOrderId}`, 'STATUS_UPDATE', {
+            status: orderPayload.status,
+            baristaStatus: orderPayload.baristaStatus,
+            kitchenStatus: orderPayload.kitchenStatus,
+          });
+        } catch (pusherErr) {
+          console.warn(`[Pusher] Failed to broadcast order-${localOrderId} STATUS_UPDATE:`, pusherErr);
+        }
+
         // 3. Broadcast to Admin Reports
         await pusherServer.trigger('admin-reports', 'SALES_UPDATED', {
           orderId: localOrderId,

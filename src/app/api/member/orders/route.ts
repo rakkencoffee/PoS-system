@@ -3,6 +3,38 @@ import { prisma } from '@/lib/db';
 import { requireMemberApiKey } from '@/lib/member-api-guard';
 
 /**
+ * GET /api/member/orders?memberId=...
+ *
+ * Order history list for the Riwayat Pesanan page — newest first, items
+ * included so the list can show a short summary without a second request.
+ */
+export async function GET(request: NextRequest) {
+  const guardError = requireMemberApiKey(request);
+  if (guardError) return guardError;
+
+  const memberId = request.nextUrl.searchParams.get('memberId');
+  if (!memberId) {
+    return NextResponse.json({ error: 'memberId is required' }, { status: 400 });
+  }
+
+  const orders = await prisma.order.findMany({
+    where: { memberId },
+    orderBy: { createdAt: 'desc' },
+    include: { items: true },
+  });
+
+  return NextResponse.json(
+    orders.map((order) => ({
+      id: order.id,
+      status: order.status,
+      total: order.total,
+      createdAt: order.createdAt,
+      items: order.items.map((item) => ({ name: item.name, quantity: item.quantity })),
+    }))
+  );
+}
+
+/**
  * POST /api/member/orders
  *
  * Creates a pickup order for a member. Reuses pos.adapter.createOrder() —

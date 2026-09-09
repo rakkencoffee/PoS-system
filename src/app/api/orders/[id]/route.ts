@@ -614,6 +614,19 @@ export async function PATCH(
         console.warn('[Pusher] Failed to broadcast ORDER_UPDATED:', pusherErr);
       }
 
+      // Also broadcast on a per-order channel — this is what the Member App
+      // Tracking page subscribes to (kept separate from `kitchen`, which is
+      // a shared channel not scoped to one member's order).
+      try {
+        await pusherServer.trigger(`order-${id}`, 'STATUS_UPDATE', {
+          status: updatedOrder.status,
+          baristaStatus: updatedOrder.baristaStatus,
+          kitchenStatus: updatedOrder.kitchenStatus,
+        });
+      } catch (pusherErr) {
+        console.warn(`[Pusher] Failed to broadcast order-${id} STATUS_UPDATE:`, pusherErr);
+      }
+
       return NextResponse.json(updatedOrder);
     } else {
       throw new Error("Local database (Prisma) is no longer supported for updating orders.");
