@@ -7,7 +7,8 @@ export type StatusLogSource =
   | 'kds_manual'
   | 'olsera_webhook'
   | 'system_recovery'
-  | 'edc_bridge';
+  | 'edc_bridge'
+  | 'kiosk_cancelled';
 
 export type StatusField = 'order' | 'barista' | 'kitchen';
 

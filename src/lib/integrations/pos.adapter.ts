@@ -823,6 +823,44 @@ export async function createOrder(
 }
 
 /**
+ * Cancel an order that never got paid -- customer backed out of the EDC
+ * payment screen, or staff gave up on a genuinely-failed transaction.
+ * Marks the local Order CANCELLED (never touches an already-PAID order) and
+ * best-effort voids the matching Olsera Open Order, so an abandoned kiosk
+ * checkout doesn't sit there forever looking like a live unpaid order --
+ * confirmed live 2026-09-09 that the kiosk's own "Batalkan" button only ever
+ * reset the checkout page's local state, with no cancellation reaching
+ * either the local database or Olsera.
+ */
+export async function cancelOrder(
+  orderId: string,
+  source: StatusLogSource = "kiosk_cancelled",
+): Promise<void> {
+  const { prisma } = await import("@/lib/db");
+
+  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!order || order.status === "PAID" || order.status === "CANCELLED") return;
+
+  await prisma.order.update({ where: { id: orderId }, data: { status: "CANCELLED" } });
+  await logOrderStatusChange({
+    orderId,
+    statusField: "order",
+    fromStatus: order.status,
+    toStatus: "CANCELLED",
+    source,
+  });
+
+  if (USE_OLSERA && orderId.startsWith("OLSERA-") && !orderId.includes("TEST")) {
+    const olseraOrderId = parseInt(orderId.replace("OLSERA-", ""));
+    try {
+      await olsera.updateOrderStatus(olseraOrderId, "X");
+    } catch (err) {
+      console.warn(`[Cancel] Failed to void order ${orderId} in Olsera (non-blocking):`, err);
+    }
+  }
+}
+
+/**
  * Update order status after payment
  * For Olsera: runs the full auto-settlement flow
  */

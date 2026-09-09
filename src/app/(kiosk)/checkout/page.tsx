@@ -135,6 +135,18 @@ export default function CheckoutNewPage() {
     router.push(`/success?orderId=${data.orderId}&queue=${queueNum}${orderNoParam}`);
   };
 
+  // Voids the order locally and in Olsera so an abandoned EDC payment
+  // doesn't sit forever as an unpaid Open Order -- confirmed live 2026-09-09
+  // that "Batalkan" only ever reset this page's own state, never reaching
+  // the backend at all.
+  const cancelEdcOrder = async (orderId: string) => {
+    try {
+      await fetch(`/api/orders/${orderId}/cancel`, { method: 'POST' });
+    } catch (err) {
+      console.warn('[Checkout] Failed to cancel order (non-blocking):', err);
+    }
+  };
+
   const handleCheckout = async () => {
     checkoutInProgress.current = true;
     setIsProcessing(true);
@@ -729,6 +741,7 @@ export default function CheckoutNewPage() {
           method={paymentMethod === 'EDC_QRIS' ? 'QRIS' : 'CARD'}
           onApproved={() => finalizeOrder(edcOrder)}
           onCancel={() => {
+            cancelEdcOrder(edcOrder.orderId);
             setEdcOrder(null);
             checkoutInProgress.current = false;
           }}
