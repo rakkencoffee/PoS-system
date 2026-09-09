@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { requireMemberApiKey } from '@/lib/member-api-guard';
 
@@ -43,14 +44,23 @@ export async function GET(request: NextRequest) {
  * addition is tagging the resulting Order row with channel=MEMBER_APP and
  * memberId, which createOrder() has no reason to know about.
  *
- * Body: { memberId, items: [{ productId, variantId?, quantity, price, name, note?, options? }] }
+ * Body: { memberId, items: [...], redeemedRewardId?: string }
+ *
+ * redeemedRewardId is validated and priced SERVER-SIDE (never trust a raw
+ * discountAmount from the client) — see RedeemedReward in schema.prisma
+ * for the redeem->checkout bridge this closes. VOUCHER rewards become a
+ * discountAmount on the whole order (same discountAmount/voucherCode path
+ * the kiosk's hardcoded vouchers already use in createOrder()); FREE_ITEM
+ * rewards are simpler than originally planned — the linked product is just
+ * appended to `items` at price 0, no discount-scoping needed. MERCHANDISE
+ * is rejected here; those are claimed physically at the outlet.
  */
 export async function POST(request: NextRequest) {
   const guardError = requireMemberApiKey(request);
   if (guardError) return guardError;
 
   const body = await request.json();
-  const { memberId, items } = body;
+  const { memberId, items, redeemedRewardId } = body;
 
   if (!memberId || !Array.isArray(items) || items.length === 0) {
     return NextResponse.json({ error: 'memberId and a non-empty items array are required' }, { status: 400 });
@@ -61,12 +71,57 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Member not found' }, { status: 404 });
   }
 
+  let discountAmount = 0;
+  let orderItems = items;
+  let redeemedReward: Prisma.RedeemedRewardGetPayload<{ include: { rewardsCatalog: true } }> | null = null;
+
+  if (redeemedRewardId) {
+    redeemedReward = await prisma.redeemedReward.findUnique({
+      where: { id: redeemedRewardId },
+      include: { rewardsCatalog: true },
+    });
+
+    if (
+      !redeemedReward ||
+      redeemedReward.memberId !== memberId ||
+      redeemedReward.status !== 'AVAILABLE' ||
+      redeemedReward.expiresAt < new Date()
+    ) {
+      return NextResponse.json({ error: 'Redeemed reward is not available' }, { status: 400 });
+    }
+
+    const reward = redeemedReward.rewardsCatalog;
+    if (reward.category === 'MERCHANDISE') {
+      return NextResponse.json({ error: 'Merchandise rewards are claimed at the outlet, not at checkout' }, { status: 400 });
+    }
+
+    if (reward.category === 'VOUCHER') {
+      const cartTotal = items.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0);
+      discountAmount =
+        reward.discountType === 'PERCENTAGE'
+          ? Math.round((cartTotal * (reward.discountValue || 0)) / 100)
+          : reward.discountValue || 0;
+      discountAmount = Math.min(discountAmount, cartTotal);
+    } else if (reward.category === 'FREE_ITEM') {
+      if (!reward.linkedProductId) {
+        return NextResponse.json({ error: 'Reward has no linked product' }, { status: 500 });
+      }
+      const posAdapter = await import('@/lib/integrations/pos.adapter');
+      const menuItems = await posAdapter.getMenuItems();
+      const product = menuItems.find((m) => m.id === reward.linkedProductId);
+      if (!product) {
+        return NextResponse.json({ error: 'Linked product is no longer available' }, { status: 400 });
+      }
+      orderItems = [...items, { productId: product.id, quantity: 1, price: 0, name: product.name }];
+    }
+  }
+
   try {
     const posAdapter = await import('@/lib/integrations/pos.adapter');
     const order = await posAdapter.createOrder(
-      items,
+      orderItems,
       member.name,
-      0, // discountAmount — reward redemption (Bab 5) not wired to this endpoint yet
+      discountAmount,
       undefined, // voucherCode
       member.phone
     );
@@ -77,6 +132,13 @@ export async function POST(request: NextRequest) {
       where: { id: order.orderId },
       data: { channel: 'MEMBER_APP', memberId },
     });
+
+    if (redeemedReward) {
+      await prisma.redeemedReward.update({
+        where: { id: redeemedReward.id },
+        data: { status: 'USED', usedInOrderId: order.orderId },
+      });
+    }
 
     return NextResponse.json({
       orderId: order.orderId,

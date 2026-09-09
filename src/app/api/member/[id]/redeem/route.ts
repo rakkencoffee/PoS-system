@@ -13,18 +13,17 @@ import { requireMemberApiKey } from '@/lib/member-api-guard';
  * DECISION (2026-09-03): redemption does NOT create a separate Olsera
  * "Discount Voucher" — olsera.service.ts has no voucher-creation function,
  * and guessing its request shape risked writing bad data to the real
- * Olsera account. Instead, a redeemed VOUCHER-category reward is meant to
- * be applied as a plain discountAmount on the member's next order via
+ * Olsera account. Instead, a redeemed VOUCHER-category reward is applied
+ * as a plain discountAmount on the member's next order via
  * POST /api/member/orders, which already threads discountAmount/voucherCode
  * straight into pos.adapter.createOrder() (the same mechanism the kiosk's
  * own hardcoded voucher codes use) — so the discount still lands on the
  * real Olsera order, just not as a separate Voucher entity.
  *
- * NOT YET DESIGNED: there is no structured "this member has an unused
- * redeemed voucher worth Rp X" state anywhere — this endpoint only spends
- * the points. Wiring redemption through to an actual checkout discount is
- * a separate open question, tracked in docs/reference/LOYALTY-MEMBER-APP.md,
- * not solved here.
+ * UPDATE (2026-09-09): the redeem->checkout bridge is now built. This
+ * endpoint additionally creates a RedeemedReward row (30-day validity) —
+ * that's the "this member has an unused redeemed voucher" state that was
+ * missing before. See POST /api/member/orders for how it's consumed.
  */
 export async function POST(
   request: NextRequest,
@@ -91,6 +90,14 @@ export async function POST(
 
       await tx.pointLedger.create({
         data: { memberId, type: 'REDEEM', amount: -reward.pointCost, note: `Redeem: ${reward.name}` },
+      });
+
+      await tx.redeemedReward.create({
+        data: {
+          memberId,
+          rewardsCatalogId: rewardId,
+          expiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+        },
       });
     });
   } catch (err) {

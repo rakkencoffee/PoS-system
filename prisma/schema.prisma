@@ -240,6 +240,7 @@ model Member {
   orders          Order[]
   pointLedger     PointLedger[]
   claimedBenefits ClaimedBenefit[]
+  redeemedRewards RedeemedReward[]
 
   @@index([tierLevel])
 }
@@ -306,7 +307,12 @@ model RewardsCatalog {
   // relevan buat category FREE_ITEM (snack, pakai linkedProductId) atau
   // MERCHANDISE (merch). Diharapkan cuma 1 baris ter-flag true per category.
   isBirthdayReward Boolean          @default(false)
+  // Cuma relevan buat category=VOUCHER — jenis & besaran diskon yang
+  // diterapkan ke order pas RedeemedReward ini dipakai di checkout.
+  discountType     DiscountType?
+  discountValue    Int?
   claimedBenefits  ClaimedBenefit[]
+  redeemedRewards  RedeemedReward[]
   validFrom        DateTime?
   validUntil       DateTime?
   createdAt        DateTime         @default(now())
@@ -314,6 +320,37 @@ model RewardsCatalog {
 
   @@index([isActive])
   @@index([category])
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+// "Dompet" hasil redeem member — dibuat begitu POST /member/:id/redeem
+// sukses, dipakai (atau kedaluwarsa) begitu member checkout dengan
+// redeemedRewardId ini di POST /member/orders. Beda dari ClaimedBenefit
+// (otomatis dari sistem tier/ultah) — ini murni inisiatif member sendiri
+// nuker poin kapan pun mereka mau.
+model RedeemedReward {
+  id               String               @id @default(cuid())
+  memberId         String
+  rewardsCatalogId String
+  status           RedeemedRewardStatus @default(AVAILABLE)
+  redeemedAt       DateTime             @default(now())
+  expiresAt        DateTime // redeemedAt + 30 hari
+  usedInOrderId    String?
+
+  member         Member         @relation(fields: [memberId], references: [id])
+  rewardsCatalog RewardsCatalog @relation(fields: [rewardsCatalogId], references: [id])
+
+  @@index([memberId, status])
+}
+
+enum RedeemedRewardStatus {
+  AVAILABLE
+  USED
+  EXPIRED
 }
 
 // Catatan klaim manual benefit tier (upgrade/ulang tahun/hari member) —
