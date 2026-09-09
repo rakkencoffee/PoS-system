@@ -8,7 +8,7 @@ import { getLoyaltyConfig } from '@/lib/loyalty';
  * PUT /api/member/admin/config — upsert either or both.
  *
  * Body (PUT): {
- *   tierRules?: [{ level, name, minSpend, upgradeVoucherPercent, birthdayPointMultiplier, weeklyDiscountPercent }],
+ *   tierRules?: [{ level, name, minSpend, upgradeVoucherPercent, weeklyDiscountPercent, birthdayFreeBeverage, birthdayFreeSnack, birthdayFreeMerch }],
  *   loyaltyConfig?: { pointRatePerRupiah?, pointExpiryMonths?, tierPeriodDays?, tierUpgradeClaimWindowDays?, weeklyMemberDayOfWeek? }
  * }
  */
