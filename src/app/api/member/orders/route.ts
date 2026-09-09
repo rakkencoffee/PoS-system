@@ -35,6 +35,151 @@ export async function GET(request: NextRequest) {
   );
 }
 
+// Categories whose items count as "minuman" for the BIRTHDAY free-beverage
+// benefit — derived from real Olsera category slugs (checked via a
+// throwaway script against getMenuItems()), not guessed. dessert/bites/
+// main-course are food, so they're excluded.
+const BEVERAGE_CATEGORY_SLUGS = new Set(['non-coffee', 'rakken-signature', 'rakken-style', 'refreshment']);
+
+type OrderItemInput = {
+  productId: string;
+  variantId?: string;
+  quantity: number;
+  price?: number;
+  note?: string;
+  name?: string;
+  options?: any;
+};
+
+/**
+ * Reduces the price of exactly ONE unit among items matching `predicate`
+ * (the cheapest or most expensive, per `pick`) — splitting its line in two
+ * when quantity > 1, so a benefit never silently discounts every unit of a
+ * multi-quantity line. Mutates `orderItems` in place. Returns null if no
+ * item matched the predicate.
+ */
+function adjustOneUnitPrice(
+  orderItems: OrderItemInput[],
+  predicate: (item: OrderItemInput) => boolean,
+  pick: 'max' | 'min',
+  newPrice: (currentPrice: number) => number
+): { originalPrice: number } | null {
+  let targetIndex = -1;
+  let targetPrice = pick === 'max' ? -Infinity : Infinity;
+  orderItems.forEach((item, index) => {
+    if (!predicate(item)) return;
+    const price = item.price ?? 0;
+    if ((pick === 'max' && price > targetPrice) || (pick === 'min' && price < targetPrice)) {
+      targetPrice = price;
+      targetIndex = index;
+    }
+  });
+  if (targetIndex === -1) return null;
+
+  const target = orderItems[targetIndex];
+  const originalPrice = target.price ?? 0;
+  if (target.quantity > 1) {
+    orderItems[targetIndex] = { ...target, quantity: target.quantity - 1 };
+    orderItems.splice(targetIndex + 1, 0, { ...target, quantity: 1, price: newPrice(originalPrice) });
+  } else {
+    orderItems[targetIndex] = { ...target, price: newPrice(originalPrice) };
+  }
+  return { originalPrice };
+}
+
+/**
+ * Validates + applies one ClaimedBenefit (automated tier-upgrade/birthday/
+ * weekly-member-day rewards — see ClaimedBenefit in schema.prisma) to the
+ * cart. Mutates `orderItems` directly for item-scoped benefits (TIER_UPGRADE,
+ * BIRTHDAY) instead of going through createOrder()'s proportional
+ * discountAmount split, so the discount lands on exactly the right item(s)
+ * with no risk to the shared kiosk order path. WEEKLY_MEMBER_DAY is a flat
+ * % off the whole order, so it returns a discountAmount instead.
+ */
+async function applyClaimedBenefit(
+  claimedBenefitId: string,
+  memberId: string,
+  orderItems: OrderItemInput[]
+): Promise<{ error: NextResponse } | { discountAmount: number; benefitId: string }> {
+  const benefit = await prisma.claimedBenefit.findUnique({
+    where: { id: claimedBenefitId },
+    include: { rewardsCatalog: true },
+  });
+
+  if (
+    !benefit ||
+    benefit.memberId !== memberId ||
+    benefit.status !== 'AVAILABLE' ||
+    benefit.expiresAt < new Date()
+  ) {
+    return { error: NextResponse.json({ error: 'Claimed benefit is not available' }, { status: 400 }) };
+  }
+
+  if (benefit.type === 'TIER_UPGRADE') {
+    const tierRule = benefit.tierLevelReached
+      ? await prisma.tierRule.findUnique({ where: { level: benefit.tierLevelReached } })
+      : null;
+    if (!tierRule) {
+      return { error: NextResponse.json({ error: 'Tier rule for this benefit no longer exists' }, { status: 500 }) };
+    }
+    const result = adjustOneUnitPrice(orderItems, () => true, 'max', (price) =>
+      Math.round(price * (1 - tierRule.upgradeVoucherPercent / 100))
+    );
+    if (!result) {
+      return { error: NextResponse.json({ error: 'Cart is empty' }, { status: 400 }) };
+    }
+  } else if (benefit.type === 'WEEKLY_MEMBER_DAY') {
+    const member = await prisma.member.findUnique({ where: { id: memberId }, select: { tierLevel: true } });
+    const tierRule = member ? await prisma.tierRule.findUnique({ where: { level: member.tierLevel } }) : null;
+    if (!tierRule) {
+      return { error: NextResponse.json({ error: 'Tier rule for this member no longer exists' }, { status: 500 }) };
+    }
+    const cartTotal = orderItems.reduce((sum, item) => sum + (item.price ?? 0) * item.quantity, 0);
+    return { discountAmount: Math.round((cartTotal * tierRule.weeklyDiscountPercent) / 100), benefitId: benefit.id };
+  } else if (benefit.type === 'BIRTHDAY') {
+    if (benefit.rewardsCatalogId) {
+      const reward = benefit.rewardsCatalog!;
+      if (reward.category === 'MERCHANDISE') {
+        return {
+          error: NextResponse.json(
+            { error: 'Merchandise rewards are claimed at the outlet, not at checkout' },
+            { status: 400 }
+          ),
+        };
+      }
+      if (!reward.linkedProductId) {
+        return { error: NextResponse.json({ error: 'Reward has no linked product' }, { status: 500 }) };
+      }
+      const posAdapter = await import('@/lib/integrations/pos.adapter');
+      const menuItems = await posAdapter.getMenuItems();
+      const product = menuItems.find((m) => m.id === reward.linkedProductId);
+      if (!product) {
+        return { error: NextResponse.json({ error: 'Linked product is no longer available' }, { status: 400 }) };
+      }
+      orderItems.push({ productId: product.id, quantity: 1, price: 0, name: product.name });
+    } else {
+      // Generic free-beverage perk — cheapest item that IS a beverage among
+      // what's actually in the cart, not just the cheapest item overall.
+      const posAdapter = await import('@/lib/integrations/pos.adapter');
+      const menuItems = await posAdapter.getMenuItems();
+      const categoryByProductId = new Map(menuItems.map((m) => [m.id, m.categorySlug]));
+      const isBeverage = (item: OrderItemInput) =>
+        BEVERAGE_CATEGORY_SLUGS.has(categoryByProductId.get(item.productId) ?? '');
+      const result = adjustOneUnitPrice(orderItems, isBeverage, 'min', () => 0);
+      if (!result) {
+        return {
+          error: NextResponse.json(
+            { error: 'Beli minimal 1 minuman dulu untuk klaim gratis minuman ulang tahun' },
+            { status: 400 }
+          ),
+        };
+      }
+    }
+  }
+
+  return { discountAmount: 0, benefitId: benefit.id };
+}
+
 /**
  * POST /api/member/orders
  *
@@ -44,7 +189,7 @@ export async function GET(request: NextRequest) {
  * addition is tagging the resulting Order row with channel=MEMBER_APP and
  * memberId, which createOrder() has no reason to know about.
  *
- * Body: { memberId, items: [...], redeemedRewardId?: string }
+ * Body: { memberId, items: [...], redeemedRewardId?: string, claimedBenefitId?: string }
  *
  * redeemedRewardId is validated and priced SERVER-SIDE (never trust a raw
  * discountAmount from the client) — see RedeemedReward in schema.prisma
@@ -54,13 +199,18 @@ export async function GET(request: NextRequest) {
  * rewards are simpler than originally planned — the linked product is just
  * appended to `items` at price 0, no discount-scoping needed. MERCHANDISE
  * is rejected here; those are claimed physically at the outlet.
+ *
+ * claimedBenefitId closes the same bridge for ClaimedBenefit (the automated
+ * tier-upgrade/birthday/weekly-member-day rewards) — see applyClaimedBenefit
+ * above. Both can be used in the same order since they're independent
+ * wallets (member-initiated redeem vs. automatic system grant).
  */
 export async function POST(request: NextRequest) {
   const guardError = requireMemberApiKey(request);
   if (guardError) return guardError;
 
   const body = await request.json();
-  const { memberId, items, redeemedRewardId } = body;
+  const { memberId, items, redeemedRewardId, claimedBenefitId } = body;
 
   if (!memberId || !Array.isArray(items) || items.length === 0) {
     return NextResponse.json({ error: 'memberId and a non-empty items array are required' }, { status: 400 });
@@ -72,7 +222,7 @@ export async function POST(request: NextRequest) {
   }
 
   let discountAmount = 0;
-  let orderItems = items;
+  let orderItems: OrderItemInput[] = items.map((item: OrderItemInput) => ({ ...item }));
   let redeemedReward: Prisma.RedeemedRewardGetPayload<{ include: { rewardsCatalog: true } }> | null = null;
 
   if (redeemedRewardId) {
@@ -112,8 +262,16 @@ export async function POST(request: NextRequest) {
       if (!product) {
         return NextResponse.json({ error: 'Linked product is no longer available' }, { status: 400 });
       }
-      orderItems = [...items, { productId: product.id, quantity: 1, price: 0, name: product.name }];
+      orderItems.push({ productId: product.id, quantity: 1, price: 0, name: product.name });
     }
+  }
+
+  if (claimedBenefitId) {
+    const result = await applyClaimedBenefit(claimedBenefitId, memberId, orderItems);
+    if ('error' in result) {
+      return result.error;
+    }
+    discountAmount += result.discountAmount;
   }
 
   try {
@@ -137,6 +295,13 @@ export async function POST(request: NextRequest) {
       await prisma.redeemedReward.update({
         where: { id: redeemedReward.id },
         data: { status: 'USED', usedInOrderId: order.orderId },
+      });
+    }
+
+    if (claimedBenefitId) {
+      await prisma.claimedBenefit.update({
+        where: { id: claimedBenefitId },
+        data: { status: 'CLAIMED', claimedAt: new Date(), usedInOrderId: order.orderId },
       });
     }
 
