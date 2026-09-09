@@ -193,7 +193,7 @@ export function EdcPaymentFlow({ orderId, amount, method = 'CARD', onApproved, o
               {formatCurrency(amount)}
             </span>
 
-            <EdcPaymentAnimation className="py-section-item" />
+            <EdcPaymentAnimation className="py-section-item" method={method} />
 
             <p className="text-near-black text-center font-body-lg font-semibold">
               {method === 'QRIS' ? 'Scan QR di layar mesin EDC' : 'Tap kartu atau masukan kartu'}

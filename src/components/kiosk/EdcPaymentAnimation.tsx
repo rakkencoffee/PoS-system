@@ -2,22 +2,42 @@ import Image from 'next/image';
 
 interface EdcPaymentAnimationProps {
   className?: string;
+  method?: 'CARD' | 'QRIS';
 }
+
+// Each method's pair of frames, cross-faded by the same keyframes below --
+// the animation itself doesn't care about content, only the asset paths and
+// alt text differ. Same 3D-icon illustration style, generated to match the
+// existing card artwork (cream/mauve terminal, maroon-red accents).
+const FRAMES = {
+  CARD: {
+    first: '/images/kiosk/edc-payment-tap.png',
+    second: '/images/kiosk/edc-payment-insert.png',
+    alt: 'Animasi kartu ditap lalu dimasukkan ke mesin EDC',
+  },
+  QRIS: {
+    first: '/images/kiosk/edc-payment-qr-display.png',
+    second: '/images/kiosk/edc-payment-qr-scan.png',
+    alt: 'Animasi kode QR di layar mesin EDC dipindai dengan ponsel',
+  },
+} as const;
 
 /**
  * Cross-fades between two locally generated raster illustrations.
  * The EDC artwork is kept outside the component so the animation stays cheap.
  */
-export default function EdcPaymentAnimation({ className = '' }: EdcPaymentAnimationProps) {
+export default function EdcPaymentAnimation({ className = '', method = 'CARD' }: EdcPaymentAnimationProps) {
+  const frames = FRAMES[method];
+
   return (
     <div
       className={`relative aspect-square w-full max-w-[300px] overflow-hidden ${className}`.trim()}
       role="img"
-      aria-label="Animasi kartu ditap lalu dimasukkan ke mesin EDC"
+      aria-label={frames.alt}
     >
       <div className="edc-payment-image edc-payment-image--tap" aria-hidden="true">
         <Image
-          src="/images/kiosk/edc-payment-tap.png"
+          src={frames.first}
           alt=""
           fill
           priority
@@ -29,7 +49,7 @@ export default function EdcPaymentAnimation({ className = '' }: EdcPaymentAnimat
 
       <div className="edc-payment-image edc-payment-image--insert" aria-hidden="true">
         <Image
-          src="/images/kiosk/edc-payment-insert.png"
+          src={frames.second}
           alt=""
           fill
           priority
