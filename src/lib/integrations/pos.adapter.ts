@@ -996,6 +996,20 @@ export async function updateOrderPaymentStatus(
           );
         }
 
+        // Per-order channel — this is what the Member App checkout/tracking
+        // pages subscribe to, so payment confirmation (from any settlement
+        // path: EDC, simulate-pay, Tripay webhook) reaches them instantly.
+        try {
+          const { pusherServer } = await import("@/lib/pusher");
+          await pusherServer.trigger(`order-${orderId}`, "STATUS_UPDATE", {
+            status: "PAID",
+            baristaStatus: "PENDING",
+            kitchenStatus: "PENDING",
+          });
+        } catch (pusherErr) {
+          console.warn(`[Pusher] Failed to broadcast order-${orderId} STATUS_UPDATE:`, pusherErr);
+        }
+
         // Step 4: Broadcast to Admin Reports (Sprint 4)
         try {
           const { pusherServer } = await import("@/lib/pusher");

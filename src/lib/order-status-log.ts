@@ -8,7 +8,8 @@ export type StatusLogSource =
   | 'olsera_webhook'
   | 'system_recovery'
   | 'edc_bridge'
-  | 'kiosk_cancelled';
+  | 'kiosk_cancelled'
+  | 'tripay_webhook';
 
 export type StatusField = 'order' | 'barista' | 'kitchen';
 

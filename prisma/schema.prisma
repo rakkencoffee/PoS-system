@@ -39,6 +39,7 @@ model Order {
   olseraTransactionId String?
   channel             OrderChannel     @default(KIOSK) // KIOSK (existing) vs MEMBER_APP (loyalty, lihat PRD Bab 3)
   memberId            String?
+  tripayReference     String?          @unique // reference dari Tripay create-transaction, dipakai webhook buat lookup
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
   cashier             User             @relation(fields: [cashierId], references: [id])
