@@ -33,9 +33,6 @@ export default class ErrorBoundary extends Component<Props, State> {
       return this.props.fallback || (
         <div className="min-h-screen flex items-center justify-center p-8 bg-black">
           <div className="max-w-md w-full text-center space-y-6 animate-fade-in">
-            <div className="w-24 h-24 bg-[#A8131E]/20 rounded-3xl flex items-center justify-center mx-auto mb-4 border border-[#A8131E]/30">
-              <span className="text-5xl">☕</span>
-            </div>
             <h1 className="text-2xl font-bold text-white">Oops, Kopi Tumpah!</h1>
             <p className="text-zinc-400 text-sm leading-relaxed">
               Terjadi sedikit gangguan dI sistem. Jangan khawatir, pesanan Anda dI keranjang tetap aman.

@@ -12,17 +12,17 @@ import { runDailyLoyaltyEvaluation } from '@/lib/loyalty-cron';
  */
 async function handler() {
   try {
-    console.log('[Job] 🎂 Daily loyalty evaluation started...');
+    console.log('[Job] Daily loyalty evaluation started...');
 
     const result = await runDailyLoyaltyEvaluation();
 
     console.log(
-      `[Job] ✅ Loyalty evaluation done: ${result.birthdaysProcessed} birthday(s), ${result.weeklyMemberDayGenerated} Hari Member benefit(s)`
+      `[Job] Loyalty evaluation done: ${result.birthdaysProcessed} birthday(s), ${result.weeklyMemberDayGenerated} Hari Member benefit(s)`
     );
 
     return NextResponse.json({ success: true, ...result });
   } catch (err: any) {
-    console.error('[Job] ❌ Loyalty evaluation failed:', err);
+    console.error('[Job] Loyalty evaluation failed:', err);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }

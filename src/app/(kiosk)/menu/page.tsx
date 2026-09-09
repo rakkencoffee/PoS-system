@@ -44,7 +44,7 @@ function KioskProductCard({ item, onSelect, priority }: { item: MenuItem; onSele
             fetchPriority={priority ? "high" : "auto"}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-4xl opacity-30">☕</div>
+          <div className="w-full h-full" />
         )}
         {item.isBestSeller && (
           <span
@@ -103,7 +103,7 @@ function MobileProductCard({ item, onSelect, priority }: { item: MenuItem; onSel
             fetchPriority={priority ? "high" : "auto"}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-3xl opacity-30">☕</div>
+          <div className="w-full h-full" />
         )}
         {item.isBestSeller && (
           <span

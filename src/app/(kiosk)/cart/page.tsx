@@ -94,7 +94,7 @@ function KioskCartItemCard({
         {item.image ? (
           <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-3xl opacity-30">☕</div>
+          <div className="w-full h-full" />
         )}
       </div>
 
@@ -160,7 +160,7 @@ function MobileCartItemCard({
         {item.image ? (
           <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-2xl opacity-30">☕</div>
+          <div className="w-full h-full" />
         )}
       </div>
 

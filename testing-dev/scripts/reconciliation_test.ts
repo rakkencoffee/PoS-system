@@ -26,12 +26,12 @@ async function testSyncReconciliation() {
   const fallbackOrderId = `SF-${Date.now()}-TESTRECOVERY`;
   const paymentAmount = 25000;
 
-  console.log(`📦 Order ID Fallback: ${fallbackOrderId}`);
-  console.log(`💰 Jumlah Pembayaran: Rp ${paymentAmount.toLocaleString('id-ID')}`);
+  console.log(`Order ID Fallback: ${fallbackOrderId}`);
+  console.log(`Jumlah Pembayaran: Rp ${paymentAmount.toLocaleString('id-ID')}`);
   console.log('');
 
   // ─── SIMULASI WEBHOOK MIDTRANS ───
-  console.log('🔔 Midtrans Webhook masuk: pembayaran SUKSES untuk order SF-...');
+  console.log('Midtrans Webhook masuk: pembayaran SUKSES untuk order SF-...');
   console.log('   (Ini terjadi karena saat checkout awal, Olsera API gagal)\n');
 
   const startTime = Date.now();
@@ -41,7 +41,7 @@ async function testSyncReconciliation() {
 
     console.log(`\n⏱️ Durasi proses: ${duration}ms`);
   } catch (err: any) {
-    console.error(`❌ ERROR: ${err.message}`);
+    console.error(`ERROR: ${err.message}`);
   }
 
   console.log('\n═══════════════════════════════════════════════');
@@ -50,12 +50,12 @@ async function testSyncReconciliation() {
   console.log('');
   console.log('  Cek log di atas dan cari kata kunci:');
   console.log('');
-  console.log('  ✅ RECOVERY BERHASIL jika ada:');
+  console.log('  RECOVERY BERHASIL jika ada:');
   console.log('     → "[Recovery] Attempting to create order in Olsera"');
   console.log('     → "[Recovery] Order created in Olsera: OLSERA-xxx"');
   console.log('     → "[Pusher] ORDER_CREATED broadcast"');
   console.log('');
-  console.log('  ❌ RECOVERY GAGAL jika ada:');
+  console.log('  RECOVERY GAGAL jika ada:');
   console.log('     → "does not exist in Olsera POS"');
   console.log('     → "Escaping Prisma update"');
   console.log('     → (tidak ada log recovery sama sekali)');

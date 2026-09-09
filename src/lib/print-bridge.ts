@@ -85,17 +85,17 @@ export async function printReceipt(
     });
 
     if (res.ok) {
-      console.log('[PrintBridge] ✅ Receipt printed via thermal printer');
+      console.log('[PrintBridge] Receipt printed via thermal printer');
       return { printed: true, method: 'bridge' };
     }
 
     const err = await res.json().catch(() => ({ error: 'Unknown error' }));
-    console.warn('[PrintBridge] ⚠️ Print failed:', err.error);
+    console.warn('[PrintBridge] Print failed:', err.error);
     return { printed: false, method: 'none', error: err.error };
 
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    console.warn('[PrintBridge] ⚠️ Bridge offline, falling back to browser print:', message);
+    console.warn('[PrintBridge] Bridge offline, falling back to browser print:', message);
     
     // Fallback: trigger browser print dialog
     if (typeof window !== 'undefined') {

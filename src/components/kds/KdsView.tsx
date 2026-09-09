@@ -207,9 +207,7 @@ export function KdsView({ type, title, headerExtra }: KdsViewProps) {
         {/* Customer Name */}
         {order.customerName && (
           <div className="mb-3 px-3 py-2 bg-amber-500/10 border border-amber-500/20 rounded-xl">
-            <p className="text-xs text-amber-400 font-bold flex items-center gap-1.5">
-              <span>👤</span> {order.customerName}
-            </p>
+            <p className="text-xs text-amber-400 font-bold">{order.customerName}</p>
           </div>
         )}
 
@@ -264,7 +262,7 @@ export function KdsView({ type, title, headerExtra }: KdsViewProps) {
               disabled={!isOnline}
               className="flex-1 py-3 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-500 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
             >
-              👨‍🍳 Start Making
+              Start Making
             </button>
           ) : (
             <button
@@ -272,7 +270,7 @@ export function KdsView({ type, title, headerExtra }: KdsViewProps) {
               disabled={!isOnline}
               className="flex-1 py-3 rounded-xl bg-green-600 text-white font-bold text-sm hover:bg-green-500 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
             >
-              🎉 Complete
+              Complete
             </button>
           )}
         </div>
@@ -351,7 +349,6 @@ export function KdsView({ type, title, headerExtra }: KdsViewProps) {
         {/* Content Section */}
         {filteredOrders.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-32 bg-zinc-900/20 border border-dashed border-zinc-800 rounded-[3rem]">
-            <span className="text-7xl mb-6 grayscale opacity-20">🍵</span>
             <h2 className="text-2xl font-bold text-zinc-500 mb-2">No Active Orders</h2>
             <p className="text-zinc-600">Waiting for {type === 'barista' ? 'coffee' : 'kitchen'} items...</p>
           </div>

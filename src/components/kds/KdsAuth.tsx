@@ -43,9 +43,6 @@ export function KdsAuth({ children, title }: KdsAuthProps) {
     <div className="min-h-screen flex items-center justify-center bg-[#0F0F0F] p-4">
       <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-3xl p-8 shadow-2xl">
         <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-[#A8131E]/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-[#A8131E]/20">
-            <span className="text-4xl">🔐</span>
-          </div>
           <h1 className="text-2xl font-bold text-white mb-2">{title}</h1>
           <p className="text-zinc-400 text-sm">Masukkan PIN staff untuk mengakses KDS</p>
         </div>

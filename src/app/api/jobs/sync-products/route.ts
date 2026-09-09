@@ -11,7 +11,7 @@ import { syncProductsFromOlsera } from '@/lib/integrations/olsera-sync';
 
 async function handler(req: Request) {
   try {
-    console.log('[Job] 🏃 Scheduled sync job started...');
+    console.log('[Job] Scheduled sync job started...');
     
     const result = await syncProductsFromOlsera();
     
@@ -20,7 +20,7 @@ async function handler(req: Request) {
       message: `Sync completed: ${result.count} products processed` 
     });
   } catch (err: any) {
-    console.error('[Job] ❌ Sync job failed:', err);
+    console.error('[Job] Sync job failed:', err);
     return NextResponse.json({ 
       success: false, 
       error: err.message 

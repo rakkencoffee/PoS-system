@@ -963,7 +963,7 @@ export async function updateOrderPaymentStatus(
         // Step 3: Broadcast to KDS via Pusher
         // The Barista will manually move it to PREPARING (A) by clicking "Start Making"
         console.log(
-          `[Auto-Settlement] ✅ Order ${orderId} marked as PAID. Broadcasting to KDS...`,
+          `[Auto-Settlement] Order ${orderId} marked as PAID. Broadcasting to KDS...`,
         );
 
         try {
@@ -1080,7 +1080,7 @@ export async function updateOrderPaymentStatus(
       } catch (error: any) {
         // Log but don't throw — caller (e.g. a webhook handler) must still return 200
         console.error(
-          `[Auto-Settlement] ❌ Failed to settle order ${orderId} in Olsera:`,
+          `[Auto-Settlement] Failed to settle order ${orderId} in Olsera:`,
           error.message,
         );
       }
@@ -1124,7 +1124,7 @@ export async function updateOrderPaymentStatus(
   // Order tetap ditandai paid (simulasi) dengan SF-xxxx.
   // Kita HARUS recover order ini ke Olsera agar tidak hilang.
   if (USE_OLSERA && orderId.startsWith("SF-") && status === "paid") {
-    console.log(`[Recovery] ⚠️ Order fallback terdeteksi: ${orderId}`);
+    console.log(`[Recovery] Order fallback terdeteksi: ${orderId}`);
     console.log(
       `[Recovery] Attempting to create order in Olsera for reconciliation...`,
     );
@@ -1141,7 +1141,7 @@ export async function updateOrderPaymentStatus(
       const newOlseraId = (newOrder.id || newOrder.order_id) as number;
       recoveredOlseraId = `OLSERA-${newOlseraId}`;
       console.log(
-        `[Recovery] ✅ Order created in Olsera: ${recoveredOlseraId}`,
+        `[Recovery] Order created in Olsera: ${recoveredOlseraId}`,
       );
 
       // Step 2: Settlement di Olsera (mark as paid)
@@ -1180,7 +1180,7 @@ export async function updateOrderPaymentStatus(
           await olsera.markOrderAsPaid(newOlseraId, true);
           await olsera.updateOrderStatus(newOlseraId, "P");
           console.log(
-            `[Recovery] ✅ Settlement completed for ${recoveredOlseraId}`,
+            `[Recovery] Settlement completed for ${recoveredOlseraId}`,
           );
         }
       } catch (settlementErr: any) {
@@ -1190,7 +1190,7 @@ export async function updateOrderPaymentStatus(
       }
     } catch (recoveryErr: any) {
       console.warn(
-        `[Recovery] ⚠️ Could not create Olsera order (non-blocking): ${recoveryErr.message}`,
+        `[Recovery] Could not create Olsera order (non-blocking): ${recoveryErr.message}`,
       );
       // Even if Olsera fails again, we still broadcast to KDS and update local DB
     }
@@ -1211,7 +1211,7 @@ export async function updateOrderPaymentStatus(
         },
       });
       console.log(
-        `[Recovery] ✅ KDS broadcast sent for ${recoveredOlseraId || orderId}`,
+        `[Recovery] KDS broadcast sent for ${recoveredOlseraId || orderId}`,
       );
     } catch (pusherErr) {
       console.warn(
@@ -1236,7 +1236,7 @@ export async function updateOrderPaymentStatus(
             olseraTransactionId: recoveredOlseraId || undefined,
           },
         });
-        console.log(`[Recovery] ✅ Local DB updated for ${orderId}`);
+        console.log(`[Recovery] Local DB updated for ${orderId}`);
         await logOrderStatusChange({
           orderId,
           statusField: "order",
@@ -1261,7 +1261,7 @@ export async function updateOrderPaymentStatus(
           },
         });
         console.log(
-          `[Recovery] ✅ New local DB record created for ${recoveredOlseraId || orderId}`,
+          `[Recovery] New local DB record created for ${recoveredOlseraId || orderId}`,
         );
         await logOrderStatusChange({
           orderId: recoveredOlseraId || orderId,
@@ -1279,7 +1279,7 @@ export async function updateOrderPaymentStatus(
     }
 
     console.log(
-      `[Recovery] 🏁 Reconciliation complete for ${orderId} → ${recoveredOlseraId || "(local only)"}`,
+      `[Recovery] Reconciliation complete for ${orderId} -> ${recoveredOlseraId || "(local only)"}`,
     );
     return;
   }

@@ -101,7 +101,7 @@ async function fetchNewToken(): Promise<string> {
 
   // Safety check: if credentials are missing, fail fast with a helpful message
   if (!env.APP_ID || !env.SECRET_KEY) {
-    console.error('[Olsera Auth] ❌ OLSERA_APP_ID or OLSERA_SECRET_KEY is empty!');
+    console.error('[Olsera Auth] OLSERA_APP_ID or OLSERA_SECRET_KEY is empty!');
     throw new Error('Olsera credentials not configured.');
   }
 
@@ -148,7 +148,7 @@ async function fetchNewToken(): Promise<string> {
           cachedToken = newCache;
           // Persist to Redis (non-blocking — don't await to avoid slowing response)
           writeTokenToRedis(newCache).catch(() => {});
-          console.log(`[Olsera Auth] ✅ Token acquired successfully (attempt ${attempt + 1})`);
+          console.log(`[Olsera Auth] Token acquired successfully (attempt ${attempt + 1})`);
           return token;
         }
       }
@@ -186,7 +186,7 @@ async function getAccessToken(): Promise<string> {
   const redisCache = await readTokenFromRedis();
   if (redisCache) {
     cachedToken = redisCache; // warm the in-memory cache
-    console.log('[Olsera Auth] 🔄 Recovered token from Redis cache (survived cold start)');
+    console.log('[Olsera Auth] Recovered token from Redis cache (survived cold start)');
     return redisCache.token;
   }
 

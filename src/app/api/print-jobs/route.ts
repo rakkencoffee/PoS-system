@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
       throw createErr;
     }
 
-    console.log(`[PrintQueue] ✅ Job created: ${job.id} for order ${payload.orderId}`);
+    console.log(`[PrintQueue] Job created: ${job.id} for order ${payload.orderId}`);
 
     // Nudge the print-bridge daemon to check right away instead of waiting
     // for its next poll tick. Non-fatal — the daemon's own polling loop is

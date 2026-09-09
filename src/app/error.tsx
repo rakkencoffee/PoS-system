@@ -19,7 +19,6 @@ export default function Error({
   return (
     <div className="min-h-screen flex items-center justify-center p-8 bg-[#0a0a0a]">
       <div className="max-w-md w-full text-center space-y-6">
-        <div className="text-6xl mb-4">☕</div>
         <h1 className="text-3xl font-black text-white tracking-tight">SIBUK MENYEDUH...</h1>
         <p className="text-zinc-400 text-base leading-relaxed">
           Terjadi kendala teknis saat memproses halaman ini. Mohon maaf atas ketidaknyamanannya.

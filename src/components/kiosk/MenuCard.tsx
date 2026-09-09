@@ -32,10 +32,10 @@ function formatCurrency(amount: number): string {
 }
 
 export default function MenuCard({ item, index, onSelect }: MenuCardProps) {
-  const typeIcons: Record<string, string> = {
-    hot: '🔴',
-    iced: '🧊',
-    both: '🔴🧊',
+  const typeLabels: Record<string, string> = {
+    hot: 'Hot',
+    iced: 'Iced',
+    both: 'Hot/Iced',
   };
 
   return (
@@ -52,25 +52,21 @@ export default function MenuCard({ item, index, onSelect }: MenuCardProps) {
             alt={item.name}
             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
           />
-        ) : (
-          <span className="text-5xl opacity-50 group-hover:scale-110 transition-transform duration-500">
-            ☕
-          </span>
-        )}
+        ) : null}
 
         {/* Badges */}
         <div className="absolute top-2 left-2 flex flex-col gap-1">
           {item.isBestSeller && (
-            <span className="badge badge-best-seller text-[10px]">🔥 Best Seller</span>
+            <span className="badge badge-best-seller text-[10px]">Best Seller</span>
           )}
           {item.isRecommended && (
-            <span className="badge badge-recommended text-[10px]">⭐ Recommended</span>
+            <span className="badge badge-recommended text-[10px]">Recommended</span>
           )}
         </div>
 
         {/* Type indicator */}
-        <span className="absolute top-2 right-2 text-sm">
-          {typeIcons[item.type]}
+        <span className="absolute top-2 right-2 text-[10px] font-semibold uppercase tracking-wide bg-black/40 text-white px-1.5 py-0.5 rounded">
+          {typeLabels[item.type]}
         </span>
 
         {/* Gradient overlay */}

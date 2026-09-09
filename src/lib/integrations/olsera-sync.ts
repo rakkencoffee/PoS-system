@@ -10,7 +10,7 @@ import { redis } from '../redis';
  */
 
 export async function syncProductsFromOlsera() {
-  console.log('[Sync] 🔄 Starting product sync from Olsera...');
+  console.log('[Sync] Starting product sync from Olsera...');
   const startTime = Date.now();
 
   try {
@@ -66,11 +66,11 @@ export async function syncProductsFromOlsera() {
       }
     });
 
-    console.log(`[Sync] ✅ Sync completed in ${duration}s`);
+    console.log(`[Sync] Sync completed in ${duration}s`);
     return { success: true, count: products.length };
 
   } catch (err: any) {
-    console.error('[Sync] ❌ Sync failed:', err);
+    console.error('[Sync] Sync failed:', err);
 
     await prisma.olseraSyncLog.create({
       data: {

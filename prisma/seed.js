@@ -8,7 +8,7 @@ async function main() {
   const adminUsername = 'admin';
   const adminPassword = 'rakkenadminpos'; // Silakan ganti setelah login pertama
 
-  console.log('🌱 Seeding database...');
+  console.log('Seeding database...');
 
   // 1. Create Admin User
   const hashedPassword = await bcrypt.hash(adminPassword, 10);
@@ -27,7 +27,7 @@ async function main() {
     },
   });
 
-  console.log(`✅ Admin user created:`);
+  console.log(`Admin user created:`);
   console.log(`   Username: ${adminUsername}`);
   console.log(`   Password: ${adminPassword}`);
   console.log(`   Role: ${user.role}`);
@@ -50,9 +50,9 @@ async function main() {
     });
   }
 
-  console.log(`✅ TierRule seeded: ${tierRules.map((r) => r.name).join(', ')}`);
+  console.log(`TierRule seeded: ${tierRules.map((r) => r.name).join(', ')}`);
 
-  console.log('🌱 Seeding complete!');
+  console.log('Seeding complete!');
 }
 
 main()

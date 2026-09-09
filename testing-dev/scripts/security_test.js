@@ -6,7 +6,7 @@ const fs = require('fs');
 // Load env variables
 dotenv.config();
 
-console.log('🛡️ Starting POS Security Patches Verification Suite...\n');
+console.log('️ Starting POS Security Patches Verification Suite...\n');
 
 // ═══════════════════════════════════════════════════════════════
 // TEST 1: Dexie Offline Storage Encryption / Decryption
@@ -69,7 +69,7 @@ function decryptPendingOrder(order) {
 const dummyOrder = {
   orderId: 'OFFLINE-1234567890',
   totalAmount: 92000,
-  customerName: 'Ahmad Dzaky 😊☕',
+  customerName: 'Ahmad Dzaky ',
   items: [
     { productId: '123', name: 'Kyoto Latte', quantity: 2, notes: 'Less ice' }
   ],
@@ -90,7 +90,7 @@ const encryptionSuccess =
   JSON.stringify(decrypted.items) === JSON.stringify(dummyOrder.items) &&
   decrypted.isEncrypted === false;
 
-console.log(`\nEncryption Test Result: ${encryptionSuccess ? '✅ SUCCESS' : '❌ FAILED'}\n`);
+console.log(`\nEncryption Test Result: ${encryptionSuccess ? 'SUCCESS' : 'FAILED'}\n`);
 
 
 // ═══════════════════════════════════════════════════════════════
@@ -138,12 +138,12 @@ const sigCheckMissing = verifyOlseraSignature(payload, null);
 
 console.log('Webhook payload:', payload);
 console.log('Signature generated:', correctSignature);
-console.log('Verify with correct signature:', sigCheckValid ? '✅ VALID (Expected)' : '❌ INVALID');
-console.log('Verify with incorrect signature:', sigCheckInvalid ? '❌ VALID' : '✅ INVALID (Expected)');
-console.log('Verify with missing signature:', sigCheckMissing ? '❌ VALID' : '✅ INVALID (Expected)');
+console.log('Verify with correct signature:', sigCheckValid ? 'VALID (Expected)' : 'INVALID');
+console.log('Verify with incorrect signature:', sigCheckInvalid ? 'VALID' : 'INVALID (Expected)');
+console.log('Verify with missing signature:', sigCheckMissing ? 'VALID' : 'INVALID (Expected)');
 
 const webhookTestSuccess = sigCheckValid && !sigCheckInvalid && !sigCheckMissing;
-console.log(`\nWebhook Verification Test Result: ${webhookTestSuccess ? '✅ SUCCESS' : '❌ FAILED'}\n`);
+console.log(`\nWebhook Verification Test Result: ${webhookTestSuccess ? 'SUCCESS' : 'FAILED'}\n`);
 
 
 // ═══════════════════════════════════════════════════════════════
@@ -183,10 +183,10 @@ async function testPrintBridge() {
       printersWrongKey.status === 401 &&
       (printersCorrectKey.status === 200 || printersCorrectKey.status === 500);
       
-    console.log(`\nPrint Bridge Auth Test Result: ${printBridgeSuccess ? '✅ SUCCESS' : '❌ FAILED'}\n`);
+    console.log(`\nPrint Bridge Auth Test Result: ${printBridgeSuccess ? 'SUCCESS' : 'FAILED'}\n`);
     
   } catch (err) {
-    console.log(`⚠️ Print Bridge is offline. Start the server (npm run dev inside print-bridge) to verify local connection.`);
+    console.log(`️ Print Bridge is offline. Start the server (npm run dev inside print-bridge) to verify local connection.`);
   }
 }
 

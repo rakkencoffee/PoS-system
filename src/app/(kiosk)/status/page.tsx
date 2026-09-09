@@ -139,10 +139,10 @@ function StatusContent() {
     };
   }, [orderId, fetchOrder]);
 
-  const statusConfig: Record<string, { label: string; color: string; icon: string; desc: string }> = {
-    PENDING: { label: 'Pending', color: 'from-yellow-500 to-amber-500', icon: '⏳', desc: 'Your order is in the queue' },
-    PREPARING: { label: 'Preparing', color: 'from-blue-500 to-cyan-500', icon: '👨‍🍳', desc: 'The barista is making your drink' },
-    COMPLETED: { label: 'Completed', color: 'from-gray-500 to-gray-600', icon: '🎉', desc: 'Order completed. Thank you!' },
+  const statusConfig: Record<string, { label: string; color: string; desc: string }> = {
+    PENDING: { label: 'Pending', color: 'from-yellow-500 to-amber-500', desc: 'Your order is in the queue' },
+    PREPARING: { label: 'Preparing', color: 'from-blue-500 to-cyan-500', desc: 'The barista is making your drink' },
+    COMPLETED: { label: 'Completed', color: 'from-gray-500 to-gray-600', desc: 'Order completed. Thank you!' },
   };
 
   const steps = ['PENDING', 'PREPARING', 'COMPLETED'];
@@ -171,7 +171,6 @@ function StatusContent() {
     
     return (
       <div className="min-h-dvh flex flex-col items-center justify-center p-8 text-center">
-        <span className="text-6xl mb-6">🔍</span>
         <h2 className="text-2xl font-bold text-(--text-primary) mb-2">Order Not Found</h2>
         <p className="text-(--text-muted) mb-8 max-w-xs">
           We couldn't find your order details. Please check your order ID or try again.
@@ -190,9 +189,7 @@ function StatusContent() {
       <div className="text-center max-w-md w-full">
         {/* Status Icon */}
         <div className="mb-8 animate-scale-in">
-          <div className={`w-24 h-24 rounded-full bg-linear-to-r ${status.color} flex items-center justify-center mx-auto shadow-2xl`}>
-            <span className="text-4xl">{status.icon}</span>
-          </div>
+          <div className={`w-24 h-24 rounded-full bg-linear-to-r ${status.color} flex items-center justify-center mx-auto shadow-2xl`} />
         </div>
 
         {/* Queue Number */}
