@@ -32,6 +32,26 @@ async function main() {
   console.log(`   Password: ${adminPassword}`);
   console.log(`   Role: ${user.role}`);
 
+  // 2. TierRule — 4 tier loyalty RAKKEN Member App, final per keputusan
+  // 2026-09-09 (lihat project_rakken_loyalty_app memory). upsert by level
+  // supaya aman dijalankan ulang tanpa bikin duplikat.
+  const tierRules = [
+    { level: 1, name: 'Bean Seeker', minSpend: 0, upgradeVoucherPercent: 0, weeklyDiscountPercent: 0, birthdayFreeBeverage: false, birthdayFreeSnack: false, birthdayFreeMerch: false },
+    { level: 2, name: 'Brew Explorer', minSpend: 500_000, upgradeVoucherPercent: 50, weeklyDiscountPercent: 20, birthdayFreeBeverage: true, birthdayFreeSnack: false, birthdayFreeMerch: false },
+    { level: 3, name: 'Roast Keeper', minSpend: 2_000_000, upgradeVoucherPercent: 80, weeklyDiscountPercent: 20, birthdayFreeBeverage: true, birthdayFreeSnack: true, birthdayFreeMerch: false },
+    { level: 4, name: 'Coffee Master', minSpend: 4_000_000, upgradeVoucherPercent: 100, weeklyDiscountPercent: 20, birthdayFreeBeverage: true, birthdayFreeSnack: true, birthdayFreeMerch: true },
+  ];
+
+  for (const rule of tierRules) {
+    await prisma.tierRule.upsert({
+      where: { level: rule.level },
+      update: rule,
+      create: rule,
+    });
+  }
+
+  console.log(`✅ TierRule seeded: ${tierRules.map((r) => r.name).join(', ')}`);
+
   console.log('🌱 Seeding complete!');
 }
 

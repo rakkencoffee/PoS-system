@@ -266,13 +266,20 @@ model PointLedger {
 // 1 baris per tier (bukan JSON blob) biar gampang di-CRUD lewat TanStack
 // Table di admin dashboard Member App.
 model TierRule {
-  id                      String @id @default(cuid())
-  level                   Int    @unique
-  name                    String
-  minSpend                Int // threshold akumulasi Order.total per periode (tierPeriodDays)
-  upgradeVoucherPercent   Int
-  birthdayPointMultiplier Int
-  weeklyDiscountPercent   Int
+  id                    String  @id @default(cuid())
+  level                 Int     @unique
+  name                  String
+  minSpend              Int // threshold akumulasi Order.total per periode (tierPeriodDays)
+  upgradeVoucherPercent Int
+  weeklyDiscountPercent Int
+  // Benefit ulang tahun: kumulatif per tier (bukan gantian) — Tier 3 dapat
+  // beverage+snack, Tier 4 dapat ketiganya. Syarat klaim selalu "beli
+  // minimal 1 minuman"; beverage-nya yang termurah dari yang dibeli (bukan
+  // termahal), snack/merch masing-masing 1 item TETAP yang admin tentukan
+  // (lihat RewardsCatalog.isBirthdayReward), bukan pilihan member.
+  birthdayFreeBeverage  Boolean @default(false)
+  birthdayFreeSnack     Boolean @default(false)
+  birthdayFreeMerch     Boolean @default(false)
 }
 
 // Singleton (selalu 1 baris, id tetap "singleton") — semua angka yang bisa
@@ -287,18 +294,23 @@ model LoyaltyConfig {
 }
 
 model RewardsCatalog {
-  id              String         @id @default(cuid())
-  name            String
-  category        RewardCategory
-  pointCost       Int
-  linkedProductId String? // olseraId produk, dipakai kalau category=FREE_ITEM
-  stockQuota      Int?
-  timesRedeemed   Int            @default(0) // dibandingkan ke stockQuota (null = tanpa batas)
-  isActive        Boolean        @default(true)
-  validFrom       DateTime?
-  validUntil      DateTime?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  id               String           @id @default(cuid())
+  name             String
+  category         RewardCategory
+  pointCost        Int
+  linkedProductId  String? // olseraId produk, dipakai kalau category=FREE_ITEM
+  stockQuota       Int?
+  timesRedeemed    Int              @default(0) // dibandingkan ke stockQuota (null = tanpa batas)
+  isActive         Boolean          @default(true)
+  // Flag item ini sebagai hadiah ultah tetap (bukan pilihan member) — cuma
+  // relevan buat category FREE_ITEM (snack, pakai linkedProductId) atau
+  // MERCHANDISE (merch). Diharapkan cuma 1 baris ter-flag true per category.
+  isBirthdayReward Boolean          @default(false)
+  claimedBenefits  ClaimedBenefit[]
+  validFrom        DateTime?
+  validUntil       DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
   @@index([isActive])
   @@index([category])
@@ -307,17 +319,23 @@ model RewardsCatalog {
 // Catatan klaim manual benefit tier (upgrade/ulang tahun/hari member) —
 // beda dari RewardsCatalog yang inisiatif member sendiri kapan saja.
 model ClaimedBenefit {
-  id            String      @id @default(cuid())
-  memberId      String
-  type          ClaimType
-  status        ClaimStatus @default(AVAILABLE)
-  availableAt   DateTime    @default(now())
-  expiresAt     DateTime
-  claimedAt     DateTime?
-  usedInOrderId String?
-  createdAt     DateTime    @default(now())
+  id               String      @id @default(cuid())
+  memberId         String
+  type             ClaimType
+  status           ClaimStatus @default(AVAILABLE)
+  availableAt      DateTime    @default(now())
+  expiresAt        DateTime
+  claimedAt        DateTime?
+  usedInOrderId    String?
+  createdAt        DateTime    @default(now())
+  // Non-null cuma buat BIRTHDAY snack/merch (nunjuk ke RewardsCatalog item
+  // yang di-flag isBirthdayReward). Null buat TIER_UPGRADE (% diskon item
+  // termahal), BIRTHDAY beverage (dihitung dinamis dari keranjang, bukan 1
+  // produk tetap), dan WEEKLY_MEMBER_DAY (% diskon flat).
+  rewardsCatalogId String?
 
-  member Member @relation(fields: [memberId], references: [id])
+  member         Member          @relation(fields: [memberId], references: [id])
+  rewardsCatalog RewardsCatalog? @relation(fields: [rewardsCatalogId], references: [id])
 
   @@index([memberId, status])
 }
