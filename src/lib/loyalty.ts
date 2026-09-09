@@ -41,6 +41,7 @@ export async function applyEarnedPoints(
   const periodExpired =
     now.getTime() - member.tierPeriodStart.getTime() >= config.tierPeriodDays * 24 * 60 * 60 * 1000;
 
+  const oldTierLevel = member.tierLevel;
   let tierPeriodStart = member.tierPeriodStart;
   let tierPeriodSpend = member.tierPeriodSpend;
   let tierLevel = member.tierLevel;
@@ -55,6 +56,16 @@ export async function applyEarnedPoints(
   const qualifiedTier = tierRules.find((rule) => tierPeriodSpend >= rule.minSpend);
   if (qualifiedTier) {
     tierLevel = periodExpired ? qualifiedTier.level : Math.max(tierLevel, qualifiedTier.level);
+  }
+
+  // Naik tier (termasuk lompat beberapa level sekaligus dalam 1 order besar)
+  // -> generate 1 ClaimedBenefit TIER_UPGRADE, berlaku tierUpgradeClaimWindowDays
+  // hari (default 90) sejak sekarang.
+  if (tierLevel > oldTierLevel) {
+    const expiresAt = new Date(now.getTime() + config.tierUpgradeClaimWindowDays * 24 * 60 * 60 * 1000);
+    await tx.claimedBenefit.create({
+      data: { memberId, type: 'TIER_UPGRADE', expiresAt, tierLevelReached: tierLevel },
+    });
   }
 
   const pointsEarned = Math.floor(orderTotal * config.pointRatePerRupiah);

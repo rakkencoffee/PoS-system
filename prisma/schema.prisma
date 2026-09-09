@@ -333,6 +333,10 @@ model ClaimedBenefit {
   // termahal), BIRTHDAY beverage (dihitung dinamis dari keranjang, bukan 1
   // produk tetap), dan WEEKLY_MEMBER_DAY (% diskon flat).
   rewardsCatalogId String?
+  // Cuma buat TIER_UPGRADE — tier yang dicapai saat benefit ini di-generate.
+  // Dipakai buat lookup TierRule.upgradeVoucherPercent LIVE pas checkout
+  // (bukan disimpen persennya langsung), biar selalu ikut config terbaru.
+  tierLevelReached Int?
 
   member         Member          @relation(fields: [memberId], references: [id])
   rewardsCatalog RewardsCatalog? @relation(fields: [rewardsCatalogId], references: [id])
