@@ -110,7 +110,15 @@ export function KioskPrinterProvider({ children }: { children: React.ReactNode }
       }
     };
 
+    // Guards resolveApproved against running twice for the same order -- it's now
+    // reachable from three independent triggers (watch-start reconcile, the live
+    // Pusher push, and the periodic poll below), and a real card being tapped
+    // fast enough could plausibly satisfy two of them within the same tick.
+    const resolved = new Set<string>();
+
     const resolveApproved = async (orderId: string) => {
+      if (resolved.has(orderId)) return;
+      resolved.add(orderId);
       const success = await printPendingReceipt(orderId);
       console.log(`[KioskPrinterProvider] Print ${success ? 'succeeded' : 'failed'} for ${orderId}`);
       setKioskPrintResult(orderId, success ? 'ok' : 'failed');
@@ -119,7 +127,7 @@ export function KioskPrinterProvider({ children }: { children: React.ReactNode }
     };
 
     const watch = async (entry: PendingKioskPrint) => {
-      if (watching.has(entry.orderId)) return;
+      if (watching.has(entry.orderId) || resolved.has(entry.orderId)) return;
       watching.add(entry.orderId);
 
       // Reconcile against the job's current DB status before subscribing --
@@ -184,8 +192,34 @@ export function KioskPrinterProvider({ children }: { children: React.ReactNode }
     };
     window.addEventListener(PENDING_PRINT_EVENT, onQueued);
 
+    // Backstop for the live Pusher push itself being missed for reasons other
+    // than the watch-start remount race above -- confirmed live 2026-09-10:
+    // three separate orders came back APPROVED server-side (verified via
+    // GET /api/edc-jobs/status) with zero corresponding STATUS_UPDATE ever
+    // logged client-side, and no remount happened in between to trigger the
+    // watch-start reconcile either. Whatever is dropping the push, this
+    // catches it within one polling interval regardless of the cause.
+    const reconcileTimer = setInterval(async () => {
+      for (const orderId of Array.from(watching)) {
+        if (resolved.has(orderId)) continue;
+        try {
+          const res = await fetch(`/api/edc-jobs/status?orderId=${encodeURIComponent(orderId)}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.status === 'APPROVED') {
+              console.log(`[KioskPrinterProvider] Reconcile poll found ${orderId} already APPROVED, printing...`);
+              await resolveApproved(orderId);
+            }
+          }
+        } catch (err) {
+          console.warn(`[KioskPrinterProvider] Reconcile poll failed for ${orderId}:`, err);
+        }
+      }
+    }, 8_000);
+
     return () => {
       window.removeEventListener(PENDING_PRINT_EVENT, onQueued);
+      clearInterval(reconcileTimer);
       channels.forEach((c) => c.unsubscribe());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
