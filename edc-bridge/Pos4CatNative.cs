@@ -69,16 +69,31 @@ internal static class Pos4CatNative
     [DllImport("POS4CAT_Ctl.dll")]
     public static extern int POS4EDC_QRISInqLastTrans();
 
+    // DANGER -- confirmed live 2026-09-10 to crash the whole process with a native access
+    // violation (0xC0000005) the instant it's called, zero-arg exactly as documented. Same
+    // failure signature as the GenQRIS arity mismatch found earlier (doc said 1 param, real
+    // export needed 2) -- likely this export's real signature also takes an undocumented
+    // parameter. Do NOT call this until Yokke confirms the actual signature; QRISInqLastTrans
+    // (same section family, tested working with zero args) is not a safe stand-in assumption.
+    //
+    // Aftermath observed live: the crash killed the managed EdcBridge.exe process but left its
+    // native POS4CAT.exe helper (spawned by the preceding COMCreate) running as an orphan,
+    // holding the COM port open -- every subsequent EDC call failed with COMCreate ret=-2 and
+    // an empty "COM PORT=[\\.\]" in catlog (looks identical to the empty-ini-value bug, but is
+    // actually just the stale process squatting on the port). Fix: Task Manager / `Get-Process
+    // POS4CAT` and kill it before retrying.
     [DllImport("POS4CAT_Ctl.dll")]
     public static extern int POS4EDC_QRISInqAnyTrans();
 
     // Mandiri v1.12 section 2.2.24 (narrative text) documents this taking a
     // "Reff No" string, but the section 3.1 C# DllImport sample (line ~2350)
-    // declares a bare `StringBuilder amount` parameter instead -- the two
-    // parts of the vendor doc disagree on what this parameter actually is.
-    // Matches the compilable C# sample since that's more likely accurate to
-    // the real export than descriptive prose; UNTESTED either way, verify
-    // against a real refund before relying on it.
+    // declares a bare `StringBuilder amount` parameter instead (likely just a
+    // copy-pasted variable name in their sample, not the real semantics).
+    // RESOLVED live 2026-09-10: passed the original transaction's own
+    // ReferenceNumber (625387497216, from a prior GenerateQris) -- refund
+    // succeeded cleanly (StatusTransaksi SUKSES, TransactionName "QRIS
+    // REFUND", money genuinely credited back). Confirmed it takes a Reff No,
+    // matching the narrative doc, not an amount.
     [DllImport("POS4CAT_Ctl.dll")]
     public static extern int POS4EDC_RefundQRIS(StringBuilder amountOrReffNo);
 

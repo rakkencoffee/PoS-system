@@ -71,10 +71,30 @@ internal static class Program
         var isQris = args[0].Equals("qris", StringComparison.OrdinalIgnoreCase);
         var isQrisInquiry = args[0].Equals("qris-inquiry", StringComparison.OrdinalIgnoreCase);
         var isLastTransaction = args[0].Equals("last-transaction", StringComparison.OrdinalIgnoreCase);
-        var needsNoAmount = isQrisInquiry || isLastTransaction;
+        var isEcho = args[0].Equals("echo", StringComparison.OrdinalIgnoreCase);
+        var isVoid = args[0].Equals("void", StringComparison.OrdinalIgnoreCase);
+        var isRefund = args[0].Equals("refund", StringComparison.OrdinalIgnoreCase);
+        var isRefundQris = args[0].Equals("refund-qris", StringComparison.OrdinalIgnoreCase);
+        // qris-inquiry-any (POS4EDC_QRISInqAnyTrans) is deliberately NOT wired up here --
+        // confirmed live 2026-09-10 to crash the whole process with a native access
+        // violation. See the DANGER comment on Pos4CatNative.POS4EDC_QRISInqAnyTrans.
+        var needsNoAmount = isQrisInquiry || isLastTransaction || isEcho;
+        var needsStringArg = isVoid || isRefund || isRefundQris;
 
         int amount = 0;
-        if (!needsNoAmount)
+        string? stringArg = null;
+        if (needsStringArg)
+        {
+            stringArg = args.ElementAtOrDefault(1);
+            if (string.IsNullOrWhiteSpace(stringArg))
+            {
+                Console.WriteLine("Usage: EdcBridge.exe void <trace_number>       (Purchase Void test, trace number from a prior test's own output)");
+                Console.WriteLine("       EdcBridge.exe refund <amount_in_rupiah> (Refund test)");
+                Console.WriteLine("       EdcBridge.exe refund-qris <reff_no>     (QRIS Refund test, reff number from a prior QRIS test's own output)");
+                return 1;
+            }
+        }
+        else if (!needsNoAmount)
         {
             var amountArg = isQris ? args.ElementAtOrDefault(1) : args.ElementAtOrDefault(0);
             if (amountArg is null || !int.TryParse(amountArg, out amount) || amount <= 0)
@@ -84,12 +104,17 @@ internal static class Program
                 Console.WriteLine("       EdcBridge.exe qris <amount_in_rupiah>  (QRIS Generate test)");
                 Console.WriteLine("       EdcBridge.exe qris-inquiry             (QRIS Inquiry Last Trans test)");
                 Console.WriteLine("       EdcBridge.exe last-transaction         (Resend Last Transaction test)");
+                Console.WriteLine("       EdcBridge.exe echo                     (Echo Test -- no money involved)");
+                Console.WriteLine("       EdcBridge.exe void <trace_number>      (Purchase Void test)");
+                Console.WriteLine("       EdcBridge.exe refund <amount_in_rupiah> (Refund test)");
+                Console.WriteLine("       EdcBridge.exe refund-qris <reff_no>    (QRIS Refund test)");
                 return 1;
             }
         }
 
         EdcResult? cardResult = null;
         EdcQrisResult? qrisResult = null;
+        EdcSimpleResult? simpleResult = null;
 
         using var hiddenForm = CreateHiddenForm();
         // No DialogAutoCloser here (unlike the daemon) -- one-shot manual tests are
@@ -103,7 +128,27 @@ internal static class Program
         hiddenForm.Shown += (_, _) =>
         {
             var client = new EdcClient();
-            if (isLastTransaction)
+            if (isVoid)
+            {
+                Console.WriteLine($"Void transaksi trace={stringArg}...");
+                simpleResult = client.Void(stringArg!);
+            }
+            else if (isRefund)
+            {
+                Console.WriteLine($"Refund amount={stringArg}...");
+                simpleResult = client.Refund(stringArg!);
+            }
+            else if (isRefundQris)
+            {
+                Console.WriteLine($"QRIS Refund reff={stringArg}...");
+                qrisResult = client.RefundQris(stringArg!);
+            }
+            else if (isEcho)
+            {
+                Console.WriteLine("Mengirim Echo Test ke EDC (tanpa nominal, tanpa efek finansial)...");
+                simpleResult = client.EchoTest();
+            }
+            else if (isLastTransaction)
             {
                 Console.WriteLine("Mengambil ulang hasil transaksi terakhir (Resend Last Transaction)...");
                 cardResult = client.GetLastTransaction();
@@ -132,7 +177,8 @@ internal static class Program
         Application.Run(hiddenForm);
 
         Console.WriteLine();
-        return isQris || isQrisInquiry ? PrintQrisResult(qrisResult) : PrintCardResult(cardResult);
+        if (isEcho || isVoid || isRefund) return PrintSimpleResult(simpleResult);
+        return isQris || isQrisInquiry || isRefundQris ? PrintQrisResult(qrisResult) : PrintCardResult(cardResult);
     }
 
     private static Form CreateHiddenForm() => new()
@@ -171,6 +217,22 @@ internal static class Program
             Console.WriteLine($"Error        : {result.ErrorMessage}");
         }
 
+        Console.WriteLine();
+        Console.WriteLine($"Raw response data: {result.RawResponseData}");
+        return result.Approved ? 0 : 1;
+    }
+
+    private static int PrintSimpleResult(EdcSimpleResult? result)
+    {
+        if (result is null)
+        {
+            Console.WriteLine("=== TIDAK ADA HASIL (unexpected) ===");
+            return 1;
+        }
+
+        Console.WriteLine(result.Approved ? "=== SUCCESS ===" : "=== GAGAL / DITOLAK ===");
+        Console.WriteLine($"ResponseCode : {result.ResponseCode}");
+        if (result.ErrorMessage is not null) Console.WriteLine($"Error        : {result.ErrorMessage}");
         Console.WriteLine();
         Console.WriteLine($"Raw response data: {result.RawResponseData}");
         return result.Approved ? 0 : 1;

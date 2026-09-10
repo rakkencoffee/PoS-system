@@ -6,57 +6,40 @@ using System.Windows.Forms;
 
 namespace EdcBridge;
 
-// Handles every #32770 dialog POS4CAT_Ctl.dll shows, split into two groups by observed
-// behaviour (all confirmed live, one transaction at a time -- this DLL is closed-source, so
-// this is the only way to find out):
+// Covers every #32770 dialog POS4CAT_Ctl.dll shows -- purely visual, never clicks or hides
+// anything. Customers should never see raw Win32 dialogs on the kiosk screen, but this DLL is
+// closed-source and its own sample code (POS4EDC User Guide section 3.1) has ZERO
+// dialog-handling logic at all -- it never expects a POS application to click anything.
 //
-// 1. Dialogs that need an actual OK click to ever go away -- they do NOT self-dismiss no
-//    matter what happens on the physical EDC, confirmed by letting each hang indefinitely:
-//      - "Service requesting to EDC..... Initialize EDC communicate....." (shown once at the
-//        very start of every Purchase() call, before any card prompt)
-//      - "Error response from Host" (shown after the terminal/host reports a failure, e.g.
-//        cancelling from the EDC's own physical Cancel button)
-//    These are safe to click OK on immediately -- by the time they appear, the DLL is not
-//    actively waiting on hardware any more, it just needs the acknowledgement to unwind.
-//
-// 2. "Please check EDC display" -- shown WHILE the DLL is actively polling the terminal for
-//    a card tap. Clicking OK on this one (even exact-text matched, even once) broke a real
-//    approved-in-progress transaction live: the very next COMStatus() call returned a garbage
-//    response code within ~100ms of the click. This one must NEVER be clicked or hidden --
-//    only visually covered, so the DLL's own hardware-driven wait resolves it on its own
-//    (real card tap, or a cancel/timeout on the physical terminal).
-//
-// Anything not recognized falls into the "cover only" bucket too, on the assumption that an
-// unknown dialog is more likely to be another hardware-wait status than a safe-to-acknowledge
-// one -- guessing wrong the other way (auto-clicking something we don't understand) is the
-// mistake that broke transactions in every earlier iteration.
+// History: earlier versions of this class auto-clicked OK on two dialogs believed "safe"
+// ("Initialize EDC communicate", "Error response from Host"), since letting them sit
+// unclicked was observed to hang the transaction indefinitely. That auto-click was tried two
+// ways -- a raw BM_CLICK message, then a real WM_LBUTTONDOWN/UP mouse simulation at the
+// confirmed correct "OK" button (control ID 1, verified via GetWindowText, not "Cancel") --
+// and BOTH reproducibly corrupted the very next POS4EDC_COMStatus() call into returning huge
+// undocumented garbage codes (e.g. 5760392, 12050960, 46916768) instead of the documented
+// 0/-1/-2. A real human mouse click on the exact same dialog never triggered this, tested
+// repeatedly live 2026-09-10. Since neither click method is in the vendor's spec, the only
+// defensible move is to stop deviating from it entirely: cover for visual cleanliness, but
+// never interact. This needs to go back to Yokke as its own question -- why do these dialogs
+// appear at all when their sample never handles them, and how should an unattended ECR
+// suppress or dismiss them safely? See Pesan_Yokke_ResponseTimeout.txt.
 //
 // Runs its polling on its OWN background thread, deliberately NOT a System.Windows.Forms.Timer
 // -- a first attempt using one shared the same WM_TIMER-driven message queue that
 // POS4CAT_Ctl.dll's fragile internal state machine depends on (see Program.cs), and
 // transactions started failing within 2-4 seconds the moment that timer was added.
-// EnumWindows/GetWindowRect/GetDlgItem/PostMessage are safe to call cross-thread; actually
-// creating/moving/closing the overlay Form is marshaled onto the UI thread (via uiThread)
-// since Forms must live on the thread that pumps their messages -- that thread is already
-// running Application.Run() for the hidden host form, so overlay windows share that same pump.
+// EnumWindows/GetWindowRect are safe to call cross-thread; actually creating/moving/closing the
+// overlay Form is marshaled onto the UI thread (via uiThread) since Forms must live on the
+// thread that pumps their messages -- that thread is already running Application.Run() for the
+// hidden host form, so overlay windows share that same pump.
 public sealed class DialogAutoCloser : IDisposable
 {
     private const string DialogClassName = "#32770"; // standard Win32 dialog/MessageBox class
-    private const int IDOK = 1;
-    private const uint BM_CLICK = 0x00F5;
-
-    // Substring match against the dialog's combined child control text (its message body --
-    // every dialog this DLL shows has a BLANK title bar, so title text can't tell them apart).
-    private static readonly string[] SafeToClickMessages =
-    {
-        "Initialize EDC communicate",
-        "Error response from Host",
-    };
 
     private readonly ISynchronizeInvoke _uiThread;
     private readonly Thread _thread;
     private readonly Dictionary<IntPtr, Form> _overlays = new();
-    private readonly HashSet<IntPtr> _clicked = new();
     private volatile bool _stop;
 
     public DialogAutoCloser(ISynchronizeInvoke uiThread, int pollIntervalMs = 100)
@@ -92,31 +75,13 @@ public sealed class DialogAutoCloser : IDisposable
 
             if (!IsWindowVisible(hWnd)) return true;
 
-            var bodyText = GetChildText(hWnd);
-            var safeToClick = Array.Find(SafeToClickMessages, m => bodyText.Contains(m, StringComparison.OrdinalIgnoreCase));
-
-            if (safeToClick is not null)
-            {
-                seen.Add(hWnd); // covered below too, until the click actually takes effect
-                if (_clicked.Add(hWnd))
-                {
-                    var okButton = GetDlgItem(hWnd, IDOK);
-                    if (okButton != IntPtr.Zero)
-                    {
-                        Console.WriteLine($"[DialogAutoCloser] Auto-dismissing known dialog: \"{safeToClick}\"");
-                        PostMessage(okButton, BM_CLICK, IntPtr.Zero, IntPtr.Zero);
-                    }
-                }
-            }
-
             if (!GetWindowRect(hWnd, out var rect)) return true;
             seen.Add(hWnd);
             var bounds = Rectangle.FromLTRB(rect.Left, rect.Top, rect.Right, rect.Bottom);
 
             if (!_overlays.ContainsKey(hWnd))
             {
-                if (safeToClick is null)
-                    Console.WriteLine("[DialogAutoCloser] Covering unrecognized dialog on screen (not touching it)");
+                Console.WriteLine("[DialogAutoCloser] Covering dialog on screen (not clicking anything)");
                 var handle = hWnd;
                 _uiThread.Invoke(new Action(() =>
                 {
@@ -140,24 +105,8 @@ public sealed class DialogAutoCloser : IDisposable
         {
             var overlay = _overlays[goneHandle];
             _overlays.Remove(goneHandle);
-            _clicked.Remove(goneHandle);
             _uiThread.Invoke(new Action(overlay.Close), null);
         }
-    }
-
-    // Concatenates the text of every child control (Static labels, buttons, etc.) so the
-    // dialog's message body can be matched even though the window's own title is blank.
-    private static string GetChildText(IntPtr hParent)
-    {
-        var sb = new StringBuilder();
-        EnumChildWindows(hParent, (hChild, _) =>
-        {
-            var buf = new StringBuilder(512);
-            GetWindowText(hChild, buf, buf.Capacity);
-            if (buf.Length > 0) sb.Append(buf).Append(' ');
-            return true;
-        }, IntPtr.Zero);
-        return sb.ToString().Trim();
     }
 
     private static Form CreateOverlay(Rectangle bounds)
@@ -217,13 +166,7 @@ public sealed class DialogAutoCloser : IDisposable
     private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
 
     [DllImport("user32.dll")]
-    private static extern bool EnumChildWindows(IntPtr hWndParent, EnumWindowsProc lpEnumFunc, IntPtr lParam);
-
-    [DllImport("user32.dll")]
     private static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
-
-    [DllImport("user32.dll")]
-    private static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
 
     [DllImport("user32.dll")]
     private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
@@ -233,10 +176,4 @@ public sealed class DialogAutoCloser : IDisposable
 
     [DllImport("user32.dll")]
     private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
-
-    [DllImport("user32.dll")]
-    private static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
-
-    [DllImport("user32.dll")]
-    private static extern IntPtr GetDlgItem(IntPtr hDlg, int nIDDlgItem);
 }
