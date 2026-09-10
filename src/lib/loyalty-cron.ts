@@ -2,10 +2,11 @@ import { prisma } from '@/lib/db';
 
 /**
  * Daily loyalty evaluation — birthday benefits + Hari Member (weekly
- * discount day). Both need a cron because neither has an order to hook
- * into (unlike TIER_UPGRADE, which fires event-driven from
- * applyEarnedPoints() in loyalty.ts). Triggered by QStash, same pattern as
- * /api/jobs/sync-products (see src/lib/qstash.ts).
+ * discount day) + expiring stale AVAILABLE rewards/benefits. The first two
+ * need a cron because neither has an order to hook into (unlike
+ * TIER_UPGRADE, which fires event-driven from applyEarnedPoints() in
+ * loyalty.ts). Triggered by a native Vercel Cron Job (see vercel.json) —
+ * moved off QStash 2026-09-10, see /api/jobs/evaluate-loyalty for why.
  *
  * All date math is done in WIB (UTC+7), matching the convention already
  * used for queue numbers (see src/lib/queue-number.ts) — this project has
@@ -113,11 +114,33 @@ async function evaluateWeeklyMemberDay(wibNow: Date) {
   return eligibleMembers.length;
 }
 
+/**
+ * Marks past-due AVAILABLE rows EXPIRED on both reward tables. Neither
+ * table gets deleted from cron (history stays queryable), and neither list
+ * endpoint ever showed expired-but-not-yet-flipped rows anyway (they both
+ * filter `expiresAt > now()` themselves) — this is pure housekeeping so the
+ * raw status column stops lying about what's actually still claimable.
+ */
+async function expireStaleRewards(now: Date) {
+  const [redeemedRewards, claimedBenefits] = await Promise.all([
+    prisma.redeemedReward.updateMany({
+      where: { status: 'AVAILABLE', expiresAt: { lt: now } },
+      data: { status: 'EXPIRED' },
+    }),
+    prisma.claimedBenefit.updateMany({
+      where: { status: 'AVAILABLE', expiresAt: { lt: now } },
+      data: { status: 'EXPIRED' },
+    }),
+  ]);
+  return { redeemedRewardsExpired: redeemedRewards.count, claimedBenefitsExpired: claimedBenefits.count };
+}
+
 export async function runDailyLoyaltyEvaluation() {
   const wibNow = nowAsWIBFields();
-  const [birthdaysProcessed, weeklyMemberDayGenerated] = await Promise.all([
+  const [birthdaysProcessed, weeklyMemberDayGenerated, expired] = await Promise.all([
     evaluateBirthdays(wibNow),
     evaluateWeeklyMemberDay(wibNow),
+    expireStaleRewards(new Date()),
   ]);
-  return { birthdaysProcessed, weeklyMemberDayGenerated };
+  return { birthdaysProcessed, weeklyMemberDayGenerated, ...expired };
 }

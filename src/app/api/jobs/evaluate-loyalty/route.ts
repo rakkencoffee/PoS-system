@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { runDailyLoyaltyEvaluation } from '@/lib/loyalty-cron';
 
 /**
- * Background Job: Evaluate Loyalty (birthday + Hari Member)
+ * Background Job: Evaluate Loyalty (birthday + Hari Member + expire stale rewards)
  *
  * Triggered by a native Vercel Cron Job (see `crons` in vercel.json) once a
  * day — moved off QStash (2026-09-10) because it only needs once-a-day
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     const result = await runDailyLoyaltyEvaluation();
 
     console.log(
-      `[Job] Loyalty evaluation done: ${result.birthdaysProcessed} birthday(s), ${result.weeklyMemberDayGenerated} Hari Member benefit(s)`
+      `[Job] Loyalty evaluation done: ${result.birthdaysProcessed} birthday(s), ${result.weeklyMemberDayGenerated} Hari Member benefit(s), ${result.redeemedRewardsExpired} redeemed reward(s) + ${result.claimedBenefitsExpired} claimed benefit(s) expired`
     );
 
     return NextResponse.json({ success: true, ...result });
