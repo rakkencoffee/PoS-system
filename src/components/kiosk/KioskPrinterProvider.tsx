@@ -110,9 +110,39 @@ export function KioskPrinterProvider({ children }: { children: React.ReactNode }
       }
     };
 
+    const resolveApproved = async (orderId: string) => {
+      const success = await printPendingReceipt(orderId);
+      console.log(`[KioskPrinterProvider] Print ${success ? 'succeeded' : 'failed'} for ${orderId}`);
+      setKioskPrintResult(orderId, success ? 'ok' : 'failed');
+      removePendingKioskPrint(orderId);
+      watching.delete(orderId);
+    };
+
     const watch = async (entry: PendingKioskPrint) => {
       if (watching.has(entry.orderId)) return;
       watching.add(entry.orderId);
+
+      // Reconcile against the job's current DB status before subscribing --
+      // this watcher can itself remount mid-payment (confirmed live
+      // 2026-09-10: this whole effect re-ran, logging a fresh "0 pending
+      // order(s)" right after a PROCESSING push had just come in), and a
+      // Pusher channel never replays events sent while nobody was
+      // subscribed. If the daemon already reached APPROVED during that
+      // resubscribe gap, catch it here instead of waiting forever for a
+      // push that already happened.
+      try {
+        const res = await fetch(`/api/edc-jobs/status?orderId=${encodeURIComponent(entry.orderId)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status === 'APPROVED') {
+            console.log(`[KioskPrinterProvider] Order ${entry.orderId} already APPROVED on watch start, printing immediately...`);
+            await resolveApproved(entry.orderId);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn(`[KioskPrinterProvider] Failed to reconcile status for ${entry.orderId} on watch start:`, err);
+      }
 
       if (!pusher) {
         const { getPusherClient } = await import('@/lib/pusher');
@@ -137,12 +167,8 @@ export function KioskPrinterProvider({ children }: { children: React.ReactNode }
         // long-lived subscription) kept working fine.
         if (data.status === 'APPROVED') {
           console.log(`[KioskPrinterProvider] Printing receipt for ${entry.orderId}...`);
-          const success = await printPendingReceipt(entry.orderId);
-          console.log(`[KioskPrinterProvider] Print ${success ? 'succeeded' : 'failed'} for ${entry.orderId}`);
-          setKioskPrintResult(entry.orderId, success ? 'ok' : 'failed');
-          removePendingKioskPrint(entry.orderId);
+          await resolveApproved(entry.orderId);
           channel.unsubscribe();
-          watching.delete(entry.orderId);
         }
       });
     };
