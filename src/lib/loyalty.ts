@@ -31,7 +31,7 @@ export async function applyEarnedPoints(
   memberId: string,
   orderTotal: number,
   orderId: string
-): Promise<{ pointsEarned: number; tierLevel: number }> {
+): Promise<{ pointsEarned: number; tierLevel: number; tierUpgradedTo: string | null }> {
   const [config, member] = await Promise.all([
     getLoyaltyConfig(tx),
     tx.member.findUniqueOrThrow({ where: { id: memberId } }),
@@ -61,11 +61,13 @@ export async function applyEarnedPoints(
   // Naik tier (termasuk lompat beberapa level sekaligus dalam 1 order besar)
   // -> generate 1 ClaimedBenefit TIER_UPGRADE, berlaku tierUpgradeClaimWindowDays
   // hari (default 90) sejak sekarang.
+  let tierUpgradedTo: string | null = null;
   if (tierLevel > oldTierLevel) {
     const expiresAt = new Date(now.getTime() + config.tierUpgradeClaimWindowDays * 24 * 60 * 60 * 1000);
     await tx.claimedBenefit.create({
       data: { memberId, type: 'TIER_UPGRADE', expiresAt, tierLevelReached: tierLevel },
     });
+    tierUpgradedTo = tierRules.find((rule) => rule.level === tierLevel)?.name ?? null;
   }
 
   const pointsEarned = Math.floor(orderTotal * config.pointRatePerRupiah);
@@ -85,5 +87,5 @@ export async function applyEarnedPoints(
     },
   });
 
-  return { pointsEarned, tierLevel };
+  return { pointsEarned, tierLevel, tierUpgradedTo };
 }

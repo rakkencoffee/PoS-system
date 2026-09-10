@@ -3,6 +3,7 @@ import { pusherServer } from '@/lib/pusher';
 import { prisma } from '@/lib/db';
 import { getMenuItems } from '@/lib/integrations/pos.adapter';
 import { logOrderStatusChange } from '@/lib/order-status-log';
+import { sendPushToMember } from '@/lib/push';
 import { auth } from '@/lib/auth';
 import { BAG_OPTIONS } from '@/lib/bag-options';
 
@@ -537,6 +538,17 @@ export async function PATCH(
             fromStatus: prevOverallStatus, toStatus: localStatus,
             source: 'kds_manual', actorId, metadata: { stationType },
           });
+
+          // Push notification (Lapis 2 — reaches the member even with the
+          // app closed, unlike the Pusher broadcast below which only helps
+          // while a tab is open). Only Member App orders have a memberId to
+          // notify; kiosk orders are picked up in person, no notif needed.
+          if (prevOverallStatus !== 'COMPLETED' && localStatus === 'COMPLETED' && localOrder.channel === 'MEMBER_APP' && localOrder.memberId) {
+            await sendPushToMember(localOrder.memberId, {
+              title: 'Pesanan kamu siap diambil!',
+              body: 'Pesananmu sudah selesai dibuat — silakan ambil di outlet.',
+            });
+          }
         }
 
         try {

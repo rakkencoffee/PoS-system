@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db';
+import { sendPushToMember, sendPushToMembers } from '@/lib/push';
 
 /**
  * Daily loyalty evaluation — birthday benefits + Hari Member (weekly
@@ -88,6 +89,10 @@ async function evaluateBirthdays(wibNow: Date) {
     if (rows.length > 0) {
       await prisma.claimedBenefit.createMany({ data: rows });
       processed++;
+      await sendPushToMember(member.id, {
+        title: 'Selamat ulang tahun!',
+        body: 'Ada hadiah spesial nunggu kamu klaim di app.',
+      });
     }
   }
   return processed;
@@ -111,6 +116,10 @@ async function evaluateWeeklyMemberDay(wibNow: Date) {
   await prisma.claimedBenefit.createMany({
     data: eligibleMembers.map((m) => ({ memberId: m.id, type: 'WEEKLY_MEMBER_DAY' as const, expiresAt })),
   });
+  await sendPushToMembers(
+    eligibleMembers.map((m) => m.id),
+    { title: 'Hari Member!', body: 'Diskon spesial berlaku hari ini — jangan sampai kelewat.' }
+  );
   return eligibleMembers.length;
 }
 

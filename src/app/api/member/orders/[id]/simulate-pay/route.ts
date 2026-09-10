@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireMemberApiKey } from '@/lib/member-api-guard';
 import { applyEarnedPoints } from '@/lib/loyalty';
+import { sendPushToMember } from '@/lib/push';
 
 /**
  * POST /api/member/orders/:id/simulate-pay
@@ -37,9 +38,15 @@ export async function POST(
     const posAdapter = await import('@/lib/integrations/pos.adapter');
     await posAdapter.updateOrderPaymentStatus(orderId, 'paid', totalAmount, 'system_simulated');
 
-    const { pointsEarned, tierLevel } = await prisma.$transaction((tx) =>
+    const { pointsEarned, tierLevel, tierUpgradedTo } = await prisma.$transaction((tx) =>
       applyEarnedPoints(tx, order.memberId!, totalAmount, orderId)
     );
+    if (tierUpgradedTo) {
+      await sendPushToMember(order.memberId, {
+        title: 'Selamat, tier kamu naik!',
+        body: `Kamu sekarang ${tierUpgradedTo}. Cek benefit barumu di app.`,
+      });
+    }
 
     return NextResponse.json({ status: 'paid', pointsEarned, tierLevel });
   } catch (err) {

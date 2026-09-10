@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { verifyCallbackSignature } from '@/lib/integrations/tripay.service';
 import { applyEarnedPoints } from '@/lib/loyalty';
+import { sendPushToMember } from '@/lib/push';
 
 /**
  * Tripay Webhook Receiver
@@ -43,7 +44,15 @@ export async function POST(req: Request) {
     const posAdapter = await import('@/lib/integrations/pos.adapter');
     await posAdapter.updateOrderPaymentStatus(orderId, 'paid', totalAmount, 'tripay_webhook');
 
-    await prisma.$transaction((tx) => applyEarnedPoints(tx, order.memberId!, totalAmount, orderId));
+    const { tierUpgradedTo } = await prisma.$transaction((tx) =>
+      applyEarnedPoints(tx, order.memberId!, totalAmount, orderId)
+    );
+    if (tierUpgradedTo) {
+      await sendPushToMember(order.memberId, {
+        title: 'Selamat, tier kamu naik!',
+        body: `Kamu sekarang ${tierUpgradedTo}. Cek benefit barumu di app.`,
+      });
+    }
 
     return NextResponse.json({ success: true });
   } catch (err) {

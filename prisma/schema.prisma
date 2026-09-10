@@ -225,6 +225,9 @@ model Member {
   phone            String   @unique
   birthDate        DateTime
   olseraCustomerId String   @unique // hasil search-or-create Olsera saat onboarding
+  // Null = pakai foto default sisi frontend. Diisi begitu member upload foto
+  // sendiri (lihat POST /api/member/:id/photo, disimpen ke Vercel Blob).
+  photoUrl         String?
 
   // Kolom cache buat baca cepat — sumber kebenaran tetap PointLedger/akumulasi
   // Order, WAJIB diupdate bareng dalam satu Prisma $transaction.
@@ -237,12 +240,30 @@ model Member {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  orders          Order[]
-  pointLedger     PointLedger[]
-  claimedBenefits ClaimedBenefit[]
-  redeemedRewards RedeemedReward[]
+  orders            Order[]
+  pointLedger       PointLedger[]
+  claimedBenefits   ClaimedBenefit[]
+  redeemedRewards   RedeemedReward[]
+  pushSubscriptions PushSubscription[]
 
   @@index([tierLevel])
+}
+
+// One row per browser/device the member has enabled Web Push notifications
+// on (a member can have several — phone + laptop, say). endpoint is the
+// unique push service URL the browser's PushManager.subscribe() returns;
+// p256dh/auth are the two keys needed to encrypt payloads to that endpoint.
+model PushSubscription {
+  id        String   @id @default(cuid())
+  memberId  String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  member Member @relation(fields: [memberId], references: [id])
+
+  @@index([memberId])
 }
 
 // Ledger poin (bukan cache) — sumber kebenaran saldo Poin Reward member.
