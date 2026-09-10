@@ -1,16 +1,27 @@
-import { verifySignatureAppRouter } from '@upstash/qstash/nextjs';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { runDailyLoyaltyEvaluation } from '@/lib/loyalty-cron';
 
 /**
  * Background Job: Evaluate Loyalty (birthday + Hari Member)
  *
- * Triggered by a QStash schedule once a day (set up manually in the
- * Upstash Console — see project_rakken_loyalty_app memory for the
- * exact cron expression, WIB-adjusted). Uses Upstash Signature
- * Verification like /api/jobs/sync-products.
+ * Triggered by a native Vercel Cron Job (see `crons` in vercel.json) once a
+ * day — moved off QStash (2026-09-10) because it only needs once-a-day
+ * triggering, which Vercel's own scheduler already covers on the Hobby plan
+ * without any external service or manual dashboard setup (unlike QStash,
+ * whose schedule for this job was accidentally created under the wrong
+ * region in Upstash Console and silently failed signature verification
+ * every night). `sync-products` still needs QStash — it runs every 5
+ * minutes, more often than Hobby's native cron allows.
+ *
+ * Vercel signs every cron invocation with `Authorization: Bearer
+ * $CRON_SECRET` — see https://vercel.com/docs/cron-jobs/manage-cron-jobs#securing-cron-jobs.
  */
-async function handler() {
+export async function GET(request: NextRequest) {
+  const authHeader = request.headers.get('authorization');
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     console.log('[Job] Daily loyalty evaluation started...');
 
@@ -26,5 +37,3 @@ async function handler() {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
-
-export const POST = process.env.NODE_ENV === 'production' ? verifySignatureAppRouter(handler) : handler;
