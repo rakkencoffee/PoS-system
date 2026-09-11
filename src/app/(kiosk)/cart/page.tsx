@@ -66,7 +66,7 @@ function QuantityStepper({
       </span>
       <button
         onClick={onInc}
-        className={`${btnSize} flex items-center justify-center rounded-full bg-[#78000f] text-white shadow-sm active:scale-90 transition-transform`}
+        className={`${btnSize} flex items-center justify-center rounded-full bg-[#A8131E] text-white shadow-sm active:scale-90 transition-transform`}
       >
         <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>add</span>
       </button>
@@ -107,7 +107,7 @@ function KioskCartItemCard({
             {item.toppings && item.toppings.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-1.5">
                 {item.toppings.map((t) => (
-                  <span key={t.id} className="text-[11px] bg-[#fff2de] text-[#78000f] px-2 py-0.5 rounded-full font-[500]" style={JKT}>
+                  <span key={t.id} className="text-[11px] bg-[#fff2de] text-[#A8131E] px-2 py-0.5 rounded-full font-[500]" style={JKT}>
                     +{t.name} {formatCurrency(t.price)}
                   </span>
                 ))}
@@ -117,7 +117,7 @@ function KioskCartItemCard({
           <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={onEdit}
-              className="p-1.5 text-[#998075] hover:text-[#78000f] hover:bg-[#F5E6E8] rounded-lg transition-colors active:scale-95"
+              className="p-1.5 text-[#998075] hover:text-[#A8131E] hover:bg-[#F5E6E8] rounded-lg transition-colors active:scale-95"
               title="Edit"
             >
               <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>edit</span>
@@ -132,7 +132,7 @@ function KioskCartItemCard({
           </div>
         </div>
         <div className="flex justify-between items-center mt-3">
-          <span className="text-[20px] font-bold text-[#78000f]" style={JKT}>{formatCurrency(item.subtotal)}</span>
+          <span className="text-[20px] font-bold text-[#A8131E]" style={JKT}>{formatCurrency(item.subtotal)}</span>
           <QuantityStepper qty={item.quantity} onDec={onDec} onInc={onInc} />
         </div>
       </div>
@@ -169,7 +169,7 @@ function MobileCartItemCard({
         <div className="flex justify-between items-start">
           <h3 className="text-[15px] font-[600] text-[#231a05] pr-1 line-clamp-1" style={JKT}>{item.name}</h3>
           <div className="flex items-center gap-0.5 shrink-0">
-            <button onClick={onEdit} className="text-[#998075] active:text-[#78000f] p-1 transition-colors">
+            <button onClick={onEdit} className="text-[#998075] active:text-[#A8131E] p-1 transition-colors">
               <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>edit</span>
             </button>
             <button onClick={onRemove} className="text-[#998075] active:text-[#ba1a1a] p-1 transition-colors">
@@ -179,7 +179,7 @@ function MobileCartItemCard({
         </div>
         <p className="text-[11px] text-[#998075] mb-2 line-clamp-1" style={JKT}>{buildCustomText(item)}</p>
         <div className="flex justify-between items-center">
-          <span className="text-[15px] font-bold text-[#78000f]" style={JKT}>{formatCurrency(item.subtotal)}</span>
+          <span className="text-[15px] font-bold text-[#A8131E]" style={JKT}>{formatCurrency(item.subtotal)}</span>
           <QuantityStepper qty={item.quantity} onDec={onDec} onInc={onInc} size="sm" />
         </div>
       </div>
@@ -217,7 +217,7 @@ function BagOptionsSection({
             <div className="flex-1 min-w-0">
               <div className="flex justify-between items-center gap-2">
                 <span className="text-[14px] font-[600] text-[#323131]" style={JKT}>{line.label}</span>
-                <span className="text-[13px] font-[600] text-[#78000f] shrink-0" style={JKT}>{formatCurrency(line.price)}</span>
+                <span className="text-[13px] font-[600] text-[#A8131E] shrink-0" style={JKT}>{formatCurrency(line.price)}</span>
               </div>
               <p className="text-[11px] text-[#998075]" style={JKT}>{line.description}</p>
               {line.qty > 0 && (
@@ -243,7 +243,7 @@ function EmptyCart({ onBrowse, isMobile }: { onBrowse: () => void; isMobile: boo
   return (
     <div className={`flex flex-col items-center justify-center text-center ${isMobile ? 'py-20 px-6' : 'py-24'}`}>
       <div className="w-24 h-24 rounded-full bg-[#fff2de] flex items-center justify-center mb-6">
-        <span className="material-symbols-outlined text-[#78000f]" style={{ fontSize: '48px' }}>shopping_cart</span>
+        <span className="material-symbols-outlined text-[#A8131E]" style={{ fontSize: '48px' }}>shopping_cart</span>
       </div>
       <h2 className={`font-bold text-[#323131] mb-2 ${isMobile ? 'text-[20px]' : 'text-[24px]'}`} style={JKT}>
         Keranjang Kosong
@@ -253,7 +253,7 @@ function EmptyCart({ onBrowse, isMobile }: { onBrowse: () => void; isMobile: boo
       </p>
       <button
         onClick={onBrowse}
-        className="bg-[#78000f] text-white px-8 py-3 rounded-full text-[15px] font-[600] hover:bg-[#7D0F18] transition-colors active:scale-95 flex items-center gap-2"
+        className="bg-[#A8131E] text-white px-8 py-3 rounded-full text-[15px] font-[600] hover:bg-[#7D0F18] transition-colors active:scale-95 flex items-center gap-2"
         style={JKT}
       >
         <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>coffee</span>
@@ -398,7 +398,7 @@ export default function CartNewPage() {
                   onClick={() => router.push('/menu')}
                   className="w-full bg-[#fff2de] border border-[#f3e0be] border-dashed rounded-xl p-6 flex flex-col items-center justify-center text-center gap-2 opacity-80 hover:opacity-100 transition-opacity cursor-pointer active:scale-[0.99]"
                 >
-                  <span className="material-symbols-outlined text-[#78000f]" style={{ fontSize: '32px' }}>add_circle</span>
+                  <span className="material-symbols-outlined text-[#A8131E]" style={{ fontSize: '32px' }}>add_circle</span>
                   <p className="text-[17px] font-[600] text-[#5a403f]" style={JKT}>Ingin tambah minuman lagi?</p>
                   <p className="text-[13px] text-[#998075]" style={JKT}>Lihat menu rekomendasi kami untuk kamu.</p>
                 </button>
@@ -417,7 +417,7 @@ export default function CartNewPage() {
                     <input
                       className={`w-full bg-[#F5F5F5] rounded-lg px-4 py-3 text-[14px] text-[#231a05] outline-none transition-all focus:ring-2 focus:bg-white border ${
                         isNameValid
-                          ? 'border-[#f3e0be] focus:ring-[#78000f]/20 focus:border-[#78000f]'
+                          ? 'border-[#f3e0be] focus:ring-[#A8131E]/20 focus:border-[#A8131E]'
                           : 'border-[#ffdad6] focus:ring-[#ba1a1a]/20 focus:border-[#ba1a1a]'
                       }`}
                       style={JKT}
@@ -438,7 +438,7 @@ export default function CartNewPage() {
                     <input
                       type="tel"
                       inputMode="numeric"
-                      className="w-full bg-[#F5F5F5] rounded-lg px-4 py-3 text-[14px] text-[#231a05] outline-none transition-all focus:ring-2 focus:bg-white border border-[#f3e0be] focus:ring-[#78000f]/20 focus:border-[#78000f]"
+                      className="w-full bg-[#F5F5F5] rounded-lg px-4 py-3 text-[14px] text-[#231a05] outline-none transition-all focus:ring-2 focus:bg-white border border-[#f3e0be] focus:ring-[#A8131E]/20 focus:border-[#A8131E]"
                       style={JKT}
                       placeholder="Untuk kumpulkan poin / member"
                       value={customerPhone}
@@ -469,7 +469,7 @@ export default function CartNewPage() {
                     )}
                     <div className="flex justify-between items-center pt-2 border-t border-[#f3e0be] mt-2">
                       <span className="text-[17px] font-[600] text-[#323131]" style={JKT}>Total</span>
-                      <span className="text-[22px] font-bold text-[#78000f]" style={JKT}>{formatCurrency(grandTotal)}</span>
+                      <span className="text-[22px] font-bold text-[#A8131E]" style={JKT}>{formatCurrency(grandTotal)}</span>
                     </div>
                   </div>
 
@@ -479,7 +479,7 @@ export default function CartNewPage() {
                     disabled={!isNameValid}
                     className={`w-full py-3 rounded-full text-[17px] font-[600] flex items-center justify-center gap-2 shadow-md active:scale-[0.97] transition-all ${
                       isNameValid
-                        ? 'bg-[#78000f] text-white hover:bg-[#7D0F18]'
+                        ? 'bg-[#A8131E] text-white hover:bg-[#7D0F18]'
                         : 'bg-[#f3e0be] text-[#998075] cursor-not-allowed'
                     }`}
                     style={JKT}
@@ -511,13 +511,13 @@ export default function CartNewPage() {
               onClick={() => router.push('/menu')}
               className="w-10 h-10 flex items-center justify-center rounded-full active:scale-95 transition-transform hover:bg-[#F5F5F5]"
             >
-              <span className="material-symbols-outlined text-[#78000f]">arrow_back</span>
+              <span className="material-symbols-outlined text-[#A8131E]">arrow_back</span>
             </button>
             <img src="/rakken-wordmark-red.png" alt="Rakken Coffee" className="h-6 w-auto object-contain" />
           </div>
           <div className="flex items-center gap-1">
-            <span className="material-symbols-outlined text-[#78000f] p-2">shopping_bag</span>
-            <span className="material-symbols-outlined text-[#78000f] p-2">person</span>
+            <span className="material-symbols-outlined text-[#A8131E] p-2">shopping_bag</span>
+            <span className="material-symbols-outlined text-[#A8131E] p-2">person</span>
           </div>
         </header>
 
@@ -536,7 +536,7 @@ export default function CartNewPage() {
                 <input
                   className={`w-full bg-white border-[1.5px] rounded-xl px-4 py-3 text-[15px] text-[#231a05] focus:outline-none transition-all ${
                     isNameValid
-                      ? 'border-[#f3e0be] focus:border-[#78000f] focus:ring-1 focus:ring-[#78000f]'
+                      ? 'border-[#f3e0be] focus:border-[#A8131E] focus:ring-1 focus:ring-[#A8131E]'
                       : 'border-[#ffdad6] focus:border-[#ba1a1a] focus:ring-1 focus:ring-[#ba1a1a]'
                   }`}
                   style={JKT}
@@ -556,7 +556,7 @@ export default function CartNewPage() {
               <input
                 type="tel"
                 inputMode="numeric"
-                className="w-full bg-white border-[1.5px] border-[#f3e0be] rounded-xl px-4 py-3 text-[15px] text-[#231a05] focus:outline-none focus:border-[#78000f] focus:ring-1 focus:ring-[#78000f] transition-all"
+                className="w-full bg-white border-[1.5px] border-[#f3e0be] rounded-xl px-4 py-3 text-[15px] text-[#231a05] focus:outline-none focus:border-[#A8131E] focus:ring-1 focus:ring-[#A8131E] transition-all"
                 style={JKT}
                 placeholder="Untuk kumpulkan poin / member"
                 value={customerPhone}
@@ -575,7 +575,7 @@ export default function CartNewPage() {
               <div className="flex justify-between items-center mb-3">
                 <h2 className="text-[22px] font-bold text-[#231a05]" style={JKT}>Your Order</h2>
                 <span
-                  className="text-[12px] font-[500] text-[#78000f] bg-[#F5E6E8] px-3 py-1 rounded-full live-pulse"
+                  className="text-[12px] font-[500] text-[#A8131E] bg-[#F5E6E8] px-3 py-1 rounded-full live-pulse"
                   style={JKT}
                 >
                   {itemCount} ITEM
@@ -608,13 +608,13 @@ export default function CartNewPage() {
                   <h4 className="text-[16px] font-[600] text-[#231a05]" style={JKT}>Tambah lagi?</h4>
                   <p className="text-[13px] text-[#998075]" style={JKT}>Lihat menu lainnya</p>
                 </div>
-                <span className="material-symbols-outlined text-[#78000f]" style={{ fontSize: '28px' }}>auto_awesome</span>
+                <span className="material-symbols-outlined text-[#A8131E]" style={{ fontSize: '28px' }}>auto_awesome</span>
               </div>
               <button
                 onClick={() => router.push('/menu')}
                 className="flex items-center gap-2 bg-white px-4 py-2.5 rounded-xl border border-[#f3e0be] shadow-sm active:scale-95 transition-transform"
               >
-                <span className="material-symbols-outlined text-[#78000f]" style={{ fontSize: '18px' }}>add_circle</span>
+                <span className="material-symbols-outlined text-[#A8131E]" style={{ fontSize: '18px' }}>add_circle</span>
                 <span className="text-[13px] font-[500] text-[#323131]" style={JKT}>Tambah dari Menu</span>
               </button>
             </div>
@@ -640,7 +640,7 @@ export default function CartNewPage() {
                 <div className="h-px bg-[#f3e0be] my-1" />
                 <div className="flex justify-between items-center">
                   <span className="text-[20px] font-bold text-[#231a05]" style={JKT}>Total</span>
-                  <span className="text-[22px] font-bold text-[#78000f]" style={JKT}>{formatCurrency(grandTotal)}</span>
+                  <span className="text-[22px] font-bold text-[#A8131E]" style={JKT}>{formatCurrency(grandTotal)}</span>
                 </div>
               </div>
 
@@ -650,7 +650,7 @@ export default function CartNewPage() {
                 disabled={!isNameValid}
                 className={`w-full py-5 rounded-full text-[18px] font-bold flex items-center justify-center gap-2 shadow-lg active:scale-[0.97] transition-all ${
                   isNameValid
-                    ? 'bg-[#78000f] text-white'
+                    ? 'bg-[#A8131E] text-white'
                     : 'bg-[#f3e0be] text-[#998075] cursor-not-allowed'
                 }`}
                 style={JKT}

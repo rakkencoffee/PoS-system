@@ -254,7 +254,7 @@ export default function CheckoutNewPage() {
         }
         .live-pulse { animation: pulse-live 1.5s infinite; }
         .active-payment {
-            border: 2px solid #78000f !important;
+            border: 2px solid #A8131E !important;
             background-color: #F5E6E8 !important;
         }
         ::-webkit-scrollbar { width: 6px; }

@@ -56,7 +56,7 @@ function KioskProductCard({ item, onSelect, priority }: { item: MenuItem; onSele
         )}
         {item.isRecommended && !item.isBestSeller && (
           <span
-            className="absolute top-1.5 left-1.5 bg-[#78000f] text-white text-[9px] font-bold px-2 py-0.5 rounded-full"
+            className="absolute top-1.5 left-1.5 bg-[#A8131E] text-white text-[9px] font-bold px-2 py-0.5 rounded-full"
             style={JKT}
           >
             Recommended
@@ -73,11 +73,11 @@ function KioskProductCard({ item, onSelect, priority }: { item: MenuItem; onSele
           </p>
         </div>
         <div className="flex items-center justify-between gap-2 mt-auto">
-          <span className="text-[17px] font-bold text-[#78000f] whitespace-nowrap" style={JKT}>
+          <span className="text-[17px] font-bold text-[#A8131E] whitespace-nowrap" style={JKT}>
             {formatCurrency(item.price)}
           </span>
           <div
-            className="bg-[#78000f] text-white text-[13px] font-[600] px-3.5 py-1.5 rounded-lg hover:bg-[#7D0F18] transition-colors flex items-center justify-center active:scale-95"
+            className="bg-[#A8131E] text-white text-[13px] font-[600] px-3.5 py-1.5 rounded-lg hover:bg-[#7D0F18] transition-colors flex items-center justify-center active:scale-95"
             style={JKT}
           >
             Pilih
@@ -122,10 +122,10 @@ function MobileProductCard({ item, onSelect, priority }: { item: MenuItem; onSel
           {item.name}
         </h3>
         <div className="mt-auto flex justify-between items-center">
-          <span className="text-[14px] font-bold text-[#78000f]" style={JKT}>
+          <span className="text-[14px] font-bold text-[#A8131E]" style={JKT}>
             {formatCurrency(item.price)}
           </span>
-          <div className="w-7 h-7 rounded-full bg-[#F5F5F5] flex items-center justify-center text-[#78000f] group-hover:bg-[#78000f] group-hover:text-white transition-colors shrink-0">
+          <div className="w-7 h-7 rounded-full bg-[#F5F5F5] flex items-center justify-center text-[#A8131E] group-hover:bg-[#A8131E] group-hover:text-white transition-colors shrink-0">
             <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>add</span>
           </div>
         </div>
@@ -200,8 +200,8 @@ function CategoryPills({ categories, selected, onSelect, compact = false }: Cate
   const base = compact
     ? 'px-4 py-1.5 text-[12px]'
     : 'px-6 py-2 text-[13px]';
-  const active = 'bg-[#78000f] text-white active-pill';
-  const inactive = 'bg-white border border-[#f3e0be] text-[#998075] hover:border-[#78000f]';
+  const active = 'bg-[#A8131E] text-white active-pill';
+  const inactive = 'bg-white border border-[#f3e0be] text-[#998075] hover:border-[#A8131E]';
 
   return (
     <div className={`flex gap-3 overflow-x-auto hide-scrollbar ${compact ? 'px-4 py-2' : 'px-12 pb-1'}`}>
@@ -326,19 +326,25 @@ function MenuPageContent() {
       {/* ══════════════════════════════════════════════════ */}
       <div className="hidden lg:block">
 
-        <KioskHeader
-          searchValue={searchQuery}
-          onSearchChange={onSearchValueChange}
-          itemCount={itemCount}
-        />
-
-        {/* Category Pills */}
-        <div className="sticky top-[72px] z-40 py-3 bg-[#fff8f2]/95 backdrop-blur-sm border-b border-[#f3e0be]/40">
-          <CategoryPills
-            categories={categories}
-            selected={selectedCategory}
-            onSelect={handleScrollToCategory}
+        {/* Header + Category Pills are one sticky unit -- previously the pills
+            div stuck at a hardcoded top-[72px] guessed to match the header's
+            height, which silently drifted (and left a visible gap) the
+            moment the header's own padding changed. Wrapping both together
+            means there's no pixel offset to keep in sync at all. */}
+        <div className="sticky top-0 z-50">
+          <KioskHeader
+            searchValue={searchQuery}
+            onSearchChange={onSearchValueChange}
+            itemCount={itemCount}
+            disableSticky
           />
+          <div className="py-3 bg-[#fff8f2]/95 backdrop-blur-sm border-b border-[#f3e0be]/40">
+            <CategoryPills
+              categories={categories}
+              selected={selectedCategory}
+              onSelect={handleScrollToCategory}
+            />
+          </div>
         </div>
 
         {/* Main Content */}
@@ -396,12 +402,12 @@ function MenuPageContent() {
             itemCount > 0 ? 'translate-y-0' : 'translate-y-full'
           }`}
         >
-          <div className="mx-12 mb-4 bg-[#78000f] text-white rounded-2xl shadow-lg p-3 flex items-center justify-between">
+          <div className="mx-12 mb-4 bg-[#A8131E] text-white rounded-2xl shadow-lg p-3 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="relative">
                 <span className="material-symbols-outlined" style={{ fontSize: '28px' }}>shopping_bag</span>
                 <span
-                  className="absolute -top-1 -right-1 bg-white text-[#78000f] text-[10px] font-bold h-5 w-5 flex items-center justify-center rounded-full"
+                  className="absolute -top-1 -right-1 bg-white text-[#A8131E] text-[10px] font-bold h-5 w-5 flex items-center justify-center rounded-full"
                   style={JKT}
                 >
                   {itemCount}
@@ -416,7 +422,7 @@ function MenuPageContent() {
             </div>
             <button
               onClick={() => router.push('/cart')}
-              className="bg-white text-[#78000f] px-8 py-2.5 rounded-xl text-[16px] font-[600] hover:bg-[#F5F5F5] transition-colors active:scale-95"
+              className="bg-white text-[#A8131E] px-8 py-2.5 rounded-xl text-[16px] font-[600] hover:bg-[#F5F5F5] transition-colors active:scale-95"
               style={JKT}
             >
               Lihat Keranjang →
@@ -437,7 +443,7 @@ function MenuPageContent() {
               onClick={() => router.push('/')}
               className="p-1.5 hover:bg-[#F5F5F5] rounded-full transition-colors active:scale-95"
             >
-              <span className="material-symbols-outlined text-[#78000f]" style={{ fontSize: '20px' }}>arrow_back</span>
+              <span className="material-symbols-outlined text-[#A8131E]" style={{ fontSize: '20px' }}>arrow_back</span>
             </button>
             <img src="/rakken-wordmark-red.png" alt="Rakken Coffee" className="h-6 w-auto object-contain" />
           </div>
@@ -446,10 +452,10 @@ function MenuPageContent() {
               onClick={() => router.push('/cart')}
               className="relative p-1.5 hover:bg-[#F5F5F5] rounded-full transition-colors active:scale-95"
             >
-              <span className="material-symbols-outlined text-[#78000f]" style={{ fontSize: '22px' }}>shopping_bag</span>
+              <span className="material-symbols-outlined text-[#A8131E]" style={{ fontSize: '22px' }}>shopping_bag</span>
               {itemCount > 0 && (
                 <span
-                  className="absolute -top-0.5 -right-0.5 bg-[#78000f] text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full"
+                  className="absolute -top-0.5 -right-0.5 bg-[#A8131E] text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full"
                   style={JKT}
                 >
                   {itemCount}
@@ -463,7 +469,7 @@ function MenuPageContent() {
         <div className="px-4 pt-3 pb-2 bg-[#fff8f2]">
           <div className="relative w-full">
             <input
-              className="w-full bg-white border border-[#f3e0be] rounded-xl px-4 py-3 text-[14px] focus:border-[#78000f] focus:ring-2 focus:ring-[#78000f]/10 outline-none transition-all"
+              className="w-full bg-white border border-[#f3e0be] rounded-xl px-4 py-3 text-[14px] focus:border-[#A8131E] focus:ring-2 focus:ring-[#A8131E]/10 outline-none transition-all"
               style={JKT}
               placeholder="Find your perfect brew..."
               value={searchQuery}
@@ -517,8 +523,8 @@ function MenuPageContent() {
             <div>
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-[20px] font-bold text-[#231a05]" style={JKT}>Menu Kami</h2>
-                <div className="flex items-center gap-1.5 text-[#78000f]">
-                  <span className="w-2 h-2 rounded-full bg-[#78000f] pulse-live inline-block" />
+                <div className="flex items-center gap-1.5 text-[#A8131E]">
+                  <span className="w-2 h-2 rounded-full bg-[#A8131E] pulse-live inline-block" />
                   <span className="text-[12px] font-[500]" style={JKT}>Live</span>
                 </div>
               </div>
@@ -553,11 +559,11 @@ function MenuPageContent() {
         {itemCount > 0 && (
           <button
             onClick={() => router.push('/cart')}
-            className="fixed bottom-5 right-5 z-50 bg-[#78000f] text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all overflow-hidden"
+            className="fixed bottom-5 right-5 z-50 bg-[#A8131E] text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all overflow-hidden"
           >
             <span className="material-symbols-outlined" style={{ fontSize: '26px' }}>shopping_cart</span>
             <div
-              className="absolute -top-1 -right-1 bg-white text-[#78000f] w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] border-2 border-[#78000f]"
+              className="absolute -top-1 -right-1 bg-white text-[#A8131E] w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] border-2 border-[#A8131E]"
               style={JKT}
             >
               {itemCount}

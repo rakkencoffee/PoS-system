@@ -2,7 +2,7 @@
 
 @theme {
   /* Design System Colors */
-  --color-primary: #78000f;
+  --color-primary: #A8131E;
   --color-primary-container: #9f131e;
   --color-red-dark: #7D0F18;
   --color-red-light: #F5E6E8;
@@ -81,7 +81,7 @@
   --brand-200: #fca5a5;
   --brand-300: #f87171;
   --brand-400: #dc2626;
-  --brand-500: #9F131E; /* Primary RAKKEN */
+  --brand-500: #A8131E; /* Primary RAKKEN */
   --brand-600: #8B0F19;
   --brand-700: #6E0C14;
   --brand-800: #520910;
