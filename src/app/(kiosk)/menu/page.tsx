@@ -35,7 +35,7 @@ function KioskProductCard({ item, onSelect, priority }: { item: MenuItem; onSele
       onClick={onSelect}
       className="bg-white rounded-xl border border-[#f3e0be] shadow-sm overflow-hidden flex flex-col group product-card-hover text-left w-full"
     >
-      <div className="relative aspect-[4/3] overflow-hidden bg-[#F5F5F5] m-1.5 rounded-lg">
+      <div className="relative aspect-[4/3] overflow-hidden bg-white m-1.5 rounded-lg">
         {item.image ? (
           <img
             className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
@@ -94,7 +94,7 @@ function MobileProductCard({ item, onSelect, priority }: { item: MenuItem; onSel
       onClick={onSelect}
       className="bg-white rounded-xl p-2 shadow-sm border border-[#f3e0be] flex flex-col group active:scale-95 transition-all duration-200 text-left w-full"
     >
-      <div className="aspect-square w-full rounded-lg overflow-hidden mb-2 relative bg-[#F5F5F5]">
+      <div className="aspect-square w-full rounded-lg overflow-hidden mb-2 relative bg-white">
         {item.image ? (
           <img
             className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
