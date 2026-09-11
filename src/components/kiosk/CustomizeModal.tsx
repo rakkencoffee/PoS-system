@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useCartStore } from '@/stores/useCartStore';
 import { CartItem } from '@/lib/types';
 
@@ -45,6 +45,16 @@ function formatCurrency(amount: number): string {
 // Categories that show Optional Choice
 const OPTIONAL_CHOICE_CATEGORIES = ['coffee-based', 'milk-based'];
 
+// Coffee bean flavor -- a real Olsera variant dimension, baked into the
+// variant name as its trailing comma segment (e.g. "Hot,Small,Bold & Nutty").
+// Order here also drives display order and the default ("Roar", no add-on).
+const BEAN_FLAVORS = ['Roar', 'Bold & Nutty', 'Rich & Fruity'];
+
+function matchBeanFlavor(segment: string): string | null {
+  const trimmed = segment.trim();
+  return BEAN_FLAVORS.find((b) => b.toLowerCase() === trimmed.toLowerCase()) || null;
+}
+
 function getMenuConfig(itemName: string, categorySlug: string) {
   const name = itemName.toLowerCase();
   const slug = categorySlug;
@@ -60,14 +70,18 @@ function getMenuConfig(itemName: string, categorySlug: string) {
   };
 
   if (slug === 'rakken-signature') {
+    // Bean flavor (Roar / Bold & Nutty / Rich & Fruity) is now a real Olsera
+    // variant (e.g. "Hot,Small,Roar"), surfaced via its own "Coffee Beans"
+    // group derived from beanVariantInfo -- not this local Beans Choice
+    // selector -- so showBeans stays false here to avoid offering it twice.
     if (name.includes('kyoto origin')) {
-      config = { showIce: true, showSugar: true, showMilk: false, showCream: false, showBeans: true, showShot: true, freeCream: false };
+      config = { showIce: true, showSugar: true, showMilk: false, showCream: false, showBeans: false, showShot: true, freeCream: false };
     } else if (name.includes('kyoto house blend') || name.includes('kyoto sakura latte')) {
-      config = { showIce: true, showSugar: true, showMilk: true, showCream: true, showBeans: true, showShot: true, freeCream: false };
+      config = { showIce: true, showSugar: true, showMilk: true, showCream: true, showBeans: false, showShot: true, freeCream: false };
     } else if (name.includes('yuzu coffee')) {
-      config = { showIce: true, showSugar: true, showMilk: false, showCream: false, showBeans: true, showShot: true, freeCream: false };
+      config = { showIce: true, showSugar: true, showMilk: false, showCream: false, showBeans: false, showShot: true, freeCream: false };
     } else if (name.includes('dirty matcha')) {
-      config = { showIce: true, showSugar: true, showMilk: true, showCream: true, showBeans: true, showShot: true, freeCream: true };
+      config = { showIce: true, showSugar: true, showMilk: true, showCream: true, showBeans: false, showShot: true, freeCream: true };
     }
   } else if (slug === 'rakken-style') {
     if (name.includes('rakken house blend') || name.includes('cafe latte') || name.includes('café latte') || name.includes('kokuto latte')) {
@@ -124,8 +138,53 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
     return { milk, beans, shot, creamChoices };
   })();
 
+  // Groups this item's raw Olsera variants (e.g. "Hot,Small,Bold & Nutty")
+  // into a base variant (temp+size, e.g. "Hot,Small" -- same set as before
+  // bean flavors existed) crossed with a bean flavor, so the UI can offer
+  // them as two separate pick-one groups instead of one flat list of long
+  // combined labels. Returns null for items that don't have a uniform bean
+  // dimension (RAKKEN Style, food, or Signature items before their Olsera
+  // variants are migrated) -- those keep the original flat "Variant" grid.
+  const beanVariantInfo = useMemo(() => {
+    const variants = item.olseraVariants || [];
+    if (variants.length === 0) return null;
+
+    const parsed = variants.map((v) => {
+      const segments = v.name.split(',').map((s) => s.trim());
+      const bean = matchBeanFlavor(segments[segments.length - 1]);
+      const baseKey = bean ? segments.slice(0, -1).join(',') : v.name;
+      return { variant: v, baseKey, bean };
+    });
+
+    if (!parsed.every((p) => p.bean !== null) || parsed.some((p) => p.baseKey === '')) {
+      return null;
+    }
+
+    const baseKeys: string[] = [];
+    for (const p of parsed) {
+      if (!baseKeys.includes(p.baseKey)) baseKeys.push(p.baseKey);
+    }
+    return { parsed, baseKeys };
+  }, [item.olseraVariants]);
+
+  // Recover the base variant (without the bean suffix) from a previously
+  // saved cart item's `size`, so re-opening it for edit lands on the same
+  // temp/size AND bean flavor instead of losing the flavor half back to
+  // the raw combined string.
+  const stripBeanSuffix = (size: string): string => {
+    const segments = size.split(',').map((s) => s.trim());
+    return matchBeanFlavor(segments[segments.length - 1]) ? segments.slice(0, -1).join(',') : size;
+  };
+
   const [optionalChoices, setOptionalChoices] = useState<Topping[]>([]);
-  const [selectedSize, setSelectedSize] = useState(editingCartItem?.size || '');
+  const [selectedSize, setSelectedSize] = useState(
+    editingCartItem?.size ? stripBeanSuffix(editingCartItem.size) : ''
+  );
+  const [selectedBeanFlavor, setSelectedBeanFlavor] = useState<string>(() => {
+    if (!editingCartItem) return BEAN_FLAVORS[0];
+    const segments = editingCartItem.size.split(',').map((s) => s.trim());
+    return matchBeanFlavor(segments[segments.length - 1]) || BEAN_FLAVORS[0];
+  });
   const [sugarLevel, setSugarLevel] = useState(editingCartItem?.sugarLevel || 'normal');
   const [iceLevel, setIceLevel] = useState(editingCartItem?.iceLevel || 'normal');
   const [milkChoice, setMilkChoice] = useState(parsedEdit?.milk || 'dairy');
@@ -136,7 +195,18 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
 
   const slug = item.category?.slug || item.categorySlug || '';
   const config = getMenuConfig(item.name as string, slug);
-  const hasSizes = item.sizes.length > 0;
+
+  // "Variant" grid source: the item's base temp/size combos when this item
+  // has a bean dimension (priced off each combo's "Roar" entry, matching
+  // what these prices were before bean flavors existed), otherwise the
+  // plain item.sizes exactly as before.
+  const displaySizes: MenuItemSize[] = beanVariantInfo
+    ? beanVariantInfo.baseKeys.map((baseKey) => {
+        const roarEntry = beanVariantInfo.parsed.find((p) => p.baseKey === baseKey && p.bean === BEAN_FLAVORS[0]);
+        return { size: baseKey, priceAdjustment: (roarEntry?.variant.price ?? item.price) - item.price };
+      })
+    : item.sizes;
+  const hasSizes = displaySizes.length > 0;
 
   const FOOD_CATEGORIES = ['dessert', 'snack', 'main-course', 'bites'];
   const isFood = slug ? FOOD_CATEGORIES.includes(slug) : item.type === 'none';
@@ -165,10 +235,12 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
 
   // Set default selected size (only when NOT editing)
   useEffect(() => {
-    if (!isEditMode && item.sizes.length > 0) {
-      setSelectedSize(item.sizes[0].size);
+    if (isEditMode) return;
+    if (displaySizes.length > 0) {
+      setSelectedSize(displaySizes[0].size);
     }
-  }, [item.sizes, isEditMode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.sizes, beanVariantInfo, isEditMode]);
 
   // Lock background scroll while the modal is open — otherwise touch/trackpad
   // scroll gestures that start on the backdrop can scroll the page behind it.
@@ -186,9 +258,12 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
     { key: 'oat', label: 'Oat Milk', sub: 'Plant-based', price: 6000 },
   ];
   
+  // RAKKEN Style only ever uses RAKKEN Blend -- no alternative bean here, so
+  // this renders as a single, non-priced informational choice (not a real
+  // decision). Signature's beans are now picked via the Variant/size grid
+  // (see getMenuConfig's showBeans: false above), not this list.
   const beansChoices = [
-    { key: 'rakken-blend', label: 'RAKKEN Blend', sub: 'House blend', price: 0 },
-    { key: 'png-signature', label: 'PNG Signature', sub: 'Nutty profile', price: 6000 },
+    { key: 'rakken-blend', label: 'RAKKEN BLEND', sub: 'House blend', price: 0 },
   ];
 
   const shotChoices = [
@@ -201,8 +276,17 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
   const selectedBeansPrice = config.showBeans ? (beansChoices.find(b => b.key === beansChoice)?.price || 0) : 0;
   const selectedShotPrice = config.showShot ? (shotChoices.find(s => s.key === shotChoice)?.price || 0) : 0;
 
-  const sizeAdjustment = item.sizes.find((s) => s.size === selectedSize)?.priceAdjustment || 0;
-  
+  // The exact combo currently picked (base variant + bean flavor), when this
+  // item has a bean dimension -- this is what actually gets billed/synced to
+  // Olsera, since bean flavor changes the price.
+  const selectedBeanVariant = beanVariantInfo?.parsed.find(
+    (p) => p.baseKey === selectedSize && p.bean === selectedBeanFlavor
+  );
+
+  const sizeAdjustment = beanVariantInfo
+    ? (selectedBeanVariant?.variant.price ?? item.price) - item.price
+    : displaySizes.find((s) => s.size === selectedSize)?.priceAdjustment || 0;
+
   const choicesTotal = selectedChoices.reduce((sum, t) => {
     // Determine price dynamically in case freeCream config applies
     const isCream = (t.id === 9004 || t.id === 9005 || t.id === 9003);
@@ -235,12 +319,16 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
   };
 
   const handleSubmit = () => {
-    // Look up the Olsera variant ID that matches the selected size name
-    // Use robust matching (lowercase + trim) to handle subtle discrepancies in Olsera data
-    const matchedVariant = item.olseraVariants?.find((v) => 
-      v.name.toLowerCase().trim() === (selectedSize || '').toLowerCase().trim()
-    );
-    
+    // Look up the Olsera variant that matches what's currently selected --
+    // for bean-dimension items this is the precomputed base+bean combo
+    // (selectedBeanVariant), otherwise fall back to matching selectedSize
+    // directly (lowercase + trim, to handle subtle discrepancies in Olsera data).
+    const matchedVariant = beanVariantInfo
+      ? selectedBeanVariant?.variant
+      : item.olseraVariants?.find((v) =>
+          v.name.toLowerCase().trim() === (selectedSize || '').toLowerCase().trim()
+        );
+
     const finalToppings = selectedChoices.map((t) => {
       const isCream = (t.id === 9004 || t.id === 9005 || t.id === 9003);
       return { id: t.id, name: t.name, price: (config.freeCream && isCream) ? 0 : t.price };
@@ -266,7 +354,11 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
       price: item.price + sizeAdjustment,
       image: item.image,
       quantity,
-      size: selectedSize || '',
+      // For bean-dimension items, store the full raw Olsera combo name (e.g.
+      // "Hot,Small,Bold & Nutty") rather than just the base variant -- this
+      // is what prints on the KDS/receipt "Size:" line, and baristas need to
+      // see the bean flavor there since it changes which beans they grab.
+      size: (beanVariantInfo ? matchedVariant?.name : selectedSize) || selectedSize || '',
       olseraVariantId: matchedVariant?.id,
       sugarLevel: config.showSugar ? sugarLevel : '',
       iceLevel: config.showIce ? iceLevel : '',
@@ -325,8 +417,8 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
               <h3 className="text-sm font-semibold text-(--text-secondary) uppercase tracking-wider mb-3">
                 {isDrink ? 'Variant' : 'Option'}
               </h3>
-              <div className={`grid gap-2 ${item.sizes.length <= 2 ? 'grid-cols-2' : item.sizes.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
-                {item.sizes.map((size) => (
+              <div className={`grid gap-2 ${displaySizes.length <= 2 ? 'grid-cols-2' : displaySizes.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                {displaySizes.map((size) => (
                   <button
                     key={size.size}
                     onClick={() => setSelectedSize(size.size)}
@@ -344,6 +436,35 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
                     </span>
                   </button>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Coffee Beans -- the real Olsera variant dimension, shown as its
+              own pick-one group instead of baked into the Variant labels above. */}
+          {beanVariantInfo && (
+            <div>
+              <h3 className="text-sm font-semibold text-(--text-secondary) uppercase tracking-wider mb-3">Coffee Beans</h3>
+              <div className="grid grid-cols-3 gap-2">
+                {BEAN_FLAVORS.map((flavor) => {
+                  const roarEntry = beanVariantInfo.parsed.find((p) => p.baseKey === selectedSize && p.bean === BEAN_FLAVORS[0]);
+                  const flavorEntry = beanVariantInfo.parsed.find((p) => p.baseKey === selectedSize && p.bean === flavor);
+                  const priceDelta = (flavorEntry?.variant.price ?? 0) - (roarEntry?.variant.price ?? 0);
+                  return (
+                    <button
+                      key={flavor}
+                      onClick={() => setSelectedBeanFlavor(flavor)}
+                      className={`py-2 px-1 rounded-xl text-center transition-all flex flex-col items-center justify-center min-h-[60px] ${
+                        selectedBeanFlavor === flavor
+                          ? 'bg-[var(--brand-500)] text-white shadow-md'
+                          : 'bg-(--bg-card) text-(--text-secondary) border border-(--border-subtle)'
+                      }`}
+                    >
+                      <span className="text-xs font-bold block leading-tight">{flavor}</span>
+                      {priceDelta > 0 && <span className="text-[10px] font-bold mt-1">+{formatCurrency(priceDelta)}</span>}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -400,7 +521,7 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
           {config.showBeans && (
             <div>
               <h3 className="text-sm font-semibold text-(--text-secondary) uppercase tracking-wider mb-3">Beans Choice</h3>
-              <div className="grid grid-cols-2 gap-2">
+              <div className={`grid gap-2 ${beansChoices.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
                 {beansChoices.map((bean) => (
                   <button
                     key={bean.key}
