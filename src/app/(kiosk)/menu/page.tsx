@@ -38,7 +38,7 @@ function KioskProductCard({ item, onSelect, priority }: { item: MenuItem; onSele
       <div className="relative aspect-[4/3] overflow-hidden bg-[#F5F5F5] m-1.5 rounded-lg">
         {item.image ? (
           <img
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
             src={item.image}
             alt={item.name}
             fetchPriority={priority ? "high" : "auto"}
@@ -65,7 +65,7 @@ function KioskProductCard({ item, onSelect, priority }: { item: MenuItem; onSele
       </div>
       <div className="p-3 flex-1 flex flex-col justify-between">
         <div>
-          <h3 className="text-[15px] font-[600] text-[#323131] mb-0.5 line-clamp-1" style={JKT}>
+          <h3 className="text-[15px] font-bold text-[#323131] mb-0.5 line-clamp-1" style={JKT}>
             {item.name}
           </h3>
           <p className="text-[11px] text-[#998075] mb-2 line-clamp-2 min-h-[30px] leading-tight" style={JKT}>
@@ -97,7 +97,7 @@ function MobileProductCard({ item, onSelect, priority }: { item: MenuItem; onSel
       <div className="aspect-square w-full rounded-lg overflow-hidden mb-2 relative bg-[#F5F5F5]">
         {item.image ? (
           <img
-            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+            className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
             src={item.image}
             alt={item.name}
             fetchPriority={priority ? "high" : "auto"}
@@ -118,7 +118,7 @@ function MobileProductCard({ item, onSelect, priority }: { item: MenuItem; onSel
         <span className="text-[11px] font-[500] text-[#998075] mb-0.5 truncate" style={JKT}>
           {(item as any).category?.name || item.categorySlug || ''}
         </span>
-        <h3 className="text-[14px] font-[600] text-[#231a05] mb-1 leading-tight line-clamp-2" style={JKT}>
+        <h3 className="text-[14px] font-bold text-[#231a05] mb-1 leading-tight line-clamp-2" style={JKT}>
           {item.name}
         </h3>
         <div className="mt-auto flex justify-between items-center">

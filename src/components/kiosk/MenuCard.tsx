@@ -50,7 +50,7 @@ export default function MenuCard({ item, index, onSelect }: MenuCardProps) {
           <img
             src={item.image}
             alt={item.name}
-            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+            className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
           />
         ) : null}
 
@@ -75,7 +75,7 @@ export default function MenuCard({ item, index, onSelect }: MenuCardProps) {
 
       {/* Content */}
       <div className="p-4">
-        <h3 className="font-semibold text-(--text-primary) text-sm leading-tight mb-1 line-clamp-1">
+        <h3 className="font-bold text-(--text-primary) text-sm leading-tight mb-1 line-clamp-1">
           {item.name}
         </h3>
         <p className="text-(--text-muted) text-xs line-clamp-2 mb-3 min-h-8 whitespace-pre-line">
