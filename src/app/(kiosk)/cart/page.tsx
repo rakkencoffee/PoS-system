@@ -513,8 +513,7 @@ export default function CartNewPage() {
             >
               <span className="material-symbols-outlined text-[#78000f]">arrow_back</span>
             </button>
-            <img src="/rakken-icon.svg" alt="Rakken Coffee" className="h-6 w-6 object-contain" />
-            <h1 className="text-[17px] font-extrabold text-[#78000f] tracking-tight" style={JKT}>RAKKEN COFFEE</h1>
+            <img src="/rakken-wordmark-red.png" alt="Rakken Coffee" className="h-6 w-auto object-contain" />
           </div>
           <div className="flex items-center gap-1">
             <span className="material-symbols-outlined text-[#78000f] p-2">shopping_bag</span>

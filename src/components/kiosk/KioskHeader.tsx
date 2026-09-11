@@ -47,10 +47,7 @@ export function KioskHeader({
         onClick={() => router.push('/menu')}
         className="flex items-center gap-3"
       >
-        <img src="/rakken-icon.svg" alt="Rakken Coffee" className="h-8 w-8 object-contain" />
-        <h1 className="text-[22px] font-extrabold text-[#78000f] tracking-tight" style={JKT}>
-          RAKKEN COFFEE
-        </h1>
+        <img src="/rakken-wordmark-red.png" alt="Rakken Coffee" className="h-9 w-auto object-contain" />
       </button>
 
       {/* Centre search */}
