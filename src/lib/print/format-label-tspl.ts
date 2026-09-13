@@ -69,9 +69,21 @@ export interface TsplLabelOptions {
   density?: number;
 }
 
+// Portrait, not landscape. Confirmed via the printer's own self-test sticker
+// (2026-09-13 photo) that the physical roll is 58mm wide, not the 40mm this
+// was guessing before -- that alone was enough to throw off every margin/wrap
+// calculation. Label length was declared as 30mm, but the self-test's four
+// info/checkerboard/order blocks each print roughly one physical label's
+// worth of content and all look near-square against the 58mm width, putting
+// the real pitch closer to ~60mm. 30mm was too short once notes wrapped to
+// 2-3 lines -- content that ran past the declared height didn't get clipped,
+// it kept printing straight past the label's physical edge and onto the next
+// one, which is what showed up as overlapping/garbled text in that test
+// print. Still an estimate pending a ruler check -- adjust heightMm if the
+// next physical test shows it's off.
 const DEFAULT_OPTIONS: Required<TsplLabelOptions> = {
-  widthMm: 40,
-  heightMm: 30,
+  widthMm: 58,
+  heightMm: 60,
   gapMm: 2,
   density: 8,
 };
