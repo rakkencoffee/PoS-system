@@ -37,7 +37,14 @@ const FONT = {
 } as const;
 
 const FONT_CHAR_WIDTH_DOTS: Record<string, number> = { '1': 12, '2': 18, '3': 24 };
-const FONT_LINE_HEIGHT_DOTS: Record<string, number> = { '1': 16, '2': 26, '3': 30 };
+// Confirmed 2026-09-13 (round 2): lines printed physically overlapping --
+// these were the manual's stated glyph heights (12/20/24) plus a small
+// line-gap margin, but that manual spec already proved wrong for this
+// clone's char width (see FONT_CHAR_WIDTH_DOTS above, ~1.5x the manual's
+// number). Applying the same ~1.5x correction here: 18/30/36 actual glyph
+// height, plus the same small margins as before so consecutive lines don't
+// touch.
+const FONT_LINE_HEIGHT_DOTS: Record<string, number> = { '1': 22, '2': 36, '3': 42 };
 
 /** TSPL requires literal double quotes inside string params to be escaped this way. */
 function escapeTspl(text: string): string {
