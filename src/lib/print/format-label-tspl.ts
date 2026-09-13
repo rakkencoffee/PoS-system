@@ -13,8 +13,15 @@
  * text commands terminated by CR LF instead).
  *
  * Reference: TSC TSPL/TSPL2 Programming Manual (SIZE, GAP, CLS, TEXT, PRINT,
- * DENSITY). 200 DPI = 8 dots/mm, matching this printer's 576 dots at 58mm
- * (allowing headroom past the label's actual print width).
+ * DENSITY). 200 DPI = 8 dots/mm.
+ *
+ * Font width note: the manual's own bitmap-font dot widths (8/12/16 for
+ * fonts 1/2/3) didn't match this clone's actual rendering -- confirmed
+ * 2026-09-13 when a notes line we calculated should fit on one line came
+ * back auto-wrapped by the printer itself mid-word ("NORMAL" split into
+ * "NO"/"RMAL"), meaning our own wrapByDots() thought more would fit per
+ * line than the printer's real character cells allow. FONT_CHAR_WIDTH_DOTS
+ * below is scaled up ~1.5x from the manual's numbers to match.
  */
 
 import { type ReceiptData, type ReceiptItem, isDrinkItem } from './format-receipt';
@@ -29,7 +36,7 @@ const FONT = {
   LARGE: '3', // 16x24
 } as const;
 
-const FONT_CHAR_WIDTH_DOTS: Record<string, number> = { '1': 8, '2': 12, '3': 16 };
+const FONT_CHAR_WIDTH_DOTS: Record<string, number> = { '1': 12, '2': 18, '3': 24 };
 const FONT_LINE_HEIGHT_DOTS: Record<string, number> = { '1': 16, '2': 26, '3': 30 };
 
 /** TSPL requires literal double quotes inside string params to be escaped this way. */
@@ -69,20 +76,20 @@ export interface TsplLabelOptions {
   density?: number;
 }
 
-// Portrait, not landscape. Confirmed via the printer's own self-test sticker
-// (2026-09-13 photo) that the physical roll is 58mm wide, not the 40mm this
-// was guessing before -- that alone was enough to throw off every margin/wrap
-// calculation. Label length was declared as 30mm, but the self-test's four
-// info/checkerboard/order blocks each print roughly one physical label's
-// worth of content and all look near-square against the 58mm width, putting
-// the real pitch closer to ~60mm. 30mm was too short once notes wrapped to
-// 2-3 lines -- content that ran past the declared height didn't get clipped,
-// it kept printing straight past the label's physical edge and onto the next
-// one, which is what showed up as overlapping/garbled text in that test
-// print. Still an estimate pending a ruler check -- adjust heightMm if the
-// next physical test shows it's off.
+// Portrait, not landscape. The roll's paper is 58mm wide, but this class of
+// 58mm thermal head is commonly a 384-dot (~48mm) printable area with a
+// non-printing margin on each side -- widthMm here targets the printable
+// area, not the full paper width, matching the ~31-char wrap width actually
+// observed on the printer in the 2026-09-13 test.
+//
+// heightMm is a generous ceiling, not a match for the real physical label
+// pitch (still unconfirmed -- somewhere under 60mm, since a 60mm canvas
+// caused the printer to cut the label before the date printed). It's safe
+// to overstate on purpose now that the date is placed right after the
+// content instead of pinned near the bottom of the declared height -- see
+// the comment at dateY below.
 const DEFAULT_OPTIONS: Required<TsplLabelOptions> = {
-  widthMm: 58,
+  widthMm: 48,
   heightMm: 60,
   gapMm: 2,
   density: 8,
@@ -96,7 +103,6 @@ function formatItemLabelsTspl(
 ): Buffer {
   const { widthMm, heightMm, gapMm, density } = { ...DEFAULT_OPTIONS, ...opts };
   const widthDots = widthMm * DOTS_PER_MM;
-  const heightDots = heightMm * DOTS_PER_MM;
   const marginX = 10;
   const contentWidth = widthDots - marginX * 2;
 
@@ -160,14 +166,20 @@ function formatItemLabelsTspl(
         }
       }
 
-      // Date, pinned near the bottom (pushed down further if content ran long)
+      // Date, placed right after whatever content came before it. NOT pinned
+      // near the bottom of heightMm -- that only works if heightMm matches
+      // the real physical label pitch exactly, and it doesn't (confirmed
+      // 2026-09-13: a 60mm canvas with the old bottom-pinned date caused the
+      // date to land past the real label's edge and print on the next
+      // physical label instead). Following the content keeps this correct
+      // regardless of how generous heightMm is.
       const orderDate = new Date().toLocaleString('id-ID', {
         dateStyle: 'medium',
         timeStyle: 'short',
         timeZone: 'Asia/Jakarta',
       });
-      const dateY = Math.max(y, heightDots - FONT_LINE_HEIGHT_DOTS[FONT.SMALL] - 4);
-      commandLines.push(textCmd(marginX, dateY, FONT.SMALL, orderDate));
+      y += 6;
+      commandLines.push(textCmd(marginX, y, FONT.SMALL, orderDate));
 
       commandLines.push('PRINT 1,1');
 
