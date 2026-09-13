@@ -23,8 +23,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "StartFriday Coffee - Self Service",
-  description: "Self-service ordering system for StartFriday Coffee Shop",
+  title: "Rakken Coffee - Self Service",
+  description: "Self-service ordering system for Rakken Coffee Shop",
   icons: {
     icon: '/rakken-icon.svg',
     shortcut: '/rakken-icon.svg',

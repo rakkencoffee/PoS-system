@@ -40,7 +40,7 @@ export const Receipt: React.FC<ReceiptProps> = ({
       {/* Header */}
       <div className="receipt-header">
         <h1 className="receipt-brand">RAKKEN COFFEE</h1>
-        <p className="receipt-subtitle">STARTFRIDAY SPECIALTY COFFEE</p>
+        <p className="receipt-subtitle">RAKKEN SPECIALTY COFFEE</p>
         <p className="receipt-location">South Jakarta, Indonesia</p>
         <div className="receipt-divider-thick">===============================</div>
         <p className="receipt-date">{now}</p>
