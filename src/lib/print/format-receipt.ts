@@ -340,7 +340,8 @@ export function formatReceipt(data: ReceiptData, lineWidth = 48, cut = false): B
 
 const DRINK_CATEGORIES = ['bites', 'dessert', 'main-course', 'snack', 'pastry', 'makanan', 'cemilan', 'packaging', 'other'];
 
-function isDrinkItem(item: ReceiptItem): boolean {
+/** Exported so alternate label formatters (e.g. format-label-tspl.ts) classify items identically. */
+export function isDrinkItem(item: ReceiptItem): boolean {
   const category = (item.categorySlug || item.category || '').toLowerCase();
   if (category) return !DRINK_CATEGORIES.some((excluded) => category.includes(excluded));
   const name = (item.menuItem?.name || item.name || '').toLowerCase();

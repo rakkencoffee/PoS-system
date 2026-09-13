@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { formatDrinkLabels, type ReceiptData } from '@/lib/print/format-receipt';
+import { type ReceiptData } from '@/lib/print/format-receipt';
+import { formatDrinkLabelsTspl } from '@/lib/print/format-label-tspl';
 
 const ALLOWED_ROLES = ['KITCHEN', 'ADMIN'];
 
@@ -25,6 +26,13 @@ const ALLOWED_ROLES = ['KITCHEN', 'ADMIN'];
  * one row per order) -- this is what the manual "Print Label" button on
  * each KDS order card passes, since that card only ever has order.id, not
  * the PrintJob.id from a Pusher event it may never have received.
+ *
+ * Formats as TSPL, not ESC/POS -- confirmed 2026-09-13 via the barista
+ * printer's own self-test sticker ("App: TSPL+CPCL") that this RPP02N
+ * (TSC 5824TSC clone) unit doesn't speak ESC/POS at all. Every earlier
+ * ESC/POS write reported success (BLE writes don't get a parse-result back)
+ * but silently printed nothing. If Barista's printer is ever swapped for an
+ * ESC/POS model again, switch this back to formatDrinkLabels.
  */
 export async function GET(
   request: NextRequest,
@@ -45,7 +53,7 @@ export async function GET(
   }
 
   const data = job.payload as unknown as ReceiptData;
-  const buffer = formatDrinkLabels(data);
+  const buffer = formatDrinkLabelsTspl(data);
 
   if (buffer.length === 0) {
     return new NextResponse(null, { status: 204 });
