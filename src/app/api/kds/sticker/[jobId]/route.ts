@@ -14,12 +14,17 @@ const ALLOWED_ROLES = ['KITCHEN', 'ADMIN'];
  * (both on auto-print and on manual retry) and relays the bytes to its
  * paired Bluetooth printer; formatting itself never runs in the browser.
  *
- * Keyed by PrintJob.id (not Order.id) because the caller reacts to the
+ * Keyed by PrintJob.id primarily, because the caller reacts to the
  * `print-queue` / NEW_JOB Pusher event, which fires exactly when the job
  * row (and its payload) exists -- unlike `kitchen` / ORDER_CREATED, which
  * fires as soon as the order is placed, before settlement has created the
  * PrintJob. Confirmed via dev logs 2026-09-01: fetching by orderId off
  * ORDER_CREATED raced the job creation and 404'd every time.
+ *
+ * Also accepts Order.id as a fallback lookup (PrintJob.orderId is unique,
+ * one row per order) -- this is what the manual "Print Label" button on
+ * each KDS order card passes, since that card only ever has order.id, not
+ * the PrintJob.id from a Pusher event it may never have received.
  */
 export async function GET(
   request: NextRequest,
@@ -33,7 +38,8 @@ export async function GET(
 
   const { jobId } = await params;
 
-  const job = await prisma.printJob.findUnique({ where: { id: jobId } });
+  const job = await prisma.printJob.findUnique({ where: { id: jobId } })
+    ?? await prisma.printJob.findUnique({ where: { orderId: jobId } });
   if (!job) {
     return NextResponse.json({ error: 'Print job tidak ditemukan.' }, { status: 404 });
   }

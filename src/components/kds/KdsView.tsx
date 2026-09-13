@@ -11,11 +11,39 @@ interface KdsViewProps {
   title: string;
   /** Extra controls rendered in the header, alongside Sync Data/clock (e.g. StationPrinterPanel). */
   headerExtra?: ReactNode;
+  /** Whether the shared BLE printer is connected -- disables the per-order
+      "Print Label" button (rather than hiding it) so it's still visible as
+      a reminder to connect first. */
+  printerConnected?: boolean;
+  /**
+   * Manual print fallback for one order -- a safety net for when the
+   * automatic print-on-NEW_JOB in StationPrinterPanel is missed (e.g. the
+   * printer wasn't connected yet, or the Pusher event never arrived). Takes
+   * order.id directly; the label API routes accept that as a fallback
+   * lookup alongside the PrintJob.id the automatic path uses. Resolves to a
+   * short status string ("Label tercetak.", "Gagal: ...") shown next to the
+   * button that triggered it.
+   */
+  onPrintLabel?: (orderId: string) => Promise<string>;
 }
 
-export function KdsView({ type, title, headerExtra }: KdsViewProps) {
+export function KdsView({ type, title, headerExtra, printerConnected, onPrintLabel }: KdsViewProps) {
   const queryClient = useQueryClient();
   const { data: orders = [], isLoading: loading, refetch: fetchOrders, isFetching: refreshing } = useKitchenOrders();
+  const [printStatusByOrderId, setPrintStatusByOrderId] = useState<Record<string, string>>({});
+  const [printingOrderId, setPrintingOrderId] = useState<string | null>(null);
+
+  const handlePrintLabel = async (orderId: string) => {
+    if (!onPrintLabel) return;
+    setPrintingOrderId(orderId);
+    setPrintStatusByOrderId((prev) => ({ ...prev, [orderId]: '' }));
+    try {
+      const message = await onPrintLabel(orderId);
+      setPrintStatusByOrderId((prev) => ({ ...prev, [orderId]: message }));
+    } finally {
+      setPrintingOrderId(null);
+    }
+  };
   const updateStatusMutation = useUpdateOrderStatus();
   const isOnline = useOnlineStatus();
 
@@ -273,7 +301,20 @@ export function KdsView({ type, title, headerExtra }: KdsViewProps) {
               Complete
             </button>
           )}
+          {onPrintLabel && (
+            <button
+              onClick={() => handlePrintLabel(String(order.id))}
+              disabled={!printerConnected || printingOrderId === String(order.id)}
+              title={printerConnected ? 'Cetak ulang label order ini' : 'Connect printer dulu'}
+              className="px-4 py-3 rounded-xl bg-zinc-800 border border-zinc-700 text-zinc-200 font-bold text-sm hover:bg-zinc-700 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
+            >
+              {printingOrderId === String(order.id) ? 'Mencetak...' : 'Print Label'}
+            </button>
+          )}
         </div>
+        {onPrintLabel && printStatusByOrderId[String(order.id)] && (
+          <p className="text-[11px] text-zinc-500 mt-2 text-right">{printStatusByOrderId[String(order.id)]}</p>
+        )}
       </div>
     );
   };

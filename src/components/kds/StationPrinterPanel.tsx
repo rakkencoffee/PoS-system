@@ -1,20 +1,21 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useBlePrinter } from '@/hooks/useBlePrinter';
-
-function base64ToBytes(base64: string): Uint8Array {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-}
+import { printStationLabel } from '@/lib/print/station-print';
 
 interface StationPrinterPanelProps {
   /** e.g. "/api/kds/sticker" (Barista, drinks) or "/api/kds/food-label" (Kitchen, food) -- jobId is appended. */
   labelEndpointBase: string;
   /** Shown when the endpoint returns 204 (no matching items on that order for this station). */
   emptyMessage: string;
+  /** Shared useBlePrinter() instance, lifted to the page so KdsView's manual
+      "Print Label" button and this panel's auto-print use the same BLE
+      connection instead of each holding (and fighting over) their own. */
+  connected: boolean;
+  deviceName: string | null;
+  connect: () => Promise<void>;
+  disconnect: () => void;
+  writeBytes: (bytes: Uint8Array) => Promise<void>;
 }
 
 /**
@@ -26,8 +27,15 @@ interface StationPrinterPanelProps {
  * fetching the label off it 404s (confirmed via dev logs 2026-09-01).
  * NEW_JOB fires exactly when the job (and its payload) exists.
  */
-export function StationPrinterPanel({ labelEndpointBase, emptyMessage }: StationPrinterPanelProps) {
-  const { connected, deviceName, connect, disconnect, writeBytes } = useBlePrinter();
+export function StationPrinterPanel({
+  labelEndpointBase,
+  emptyMessage,
+  connected,
+  deviceName,
+  connect,
+  disconnect,
+  writeBytes,
+}: StationPrinterPanelProps) {
   const [lastJobId, setLastJobId] = useState<string | null>(null);
   const [status, setStatus] = useState<string>('');
   const connectedRef = useRef(connected);
@@ -38,15 +46,8 @@ export function StationPrinterPanel({ labelEndpointBase, emptyMessage }: Station
   const printLabel = useCallback(async (jobId: string) => {
     setStatus('Mencetak...');
     try {
-      const res = await fetch(`${labelEndpointBase}/${jobId}`);
-      if (res.status === 204) {
-        setStatus(emptyMessage);
-        return;
-      }
-      if (!res.ok) throw new Error('Gagal ambil data label.');
-      const { bytes } = await res.json();
-      await writeBytesRef.current(base64ToBytes(bytes));
-      setStatus('Label tercetak.');
+      const { ok, message } = await printStationLabel(labelEndpointBase, jobId, writeBytesRef.current);
+      setStatus(ok && message === 'Tidak ada item untuk station ini.' ? emptyMessage : message);
     } catch (err: any) {
       setStatus(`Gagal: ${err.message}`);
     }

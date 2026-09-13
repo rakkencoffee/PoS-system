@@ -9,7 +9,8 @@ const ALLOWED_ROLES = ['KITCHEN', 'ADMIN'];
  * GET /api/kds/food-label/[jobId]
  *
  * Same shape as /api/kds/sticker/[jobId] (Barista, drinks) but for food
- * items -- see that route's comments for the NEW_JOB/PrintJob.id rationale.
+ * items -- see that route's comments for the NEW_JOB/PrintJob.id rationale,
+ * and for why Order.id is also accepted as a fallback lookup.
  */
 export async function GET(
   request: NextRequest,
@@ -23,7 +24,8 @@ export async function GET(
 
   const { jobId } = await params;
 
-  const job = await prisma.printJob.findUnique({ where: { id: jobId } });
+  const job = await prisma.printJob.findUnique({ where: { id: jobId } })
+    ?? await prisma.printJob.findUnique({ where: { orderId: jobId } });
   if (!job) {
     return NextResponse.json({ error: 'Print job tidak ditemukan.' }, { status: 404 });
   }
