@@ -383,7 +383,7 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
                 {isDrink ? 'Variant' : 'Option'}
               </h3>
               <div className={`grid gap-2 ${displaySizes.length <= 2 ? 'grid-cols-2' : displaySizes.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
-                {displaySizes.map((size) => (
+                {displaySizes.map((size, index) => (
                   <button
                     key={size.size}
                     onClick={() => setSelectedSize(size.size)}
@@ -395,7 +395,11 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
                   >
                     <span className="block text-sm font-bold">{size.size}</span>
                     <span className="block text-[10px] mt-0.5 opacity-80">
-                      {size.priceAdjustment === 0
+                      {/* "Default" always tags the first variant -- the one
+                          auto-selected on open -- rather than whichever one's
+                          price happens to match the base item price, so the
+                          two never disagree even with off/testing prices. */}
+                      {index === 0
                         ? 'Default'
                         : `${size.priceAdjustment > 0 ? '+' : ''}${formatCurrency(size.priceAdjustment)}`}
                     </span>
