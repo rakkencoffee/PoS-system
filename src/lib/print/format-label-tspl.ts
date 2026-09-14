@@ -167,10 +167,17 @@ function formatItemLabelsTspl(
         const cleaned = notesArray.map((note) => note.replace(/^Size:\s*/i, '').toUpperCase());
         const notesLine = cleaned.join(' | ');
         const noteLines = wrapByDots(notesLine, FONT.SMALL, contentWidth);
-        for (const nl of noteLines) {
+        noteLines.forEach((nl, i) => {
           commandLines.push(textCmd(marginX, y, FONT.SMALL, nl));
-          y += FONT_LINE_HEIGHT_DOTS[FONT.SMALL];
-        }
+          // Physical test 2026-09-14: consecutive wrapped notes lines no
+          // longer overlap (that was the FONT_LINE_HEIGHT_DOTS fix), but sit
+          // visibly tighter than every other transition on the label -- the
+          // only spot with zero extra margin between lines. Match the +6
+          // already used around the customer-name and date lines, but only
+          // *between* notes lines -- the existing +6 right before the date
+          // below already covers the gap after the last one.
+          y += FONT_LINE_HEIGHT_DOTS[FONT.SMALL] + (i < noteLines.length - 1 ? 6 : 0);
+        });
       }
 
       // Date, placed right after whatever content came before it. NOT pinned
