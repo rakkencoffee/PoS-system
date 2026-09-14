@@ -50,6 +50,7 @@ export interface NormalizedMenuItem {
   sizes: { size: string; priceAdjustment: number }[];
   olseraProductId?: number;
   olseraVariants?: { id: number; name: string; price: number }[];
+  addOns?: { id: number; name: string; price: number }[];
 }
 
 export interface NormalizedCategory {
@@ -87,9 +88,31 @@ function slugify(str: string): string {
     .replace(/^-|-$/g, "");
 }
 
+// Resolves which of the store's Add-Ons (Olsera's product-level topping/
+// modifier catalog, fetched once via getProductAddOnsGlobal) apply to a given
+// product -- either because the add-on is scoped directly to this product id,
+// or scoped to the whole product group it belongs to.
+function resolveAddOns(
+  productId: number | string | undefined,
+  groupId: string,
+  allAddOns: olsera.OlseraProductAddOn[],
+): { id: number; name: string; price: number }[] {
+  const pid = Number(productId);
+  const result: { id: number; name: string; price: number }[] = [];
+  for (const a of allAddOns) {
+    const matchesProduct = (a.valid_products || []).some((p) => Number(p.product_id) === pid);
+    const matchesGroup = (a.valid_product_groups || []).some((g) => String(g.id) === groupId);
+    if (matchesProduct || matchesGroup) {
+      result.push({ id: a.id, name: a.name, price: Number(a.price) || 0 });
+    }
+  }
+  return result;
+}
+
 function mapOlseraProduct(
   product: OlseraProduct,
   groups: OlseraProductGroup[],
+  allAddOns: olsera.OlseraProductAddOn[],
 ): NormalizedMenuItem {
   const groupId =
     product.product_group_id || product.klasifikasi_id || product.category_id;
@@ -168,6 +191,7 @@ function mapOlseraProduct(
         price: typeof vPrice === "string" ? parseFloat(vPrice) : Number(vPrice),
       };
     }),
+    addOns: resolveAddOns(product.id || product.product_id, String(groupId || 0), allAddOns),
   };
 }
 
@@ -199,13 +223,14 @@ export async function getMenuItems(filters?: {
     const isCacheExpired = Date.now() - olseraCache.timestamp > CACHE_TTL_MS;
 
     if (isCacheExpired || !olseraCache.products) {
-      const [products, groups] = await Promise.all([
+      const [products, groups, addOns] = await Promise.all([
         olsera.getProducts(),
         olsera.getProductGroups(),
+        olsera.getProductAddOnsGlobal(),
       ]);
       // Reverse the order so newest/added-later items appear first as per user request
       olseraCache.products = products
-        .map((p) => mapOlseraProduct(p, groups))
+        .map((p) => mapOlseraProduct(p, groups, addOns))
         .reverse();
       olseraCache.timestamp = Date.now();
     }

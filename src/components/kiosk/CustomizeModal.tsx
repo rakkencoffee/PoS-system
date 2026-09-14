@@ -28,6 +28,7 @@ interface CustomizeModalProps {
     category?: { name: string; slug: string };
     categorySlug?: string;
     olseraVariants?: { id: number; name: string; price: number }[];
+    addOns?: { id: number; name: string; price: number }[];
   };
   onClose: () => void;
   editingCartItem?: CartItem;
@@ -42,9 +43,6 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-// Categories that show Optional Choice
-const OPTIONAL_CHOICE_CATEGORIES = ['coffee-based', 'milk-based'];
-
 // Coffee bean flavor -- a real Olsera variant dimension, baked into the
 // variant name as its trailing comma segment (e.g. "Hot,Small,Bold & Nutty").
 // Order here also drives display order and the default ("Roar", no add-on).
@@ -55,87 +53,80 @@ function matchBeanFlavor(segment: string): string | null {
   return BEAN_FLAVORS.find((b) => b.toLowerCase() === trimmed.toLowerCase()) || null;
 }
 
-function getMenuConfig(itemName: string, categorySlug: string) {
-  const name = itemName.toLowerCase();
-  const slug = categorySlug;
+// Which Sugar/Ice levels apply per item -- these stay kiosk-only (free, not
+// Olsera data), but unlike Milk/Beans/Shot the exact set of levels genuinely
+// varies per item (e.g. Kyoto Origin only offers No Sugar/Add Sugar, not
+// Less/Normal), so a flat "show whole section y/n" flag isn't enough anymore.
+// Ice is capped store-wide to 2 levels (Less/Normal) -- No Ice/More Ice were
+// dropped from the menu entirely. Keys reference sugarLevels/iceLevels below.
+const SUGAR_ICE_CONFIG: Record<string, { sugar: string[]; ice: string[] }> = {
+  'kyoto origin': { sugar: ['none', 'more'], ice: ['less', 'normal'] },
+  'kyoto house blend': { sugar: ['none', 'less', 'normal'], ice: ['less', 'normal'] },
+  'kyoto sakura latte': { sugar: ['none', 'less', 'normal'], ice: ['less', 'normal'] },
+  'yuzu coffee': { sugar: ['none', 'less', 'normal'], ice: ['less', 'normal'] },
+  'dirty matcha': { sugar: ['none', 'less', 'normal'], ice: ['less', 'normal'] },
+  'rakken house blend': { sugar: ['none', 'less', 'normal'], ice: ['less', 'normal'] },
+  'cafe latte': { sugar: ['none', 'more'], ice: ['less', 'normal'] },
+  'café latte': { sugar: ['none', 'more'], ice: ['less', 'normal'] },
+  'cappuccino': { sugar: ['none', 'more'], ice: [] },
+  'long black': { sugar: ['none', 'more'], ice: ['less', 'normal'] },
+  'kokuto latte': { sugar: ['less', 'normal'], ice: ['less', 'normal'] },
+  'coconut coffee': { sugar: ['less', 'normal'], ice: ['less', 'normal'] },
+  'sea salt caramel latte': { sugar: ['less', 'normal'], ice: ['less', 'normal'] },
+  'butterscotch cloud coffee': { sugar: ['less', 'normal'], ice: ['less', 'normal'] },
+  'kakao coffee shakerato': { sugar: ['less', 'normal'], ice: ['less', 'normal'] },
+  'kakao coffee shakareto': { sugar: ['less', 'normal'], ice: ['less', 'normal'] },
+  'peach coffee shakerato': { sugar: ['less', 'normal'], ice: ['less', 'normal'] },
+  'mocha coffee cloud': { sugar: ['less', 'normal'], ice: [] },
+  'uji matcha latte': { sugar: [], ice: ['less', 'normal'] },
+  'matchakura cloud latte': { sugar: ['less', 'normal'], ice: ['less', 'normal'] },
+  'kokuto matcha latte': { sugar: ['less', 'normal'], ice: ['less', 'normal'] },
+  'matcha berry latte': { sugar: ['less', 'normal'], ice: ['less', 'normal'] },
+  'kuro kakao': { sugar: ['less', 'normal'], ice: ['less', 'normal'] },
+  'rakken milk tea': { sugar: ['less', 'normal'], ice: [] },
+  'peach milk tea shakerato': { sugar: ['less', 'normal'], ice: [] },
+  'peach milk tea shakareto': { sugar: ['less', 'normal'], ice: [] },
+  'jasmine green tea': { sugar: ['none', 'less', 'normal'], ice: ['less', 'normal'] },
+  'lemon black tea': { sugar: ['none', 'less', 'normal'], ice: ['less', 'normal'] },
+  'blueberry mint tea': { sugar: ['less', 'normal'], ice: ['less', 'normal'] },
+  'yakult frizz': { sugar: ['less', 'normal'], ice: ['less', 'normal'] },
+  'sunset in kyoto': { sugar: ['less', 'normal'], ice: ['less', 'normal'] },
+};
 
-  let config = {
-    showIce: false,
-    showSugar: false,
-    showMilk: false,
-    showCream: false,
-    showBeans: false,
-    showShot: false,
-    freeCream: false,
-  };
+const FOOD_CATEGORIES = ['dessert', 'snack', 'main-course', 'bites'];
 
-  if (slug === 'rakken-signature') {
-    // Bean flavor (Roar / Bold & Nutty / Rich & Fruity) is now a real Olsera
-    // variant (e.g. "Hot,Small,Roar"), surfaced via its own "Coffee Beans"
-    // group derived from beanVariantInfo -- not this local Beans Choice
-    // selector -- so showBeans stays false here to avoid offering it twice.
-    if (name.includes('kyoto origin')) {
-      config = { showIce: true, showSugar: true, showMilk: false, showCream: false, showBeans: false, showShot: true, freeCream: false };
-    } else if (name.includes('kyoto house blend') || name.includes('kyoto sakura latte')) {
-      config = { showIce: true, showSugar: true, showMilk: true, showCream: true, showBeans: false, showShot: true, freeCream: false };
-    } else if (name.includes('yuzu coffee')) {
-      config = { showIce: true, showSugar: true, showMilk: false, showCream: false, showBeans: false, showShot: true, freeCream: false };
-    } else if (name.includes('dirty matcha')) {
-      config = { showIce: true, showSugar: true, showMilk: true, showCream: true, showBeans: false, showShot: true, freeCream: true };
-    }
-  } else if (slug === 'rakken-style') {
-    if (name.includes('rakken house blend') || name.includes('cafe latte') || name.includes('café latte') || name.includes('kokuto latte')) {
-      config = { showIce: true, showSugar: true, showMilk: true, showCream: true, showBeans: true, showShot: true, freeCream: false };
-    } else if (name.includes('cappuccino')) {
-      config = { showIce: false, showSugar: true, showMilk: true, showCream: false, showBeans: true, showShot: true, freeCream: false };
-    } else if (name.includes('long black') || name.includes('coconut coffee') || name.includes('apple spark coffee')) {
-      config = { showIce: true, showSugar: true, showMilk: false, showCream: false, showBeans: true, showShot: true, freeCream: false };
-    } else if (name.includes('sea salt caramel latte')) {
-      config = { showIce: true, showSugar: true, showMilk: true, showCream: false, showBeans: true, showShot: true, freeCream: false };
-    } else if (name.includes('butterscotch cloud coffee')) {
-      config = { showIce: true, showSugar: true, showMilk: true, showCream: true, showBeans: true, showShot: true, freeCream: true };
-    } else if (name.includes('kakao coffee') || name.includes('peach coffee') || name.includes('shakerato') || name.includes('shakareto')) {
-      config = { showIce: false, showSugar: true, showMilk: true, showCream: false, showBeans: true, showShot: true, freeCream: false };
-    }
-  } else if (slug === 'non-coffee') {
-    const isMatchaBerryLatte = name.includes('matcha berry latte');
-    config = { showIce: true, showSugar: true, showMilk: true, showCream: !isMatchaBerryLatte, showBeans: false, showShot: false, freeCream: false };
-  } else {
-    // Fallback for other drinks
-    const FOOD_CATEGORIES = ['dessert', 'snack', 'main-course', 'bites'];
-    const isFood = FOOD_CATEGORIES.includes(slug);
-    if (!isFood) {
-      config.showIce = true;
-      config.showSugar = true;
-    }
-    // Backward compatibility for old categories
-    if (OPTIONAL_CHOICE_CATEGORIES.includes(slug)) {
-      config.showCream = true;
-    }
-  }
-
-  return config;
+// Unmapped items (new drinks not yet in the table above) fall back to the
+// full set rather than silently hiding Sugar/Ice -- food items get neither.
+function getSugarIceConfig(itemName: string, categorySlug: string): { sugar: string[]; ice: string[] } {
+  if (FOOD_CATEGORIES.includes(categorySlug)) return { sugar: [], ice: [] };
+  const found = SUGAR_ICE_CONFIG[itemName.toLowerCase().trim()];
+  return found || { sugar: ['none', 'less', 'normal', 'more'], ice: ['less', 'normal'] };
 }
+
+// Olsera Add-On names, categorized so the right ones render in the right
+// section. Anything not listed here is ignored (fail-safe against unrelated
+// future add-ons showing up in the wrong spot).
+const MILK_ADDON_NAMES = ['Oat Milk'];
+const BEAN_ADDON_NAMES = ['Roar 50', 'Arabica Blend', 'Exotic Blend'];
+const SHOT_ADDON_NAMES = ['Extra Shot'];
 
 export default function CustomizeModal({ item, onClose, editingCartItem }: CustomizeModalProps) {
   const { addItem, updateItem } = useCartStore();
   const isEditMode = !!editingCartItem;
 
-  // Parse existing toppings from editingCartItem to recover milk/beans/shot/cream state
+  // Parse existing toppings from editingCartItem to recover milk/beans/shot state
   const parsedEdit = (() => {
     if (!editingCartItem) return null;
     let milk = 'dairy';
     let beans = 'rakken-blend';
     let shot = 'normal';
-    const creamChoices: Topping[] = [];
     for (const t of editingCartItem.toppings) {
       const tid = String(t.id);
       if (tid.startsWith('milk-')) { milk = tid.replace('milk-', ''); }
       else if (tid.startsWith('beans-')) { beans = tid.replace('beans-', ''); }
       else if (tid.startsWith('shot-')) { shot = tid.replace('shot-', ''); }
-      else { creamChoices.push({ id: t.id as number, name: t.name, price: t.price }); }
     }
-    return { milk, beans, shot, creamChoices };
+    return { milk, beans, shot };
   })();
 
   // Groups this item's raw Olsera variants (e.g. "Hot,Small,Bold & Nutty")
@@ -176,7 +167,47 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
     return matchBeanFlavor(segments[segments.length - 1]) ? segments.slice(0, -1).join(',') : size;
   };
 
-  const [optionalChoices, setOptionalChoices] = useState<Topping[]>([]);
+  const slug = item.category?.slug || item.categorySlug || '';
+  const sugarIceCfg = getSugarIceConfig(item.name as string, slug);
+
+  // Olsera Add-Ons applicable to this item, split into the 3 kiosk sections
+  // that read from them. Beans choices come straight from Olsera (Roar 50 /
+  // Exotic Blend are already Rp0 entries there, so no synthetic "default"
+  // needed) -- Milk and Shot each get a free/no-charge default choice added
+  // locally since "Dairy Milk"/"Normal Shot" aren't Olsera add-ons themselves.
+  const itemAddOns = item.addOns || [];
+  const beansChoices = itemAddOns
+    .filter((a) => BEAN_ADDON_NAMES.includes(a.name))
+    .map((a) => ({ key: `addon-${a.id}`, label: a.name, sub: '', price: a.price }))
+    .sort((a, b) => a.price - b.price);
+  const milkAddOns = itemAddOns.filter((a) => MILK_ADDON_NAMES.includes(a.name));
+  const milkChoices = milkAddOns.length > 0
+    ? [
+        { key: 'dairy', label: 'Dairy Milk', sub: 'Susu standar', price: 0 },
+        ...milkAddOns.map((a) => ({ key: `addon-${a.id}`, label: a.name, sub: 'Plant-based', price: a.price })),
+      ]
+    : [];
+  const shotAddOns = itemAddOns.filter((a) => SHOT_ADDON_NAMES.includes(a.name));
+  const shotChoices = shotAddOns.length > 0
+    ? [
+        { key: 'normal', label: 'Normal Shot', sub: 'Standar recipe', price: 0 },
+        ...shotAddOns.map((a) => ({ key: `addon-${a.id}`, label: a.name, sub: '+1 shot', price: a.price })),
+      ]
+    : [];
+
+  const sugarLevelsAll = [
+    { key: 'none', label: 'No Sugar', sub: 'Tanpa gula/syrup' },
+    { key: 'less', label: 'Less Sugar', sub: 'gula 70%' },
+    { key: 'normal', label: 'Normal Sugar', sub: 'Standar penyajian' },
+    { key: 'more', label: 'More Sugar', sub: 'gula 130%' },
+  ];
+  const iceLevelsAll = [
+    { key: 'less', label: 'Less Ice', sub: 'es 70%' },
+    { key: 'normal', label: 'Normal Ice', sub: 'Standar penyajian' },
+  ];
+  const sugarLevels = sugarLevelsAll.filter((l) => sugarIceCfg.sugar.includes(l.key));
+  const iceLevels = iceLevelsAll.filter((l) => sugarIceCfg.ice.includes(l.key));
+
   const [selectedSize, setSelectedSize] = useState(
     editingCartItem?.size ? stripBeanSuffix(editingCartItem.size) : ''
   );
@@ -185,16 +216,23 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
     const segments = editingCartItem.size.split(',').map((s) => s.trim());
     return matchBeanFlavor(segments[segments.length - 1]) || BEAN_FLAVORS[0];
   });
-  const [sugarLevel, setSugarLevel] = useState(editingCartItem?.sugarLevel || 'normal');
-  const [iceLevel, setIceLevel] = useState(editingCartItem?.iceLevel || 'normal');
-  const [milkChoice, setMilkChoice] = useState(parsedEdit?.milk || 'dairy');
-  const [beansChoice, setBeansChoice] = useState(parsedEdit?.beans || 'rakken-blend');
-  const [shotChoice, setShotChoice] = useState(parsedEdit?.shot || 'normal');
-  const [selectedChoices, setSelectedChoices] = useState<Topping[]>(parsedEdit?.creamChoices || []);
+  const [sugarLevel, setSugarLevel] = useState(
+    editingCartItem?.sugarLevel || (sugarLevels.find((l) => l.key === 'normal') ?? sugarLevels[0])?.key || ''
+  );
+  const [iceLevel, setIceLevel] = useState(
+    editingCartItem?.iceLevel || (iceLevels.find((l) => l.key === 'normal') ?? iceLevels[0])?.key || ''
+  );
+  const [milkChoice, setMilkChoice] = useState(parsedEdit?.milk || milkChoices[0]?.key || 'dairy');
+  const [beansChoice, setBeansChoice] = useState(parsedEdit?.beans || beansChoices[0]?.key || '');
+  const [shotChoice, setShotChoice] = useState(parsedEdit?.shot || shotChoices[0]?.key || 'normal');
   const [quantity, setQuantity] = useState(editingCartItem?.quantity || 1);
 
-  const slug = item.category?.slug || item.categorySlug || '';
-  const config = getMenuConfig(item.name as string, slug);
+  // Hot drinks can't physically have an Ice Level -- whenever the selected
+  // variant's temp segment (the part before the first comma, e.g.
+  // "Hot,Small") is "Hot", lock the Ice Level addon out entirely instead of
+  // just hiding it, so a stale selection never sneaks into the cart.
+  const isHotSelected = (selectedSize.split(',')[0] || '').trim().toLowerCase() === 'hot';
+  const showIceLevel = iceLevels.length > 0 && !isHotSelected;
 
   // "Variant" grid source: the item's base temp/size combos when this item
   // has a bean dimension (priced off each combo's "Roar" entry, matching
@@ -208,30 +246,8 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
     : item.sizes;
   const hasSizes = displaySizes.length > 0;
 
-  const FOOD_CATEGORIES = ['dessert', 'snack', 'main-course', 'bites'];
   const isFood = slug ? FOOD_CATEGORIES.includes(slug) : item.type === 'none';
   const isDrink = !isFood;
-
-  useEffect(() => {
-    if (config.showCream) {
-      if (slug === 'rakken-signature' || slug === 'rakken-style' || slug === 'non-coffee') {
-        const creamPrice = config.freeCream ? 0 : 6000;
-        setOptionalChoices([
-          { id: 9004, name: 'Sea Salt Cream', price: creamPrice },
-          { id: 9005, name: 'Cheese Cream', price: creamPrice },
-        ]);
-      } else {
-        // Fallback logic
-        setOptionalChoices([
-          { id: 9001, name: 'Almond Milk', price: 6000 },
-          { id: 9002, name: 'Espresso Shot', price: 6000 },
-          { id: 9003, name: 'Whip Cream', price: 6000 },
-        ]);
-      }
-    } else {
-      setOptionalChoices([]);
-    }
-  }, [slug, config.showCream, config.freeCream]);
 
   // Set default selected size (only when NOT editing)
   useEffect(() => {
@@ -252,29 +268,9 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
     };
   }, []);
 
-  const milkChoices = [
-    { key: 'dairy', label: 'Dairy Milk', sub: 'Susu standar', price: 0 },
-    { key: 'skim', label: 'Skim Milk', sub: 'Low-fat', price: 6000 },
-    { key: 'oat', label: 'Oat Milk', sub: 'Plant-based', price: 6000 },
-  ];
-  
-  // RAKKEN Style only ever uses RAKKEN Blend -- no alternative bean here, so
-  // this renders as a single, non-priced informational choice (not a real
-  // decision). Signature's beans are now picked via the Variant/size grid
-  // (see getMenuConfig's showBeans: false above), not this list.
-  const beansChoices = [
-    { key: 'rakken-blend', label: 'RAKKEN BLEND', sub: 'House blend', price: 0 },
-  ];
-
-  const shotChoices = [
-    { key: 'normal', label: 'Normal Shot', sub: 'Standar recipe', price: 0 },
-    { key: 'extra-1', label: 'Extra 1 Shot', sub: '+1 shot', price: 6000 },
-    { key: 'extra-2', label: 'Extra 2 Shots', sub: '+2 shots', price: 12000 },
-  ];
-
-  const selectedMilkPrice = config.showMilk ? (milkChoices.find(m => m.key === milkChoice)?.price || 0) : 0;
-  const selectedBeansPrice = config.showBeans ? (beansChoices.find(b => b.key === beansChoice)?.price || 0) : 0;
-  const selectedShotPrice = config.showShot ? (shotChoices.find(s => s.key === shotChoice)?.price || 0) : 0;
+  const selectedMilkPrice = milkChoices.find(m => m.key === milkChoice)?.price || 0;
+  const selectedBeansPrice = beansChoices.find(b => b.key === beansChoice)?.price || 0;
+  const selectedShotPrice = shotChoices.find(s => s.key === shotChoice)?.price || 0;
 
   // The exact combo currently picked (base variant + bean flavor), when this
   // item has a bean dimension -- this is what actually gets billed/synced to
@@ -287,36 +283,8 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
     ? (selectedBeanVariant?.variant.price ?? item.price) - item.price
     : displaySizes.find((s) => s.size === selectedSize)?.priceAdjustment || 0;
 
-  const choicesTotal = selectedChoices.reduce((sum, t) => {
-    // Determine price dynamically in case freeCream config applies
-    const isCream = (t.id === 9004 || t.id === 9005 || t.id === 9003);
-    const price = (config.freeCream && isCream) ? 0 : t.price;
-    return sum + price;
-  }, 0);
-
-  const unitPrice = item.price + sizeAdjustment + choicesTotal + selectedMilkPrice + selectedBeansPrice + selectedShotPrice;
+  const unitPrice = item.price + sizeAdjustment + selectedMilkPrice + selectedBeansPrice + selectedShotPrice;
   const totalPrice = unitPrice * quantity;
-
-  const sugarLevels = [
-    { key: 'none', label: 'No Sugar', sub: 'Tanpa gula/syrup' },
-    { key: 'less', label: 'Less Sugar', sub: 'gula 70%' },
-    { key: 'normal', label: 'Normal Sugar', sub: 'Standar penyajian' },
-    { key: 'more', label: 'More Sugar', sub: 'gula 130%' }
-  ];
-  const iceLevels = [
-    { key: 'none', label: 'No Ice', sub: 'Tanpa es' },
-    { key: 'less', label: 'Less Ice', sub: 'es 70%' },
-    { key: 'normal', label: 'Normal Ice', sub: 'Standar penyajian' },
-    { key: 'more', label: 'More Ice', sub: 'es 130%' },
-  ];
-
-  const toggleChoice = (choice: Topping) => {
-    setSelectedChoices((prev) =>
-      prev.find((t) => t.id === choice.id)
-        ? prev.filter((t) => t.id !== choice.id)
-        : [...prev, choice]
-    );
-  };
 
   const handleSubmit = () => {
     // Look up the Olsera variant that matches what's currently selected --
@@ -329,20 +297,17 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
           v.name.toLowerCase().trim() === (selectedSize || '').toLowerCase().trim()
         );
 
-    const finalToppings = selectedChoices.map((t) => {
-      const isCream = (t.id === 9004 || t.id === 9005 || t.id === 9003);
-      return { id: t.id, name: t.name, price: (config.freeCream && isCream) ? 0 : t.price };
-    });
+    const finalToppings: Topping[] = [];
 
-    if (config.showMilk && milkChoice !== 'dairy') {
+    if (milkChoices.length > 0 && milkChoice !== 'dairy') {
       const selectedMilk = milkChoices.find(m => m.key === milkChoice);
       if (selectedMilk) finalToppings.push({ id: `milk-${selectedMilk.key}` as any, name: selectedMilk.label, price: selectedMilk.price });
     }
-    if (config.showBeans && beansChoice !== 'rakken-blend') {
+    if (beansChoices.length > 0 && beansChoice !== beansChoices[0]?.key) {
       const selectedBeans = beansChoices.find(b => b.key === beansChoice);
       if (selectedBeans) finalToppings.push({ id: `beans-${selectedBeans.key}` as any, name: selectedBeans.label, price: selectedBeans.price });
     }
-    if (config.showShot && shotChoice !== 'normal') {
+    if (shotChoices.length > 0 && shotChoice !== 'normal') {
       const selectedShot = shotChoices.find(s => s.key === shotChoice);
       if (selectedShot) finalToppings.push({ id: `shot-${selectedShot.key}` as any, name: selectedShot.label, price: selectedShot.price });
     }
@@ -360,8 +325,8 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
       // see the bean flavor there since it changes which beans they grab.
       size: (beanVariantInfo ? matchedVariant?.name : selectedSize) || selectedSize || '',
       olseraVariantId: matchedVariant?.id,
-      sugarLevel: config.showSugar ? sugarLevel : '',
-      iceLevel: config.showIce ? iceLevel : '',
+      sugarLevel: sugarLevels.length > 0 ? sugarLevel : '',
+      iceLevel: showIceLevel ? iceLevel : '',
       extraShot: false,
       toppings: finalToppings,
       subtotal: totalPrice,
@@ -470,7 +435,7 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
           )}
 
           {/* Sugar Level */}
-          {config.showSugar && (
+          {sugarLevels.length > 0 && (
             <div>
               <h3 className="text-sm font-semibold text-(--text-secondary) uppercase tracking-wider mb-3">
                 Sugar Level
@@ -494,8 +459,8 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
             </div>
           )}
 
-          {/* Ice Level */}
-          {config.showIce && (
+          {/* Ice Level -- hidden when a Hot variant is selected (see isHotSelected) */}
+          {showIceLevel && (
             <div>
               <h3 className="text-sm font-semibold text-(--text-secondary) uppercase tracking-wider mb-3">Ice Level</h3>
               <div className="grid grid-cols-2 gap-2">
@@ -518,7 +483,7 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
           )}
 
           {/* Beans Choice */}
-          {config.showBeans && (
+          {beansChoices.length > 0 && (
             <div>
               <h3 className="text-sm font-semibold text-(--text-secondary) uppercase tracking-wider mb-3">Beans Choice</h3>
               <div className={`grid gap-2 ${beansChoices.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
@@ -533,7 +498,6 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
                     }`}
                   >
                     <span className="text-sm font-bold block leading-tight">{bean.label}</span>
-                    <span className="text-[10px] opacity-80 block mt-0.5 leading-tight">{bean.sub}</span>
                     {bean.price > 0 && <span className="text-xs font-bold mt-1">+{formatCurrency(bean.price)}</span>}
                   </button>
                 ))}
@@ -542,7 +506,7 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
           )}
 
           {/* Coffee Shot */}
-          {config.showShot && (
+          {shotChoices.length > 0 && (
             <div>
               <h3 className="text-sm font-semibold text-(--text-secondary) uppercase tracking-wider mb-3">Coffee Shot</h3>
               <div className="grid grid-cols-3 gap-2">
@@ -566,7 +530,7 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
           )}
 
           {/* Milk Choice */}
-          {config.showMilk && (
+          {milkChoices.length > 0 && (
             <div>
               <h3 className="text-sm font-semibold text-(--text-secondary) uppercase tracking-wider mb-3">
                 Milk Choice
@@ -589,44 +553,6 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
                     )}
                   </button>
                 ))}
-              </div>
-            </div>
-          )}
-
-          {/* Optional Choice / Cream Add On */}
-          {config.showCream && optionalChoices.length > 0 && (
-            <div>
-              <h3 className="text-sm font-semibold text-(--text-secondary) uppercase tracking-wider mb-3">
-                Cream Add On
-              </h3>
-              <div className="space-y-2">
-                {optionalChoices.map((choice) => {
-                  const isSelected = selectedChoices.find((t) => t.id === choice.id);
-                  const isFree = config.freeCream && (choice.id === 9004 || choice.id === 9005 || choice.id === 9003);
-                  return (
-                    <button
-                      key={choice.id}
-                      onClick={() => toggleChoice(choice)}
-                      className={`w-full flex items-center justify-between p-3.5 rounded-xl transition-all ${
-                        isSelected
-                          ? 'bg-linear-to-r from-[#A8131E]/20 to-[#8B0F19]/20 border border-[#A8131E]/50'
-                          : 'bg-(--bg-card) border border-(--border-subtle)'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
-                          isSelected ? 'bg-[#A8131E] border-[#A8131E]' : 'border-white/30'
-                        }`}>
-                          {isSelected && <span className="material-symbols-outlined text-white" style={{ fontSize: '14px' }}>check</span>}
-                        </div>
-                        <span className="text-sm text-(--text-primary) font-medium">{choice.name}</span>
-                      </div>
-                      <span className="text-xs font-bold text-(--text-primary)">
-                        {isFree ? 'FREE' : `+${formatCurrency(choice.price)}`}
-                      </span>
-                    </button>
-                  );
-                })}
               </div>
             </div>
           )}

@@ -388,6 +388,35 @@ export async function getProductGroups(): Promise<OlseraProductGroup[]> {
   return data.data || data;
 }
 
+export interface OlseraProductAddOn {
+  id: number;
+  name: string;
+  price: number | string;
+  valid_products?: { product_id: number; name: string }[];
+  valid_product_groups?: { id: number; name: string }[];
+  [key: string]: unknown;
+}
+
+/**
+ * Fetch all product add-ons (topping/modifier groups configured in Olsera's
+ * "Add-Ons" catalog feature), scoped to either specific products or whole
+ * product groups. Note: the per-product `/prodaddons` endpoint returns 404
+ * for this store no matter what -- `/prodaddons-global` (no filter) is the
+ * one that actually works and returns every add-on in a single call, each
+ * with its own `valid_products`/`valid_product_groups` scope already attached.
+ */
+export async function getProductAddOnsGlobal(): Promise<OlseraProductAddOn[]> {
+  const res = await olseraFetch('/prodaddons-global?per_page=100');
+  if (!res.ok) {
+    const text = await res.text();
+    console.error('Olsera getProductAddOnsGlobal error:', text);
+    throw new Error(`Failed to fetch product add-ons: ${res.status}`);
+  }
+
+  const data = await res.json();
+  return data.data || data;
+}
+
 // Order Detail Cache: prevents re-fetching same details within a short window
 const orderDetailCache = new Map<string | number, { data: any, expiresAt: number }>();
 const CACHE_TTL_ORDER_DETAIL = 300_000; // 5 minutes

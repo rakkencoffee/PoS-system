@@ -28,6 +28,7 @@ export interface MenuItem {
     priceAdjustment: number;
   }[];
   olseraVariants?: { id: number; name: string; price: number }[];
+  addOns?: { id: number; name: string; price: number }[];
 }
 
 export function useCategories() {
