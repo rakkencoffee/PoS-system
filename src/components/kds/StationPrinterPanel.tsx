@@ -1,13 +1,18 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { printStationLabel } from '@/lib/print/station-print';
+import { printStationLabel, printTestLabel } from '@/lib/print/station-print';
 
 interface StationPrinterPanelProps {
   /** e.g. "/api/kds/sticker" (Barista, drinks) or "/api/kds/food-label" (Kitchen, food) -- jobId is appended. */
   labelEndpointBase: string;
   /** Shown when the endpoint returns 204 (no matching items on that order for this station). */
   emptyMessage: string;
+  /** e.g. "/api/kds/sticker-test" -- when set, shows a "Test Print" button
+      that prints dummy sample data with no order/PrintJob involved, so
+      staff can validate physical layout without a real transaction. Omit
+      for stations that don't have a test endpoint (e.g. Kitchen). */
+  testEndpoint?: string;
   /** Shared useBlePrinter() instance, lifted to the page so KdsView's manual
       "Print Label" button and this panel's auto-print use the same BLE
       connection instead of each holding (and fighting over) their own. */
@@ -30,6 +35,7 @@ interface StationPrinterPanelProps {
 export function StationPrinterPanel({
   labelEndpointBase,
   emptyMessage,
+  testEndpoint,
   connected,
   deviceName,
   connect,
@@ -94,6 +100,17 @@ export function StationPrinterPanel({
     }
   };
 
+  const handleTestPrint = async () => {
+    if (!testEndpoint) return;
+    setStatus('Mencetak test...');
+    try {
+      const { message } = await printTestLabel(testEndpoint, writeBytesRef.current);
+      setStatus(message);
+    } catch (err: any) {
+      setStatus(`Gagal: ${err.message}`);
+    }
+  };
+
   return (
     <div className="flex items-center gap-3 px-5 py-3 bg-zinc-900 border border-zinc-800 rounded-2xl text-sm font-bold">
       <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-zinc-600'}`} />
@@ -120,6 +137,16 @@ export function StationPrinterPanel({
           title="Cetak ulang label order terakhir"
         >
           Print Ulang
+        </button>
+      )}
+      {testEndpoint && (
+        <button
+          onClick={handleTestPrint}
+          disabled={!connected}
+          className="ml-2 text-zinc-400 hover:text-white disabled:opacity-40 disabled:hover:text-zinc-400 transition-colors"
+          title="Cetak label dummy buat tes layout fisik, tanpa order asli"
+        >
+          Test Print
         </button>
       )}
       {status && <span className="text-zinc-500 ml-2">{status}</span>}

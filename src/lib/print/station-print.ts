@@ -29,3 +29,21 @@ export async function printStationLabel(
   await writeBytes(base64ToBytes(bytes));
   return { ok: true, message: 'Label tercetak.' };
 }
+
+/**
+ * Same idea as printStationLabel, but for a fixed test endpoint (dummy
+ * sample data, no PrintJob/order involved) -- lets staff verify physical
+ * print layout without placing a real order first.
+ */
+export async function printTestLabel(
+  endpoint: string,
+  writeBytes: (bytes: Uint8Array) => Promise<void>
+): Promise<{ ok: boolean; message: string }> {
+  const res = await fetch(endpoint);
+  if (!res.ok) {
+    return { ok: false, message: 'Gagal ambil data test print.' };
+  }
+  const { bytes } = await res.json();
+  await writeBytes(base64ToBytes(bytes));
+  return { ok: true, message: 'Test label tercetak.' };
+}
