@@ -183,27 +183,27 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
   const milkAddOns = itemAddOns.filter((a) => MILK_ADDON_NAMES.includes(a.name));
   const milkChoices = milkAddOns.length > 0
     ? [
-        { key: 'dairy', label: 'Dairy Milk', sub: 'Susu standar', price: 0 },
-        ...milkAddOns.map((a) => ({ key: `addon-${a.id}`, label: a.name, sub: 'Plant-based', price: a.price })),
+        { key: 'dairy', label: 'Dairy Milk', sub: 'Default', price: 0 },
+        ...milkAddOns.map((a) => ({ key: `addon-${a.id}`, label: a.name, sub: '', price: a.price })),
       ]
     : [];
   const shotAddOns = itemAddOns.filter((a) => SHOT_ADDON_NAMES.includes(a.name));
   const shotChoices = shotAddOns.length > 0
     ? [
-        { key: 'normal', label: 'Normal Shot', sub: 'Standar recipe', price: 0 },
-        ...shotAddOns.map((a) => ({ key: `addon-${a.id}`, label: a.name, sub: '+1 shot', price: a.price })),
+        { key: 'normal', label: 'Normal Shot', sub: 'Default', price: 0 },
+        ...shotAddOns.map((a) => ({ key: `addon-${a.id}`, label: a.name, sub: '', price: a.price })),
       ]
     : [];
 
   const sugarLevelsAll = [
-    { key: 'none', label: 'No Sugar', sub: 'Tanpa gula/syrup' },
-    { key: 'less', label: 'Less Sugar', sub: 'gula 70%' },
-    { key: 'normal', label: 'Normal Sugar', sub: 'Standar penyajian' },
-    { key: 'more', label: 'More Sugar', sub: 'gula 130%' },
+    { key: 'none', label: 'No Sugar', sub: '' },
+    { key: 'less', label: 'Less Sugar', sub: '' },
+    { key: 'normal', label: 'Normal Sugar', sub: 'Default' },
+    { key: 'more', label: 'More Sugar', sub: '' },
   ];
   const iceLevelsAll = [
-    { key: 'less', label: 'Less Ice', sub: 'es 70%' },
-    { key: 'normal', label: 'Normal Ice', sub: 'Standar penyajian' },
+    { key: 'less', label: 'Less Ice', sub: '' },
+    { key: 'normal', label: 'Normal Ice', sub: 'Default' },
   ];
   const sugarLevels = sugarLevelsAll.filter((l) => sugarIceCfg.sugar.includes(l.key));
   const iceLevels = iceLevelsAll.filter((l) => sugarIceCfg.ice.includes(l.key));
@@ -396,7 +396,7 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
                     <span className="block text-sm font-bold">{size.size}</span>
                     <span className="block text-[10px] mt-0.5 opacity-80">
                       {size.priceAdjustment === 0
-                        ? 'Base'
+                        ? 'Default'
                         : `${size.priceAdjustment > 0 ? '+' : ''}${formatCurrency(size.priceAdjustment)}`}
                     </span>
                   </button>
@@ -452,7 +452,7 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
                     }`}
                   >
                     <span className="text-sm font-bold block leading-tight">{level.label}</span>
-                    <span className="text-[10px] opacity-80 block mt-0.5 leading-tight">{level.sub}</span>
+                    {level.sub && <span className="text-[10px] opacity-80 block mt-0.5 leading-tight">{level.sub}</span>}
                   </button>
                 ))}
               </div>
@@ -475,7 +475,7 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
                     }`}
                   >
                     <span className="text-sm font-bold block leading-tight">{ice.label}</span>
-                    <span className="text-[10px] opacity-80 block mt-0.5 leading-tight">{ice.sub}</span>
+                    {ice.sub && <span className="text-[10px] opacity-80 block mt-0.5 leading-tight">{ice.sub}</span>}
                   </button>
                 ))}
               </div>
@@ -521,7 +521,7 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
                     }`}
                   >
                     <span className="text-xs font-bold block leading-tight">{shot.label}</span>
-                    <span className="text-[9px] opacity-80 block mt-0.5 leading-tight">{shot.sub}</span>
+                    {shot.sub && <span className="text-[9px] opacity-80 block mt-0.5 leading-tight">{shot.sub}</span>}
                     {shot.price > 0 && <span className="text-xs font-bold mt-1">+{formatCurrency(shot.price)}</span>}
                   </button>
                 ))}
@@ -547,7 +547,7 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
                     }`}
                   >
                     <span className="text-sm font-bold block leading-tight">{milk.label}</span>
-                    <span className="text-[10px] opacity-80 block mt-0.5 leading-tight">{milk.sub}</span>
+                    {milk.sub && <span className="text-[10px] opacity-80 block mt-0.5 leading-tight">{milk.sub}</span>}
                     {milk.price > 0 && (
                       <span className="text-xs mt-1 block font-semibold">+{formatCurrency(milk.price)}</span>
                     )}
