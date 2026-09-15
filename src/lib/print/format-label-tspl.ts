@@ -121,15 +121,17 @@ export interface TsplLabelOptions {
 // area, not the full paper width, matching the ~31-char wrap width actually
 // observed on the printer in the 2026-09-13 test.
 //
-// heightMm is a generous ceiling, not a match for the real physical label
-// pitch (still unconfirmed -- somewhere under 60mm, since a 60mm canvas
-// caused the printer to cut the label before the date printed). It's safe
-// to overstate on purpose now that the date is placed right after the
-// content instead of pinned near the bottom of the declared height -- see
-// the comment at dateY below.
+// Portrait width and printable-area note above still applies. heightMm was
+// a guessed 60mm ceiling for a long time (see git history) until measured
+// directly 2026-09-15 with formatRulerTestTspl(): printing a column of mm
+// markers and reading which ones landed on either side of two consecutive
+// physical tear lines gave 45mm consistently (tear fell between the 35mm
+// and 40mm markers, then again between 80mm and 85mm -- 45mm apart both
+// times). Declared here as 40mm, a few mm under that confirmed real pitch
+// as a safety margin against reading error, not because it's still a guess.
 const DEFAULT_OPTIONS: Required<Omit<TsplLabelOptions, 'offsetMm'>> = {
   widthMm: 48,
-  heightMm: 60,
+  heightMm: 40,
   gapMm: 2,
   density: 8,
 };
@@ -258,17 +260,22 @@ function formatItemLabelsTspl(
       commandLines.push('DIRECTION 0');
       commandLines.push('CLS');
 
-      // NOT centering against heightMm (tried 2026-09-15, reverted same day):
-      // heightMm is explicitly a generous ceiling here, never a confirmed
-      // measurement of the real physical label (see DEFAULT_OPTIONS comment)
-      // -- centering against it pushed content too far down and clipped the
-      // date line once the real label turned out shorter than 60mm, since
-      // GAP-sensing cuts/starts each physical label at its own real boundary
-      // regardless of what SIZE declares. Use formatRulerTestTspl() to read
-      // the real height first, then real centering can come back using that
-      // confirmed number instead of heightMm.
+      // Center content vertically within heightMm. A first attempt at this
+      // (2026-09-15) was reverted the same day because it used the old
+      // guessed 60mm heightMm as if it were the real physical label pitch --
+      // it wasn't, so centering against it pushed content too far down and
+      // clipped the date line. heightMm is now a ruler-test-confirmed 40mm
+      // (see DEFAULT_OPTIONS comment), so centering against it is safe this
+      // time. Measure the real content height first (dry run at y=0), then
+      // re-draw starting from whatever y centers that block, floored so it
+      // never gets closer to the top edge than minTopMarginDots.
+      const { endY: contentHeight } = buildLabelContent(
+        0, item, data, defaultName, currentItem, totalItems, String(queueNum), widthDots, marginX, contentWidth
+      );
+      const heightDots = heightMm * DOTS_PER_MM;
+      const startY = Math.max(minTopMarginDots, Math.round((heightDots - contentHeight) / 2));
       const { lines } = buildLabelContent(
-        minTopMarginDots, item, data, defaultName, currentItem, totalItems, String(queueNum), widthDots, marginX, contentWidth
+        startY, item, data, defaultName, currentItem, totalItems, String(queueNum), widthDots, marginX, contentWidth
       );
       commandLines.push(...lines);
 
