@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 
-type EdcJobStatus = 'PENDING' | 'PROCESSING' | 'APPROVED' | 'REJECTED' | 'FAILED';
+type EdcJobStatus = 'PENDING' | 'PROCESSING' | 'APPROVED' | 'REJECTED' | 'FAILED' | 'CANCELLED';
 
 interface EdcJobStatusResponse {
   status: EdcJobStatus | 'NOT_FOUND';
@@ -57,7 +57,7 @@ export function EdcPaymentFlow({ orderId, onApproved, onCancel }: EdcPaymentFlow
           handleApproved();
           return;
         }
-        if (data.status === 'REJECTED' || data.status === 'FAILED') {
+        if (data.status === 'REJECTED' || data.status === 'FAILED' || data.status === 'CANCELLED') {
           // Raw EDC/DLL error stays in the console for staff -- there's no
           // customer-facing message anymore, the EDC's own native dialog
           // (left unhidden/unclicked on purpose, see comment above) is what

@@ -875,6 +875,18 @@ export async function cancelOrder(
     source,
   });
 
+  // Also cancel any still-open EdcJob for this order -- confirmed live
+  // 2026-09-15 this was never done, so a cancelled order's job sat PENDING
+  // forever and GET /api/edc-jobs (which only filters on job status, not the
+  // order it belongs to) kept handing it back to the daemon on every future
+  // poll/restart, FIFO-ordered ahead of real new jobs -- customers who
+  // cancelled and immediately retried got stuck behind the daemon working
+  // through a backlog of their own abandoned attempts.
+  await prisma.edcJob.updateMany({
+    where: { orderId, status: { in: ["PENDING", "PROCESSING"] } },
+    data: { status: "CANCELLED", errorMessage: "Order dibatalkan dari kiosk" },
+  });
+
   if (USE_OLSERA && orderId.startsWith("OLSERA-") && !orderId.includes("TEST")) {
     const olseraOrderId = parseInt(orderId.replace("OLSERA-", ""));
     try {
