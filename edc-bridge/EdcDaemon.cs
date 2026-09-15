@@ -107,50 +107,31 @@ public sealed class EdcDaemon
     // has been confirmed live (2026-09-07/08) to often fail to relay the final
     // result even when the EDC's own screen and printed receipt show the payment
     // genuinely APPROVED. There is no known-reliable fix yet (see
-    // Pesan_Yokke_ResponseTimeout.txt, still awaiting vendor response) -- this
-    // retries the documented Inquiry function as a best-effort recovery before
-    // giving up, which is why staff must still be ready to check the EDC's own
-    // screen/receipt manually if a job comes back FAILED here.
+    // Pesan_Yokke_ResponseTimeout.txt, still awaiting vendor response).
     //
-    // Cut from 3 attempts (~30s) to 1 (~10s) 2026-09-15: the kiosk's "Batalkan"
-    // doesn't tell the EDC/daemon anything (it only marks the order cancelled in
-    // the DB, see EdcPaymentFlow.tsx) -- jobs here always run their full retry
-    // cycle regardless. Confirmed live: cancelling a QRIS payment and immediately
-    // trying to pay again got stuck behind the cancelled job's still-running 3x
-    // retry loop before the new one could even start. Fewer attempts narrows the
-    // window that can be blocked by a stale job, at the cost of less chance to
-    // recover a transaction that genuinely succeeded but failed to relay --
-    // accepted tradeoff per explicit request, not a default anyone should assume
-    // is risk-free.
-    private async Task<EdcJobPatch> ProcessQrisJobAsync(int amount, CancellationToken cancellationToken)
+    // No inquiry retry at all as of 2026-09-15 (was 3 attempts/~30s, then cut to
+    // 1/~10s, now 0): the kiosk's "Batalkan" only marks the order/job cancelled in
+    // the DB -- it can't interrupt an EDC call already in flight, since the native
+    // GenerateQris()/COMStatus() cycle blocks synchronously with no cancellation
+    // hook. Any retry here just delays how soon the daemon is free for the next
+    // job regardless of who it was for, which is what got noticed live: cancelling
+    // and immediately retrying kept landing behind a still-running retry cycle.
+    // Explicit accepted tradeoff, not a risk-free default: staff must still check
+    // the EDC's own screen/receipt manually if a job comes back FAILED here, since
+    // this is now the ONLY read of the transaction result -- there is no second
+    // chance to catch a genuinely-successful payment that failed to relay.
+    private Task<EdcJobPatch> ProcessQrisJobAsync(int amount, CancellationToken cancellationToken)
     {
+        _ = cancellationToken; // kept for signature compatibility with the caller
         var result = _edcClient.GenerateQris(amount.ToString());
-        if (IsQrisSuccess(result)) return BuildQrisPatch(result);
+        if (IsQrisSuccess(result)) return Task.FromResult(BuildQrisPatch(result));
 
-        const int maxInquiryAttempts = 1;
-        var inquiryDelayMs = TimeSpan.FromSeconds(10);
-        for (var attempt = 1; attempt <= maxInquiryAttempts; attempt++)
-        {
-            try
-            {
-                await Task.Delay(inquiryDelayMs, cancellationToken);
-            }
-            catch (TaskCanceledException)
-            {
-                break;
-            }
-
-            Console.WriteLine($"[EdcDaemon] GenQRIS result unclear (ret={result.ResponseCode}), retrying QRISInqLastTrans (attempt {attempt}/{maxInquiryAttempts})...");
-            result = _edcClient.InquiryQrisLastTransaction();
-            if (IsQrisSuccess(result)) return BuildQrisPatch(result);
-        }
-
-        return new EdcJobPatch
+        return Task.FromResult(new EdcJobPatch
         {
             Status = "FAILED",
             ResponseCode = result.ResponseCode,
-            ErrorMessage = result.ErrorMessage ?? "Status QRIS tidak dapat dikonfirmasi setelah retry — cek layar/struk EDC manual",
-        };
+            ErrorMessage = result.ErrorMessage ?? "Status QRIS tidak dapat dikonfirmasi — cek layar/struk EDC manual",
+        });
     }
 
     private static bool IsQrisSuccess(EdcQrisResult result) =>
