@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { type ReceiptData } from '@/lib/print/format-receipt';
-import { formatDrinkLabelsTspl } from '@/lib/print/format-label-tspl';
+import { formatDrinkLabelsTspl, formatRulerTestTspl } from '@/lib/print/format-label-tspl';
 
 const ALLOWED_ROLES = ['KITCHEN', 'ADMIN'];
 
 /**
  * GET /api/kds/sticker-test?offsetMm=<n>
+ * GET /api/kds/sticker-test?ruler=1
  *
  * Renders one dummy drink label through the same TSPL formatter as the real
  * sticker endpoint (`/api/kds/sticker/[jobId]`), but from hardcoded sample
@@ -23,6 +24,11 @@ const ALLOWED_ROLES = ['KITCHEN', 'ADMIN'];
  * the physical label instead of getting clipped at the top. The value used
  * is echoed into the printed customer-name line so each label in a batch is
  * self-identifying.
+ *
+ * `ruler=1` prints formatRulerTestTspl() instead -- a column of mm markers
+ * for reading the real physical label height directly off a test print
+ * (see that function's comment). Use this once to get a real heightMm value
+ * before relying on any vertical-centering behavior in formatItemLabelsTspl.
  */
 export async function GET(request: Request) {
   const session = await auth();
@@ -31,7 +37,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const offsetParam = new URL(request.url).searchParams.get('offsetMm');
+  const params = new URL(request.url).searchParams;
+  if (params.get('ruler') === '1') {
+    return NextResponse.json({ bytes: formatRulerTestTspl().toString('base64') });
+  }
+
+  const offsetParam = params.get('offsetMm');
   const offsetMm = offsetParam !== null && offsetParam !== '' ? Number(offsetParam) : undefined;
   if (offsetMm !== undefined && !Number.isFinite(offsetMm)) {
     return NextResponse.json({ error: 'offsetMm must be a number' }, { status: 400 });

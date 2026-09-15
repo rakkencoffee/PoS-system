@@ -114,6 +114,17 @@ export function StationPrinterPanel({
     }
   };
 
+  const handleRulerTest = async () => {
+    if (!testEndpoint) return;
+    setStatus('Mencetak ruler...');
+    try {
+      const { message } = await printTestLabel(`${testEndpoint}?ruler=1`, writeBytesRef.current);
+      setStatus(message);
+    } catch (err: any) {
+      setStatus(`Gagal: ${err.message}`);
+    }
+  };
+
   return (
     <div className="flex items-center gap-3 px-5 py-3 bg-zinc-900 border border-zinc-800 rounded-2xl text-sm font-bold">
       <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-zinc-600'}`} />
@@ -161,6 +172,14 @@ export function StationPrinterPanel({
             title="Cetak label dummy buat tes layout fisik, tanpa order asli"
           >
             Test Print
+          </button>
+          <button
+            onClick={handleRulerTest}
+            disabled={!connected}
+            className="ml-1 text-zinc-400 hover:text-white disabled:opacity-40 disabled:hover:text-zinc-400 transition-colors"
+            title="Cetak penggaris mm buat baca tinggi fisik label yang sebenarnya (baca angka pas garis sobekan)"
+          >
+            Ruler Test
           </button>
         </>
       )}

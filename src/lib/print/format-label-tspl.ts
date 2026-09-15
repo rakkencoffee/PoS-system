@@ -226,7 +226,6 @@ function formatItemLabelsTspl(
   const { widthMm, heightMm, gapMm, density } = { ...DEFAULT_OPTIONS, ...opts };
   const { offsetMm } = opts;
   const widthDots = widthMm * DOTS_PER_MM;
-  const heightDots = heightMm * DOTS_PER_MM;
   const marginX = 10;
   const contentWidth = widthDots - marginX * 2;
   // Floor for the gap from the physical top edge -- confirmed live
@@ -259,22 +258,17 @@ function formatItemLabelsTspl(
       commandLines.push('DIRECTION 0');
       commandLines.push('CLS');
 
-      // Center content vertically within heightMm instead of always starting
-      // right at the top edge: confirmed live 2026-09-15 that after the
-      // one-line-name fix, content got noticeably shorter (fewer wrapped
-      // lines), leaving a big unused gap at the bottom while the top stayed
-      // cramped. Measure the real content height first (dry run at y=0),
-      // then re-draw starting from whatever y centers that block -- this
-      // assumes heightMm reflects the real physical label pitch reasonably
-      // closely (already the working assumption elsewhere in this file); if
-      // it's overstated the result is just less-than-perfectly-centered, not
-      // clipped, since the content itself never changes.
-      const { endY: contentHeight } = buildLabelContent(
-        0, item, data, defaultName, currentItem, totalItems, String(queueNum), widthDots, marginX, contentWidth
-      );
-      const startY = Math.max(minTopMarginDots, Math.round((heightDots - contentHeight) / 2));
+      // NOT centering against heightMm (tried 2026-09-15, reverted same day):
+      // heightMm is explicitly a generous ceiling here, never a confirmed
+      // measurement of the real physical label (see DEFAULT_OPTIONS comment)
+      // -- centering against it pushed content too far down and clipped the
+      // date line once the real label turned out shorter than 60mm, since
+      // GAP-sensing cuts/starts each physical label at its own real boundary
+      // regardless of what SIZE declares. Use formatRulerTestTspl() to read
+      // the real height first, then real centering can come back using that
+      // confirmed number instead of heightMm.
       const { lines } = buildLabelContent(
-        startY, item, data, defaultName, currentItem, totalItems, String(queueNum), widthDots, marginX, contentWidth
+        minTopMarginDots, item, data, defaultName, currentItem, totalItems, String(queueNum), widthDots, marginX, contentWidth
       );
       commandLines.push(...lines);
 
@@ -284,6 +278,38 @@ function formatItemLabelsTspl(
     }
   }
 
+  return Buffer.from(commandLines.join(CRLF) + CRLF, 'utf8');
+}
+
+/**
+ * One-off diagnostic: prints a "ruler" of mm markers down a tall (100mm)
+ * canvas so staff can read the REAL physical label pitch directly off a
+ * single test print, no measuring tape needed. Needed because heightMm
+ * elsewhere in this file is explicitly a generous ceiling, not a confirmed
+ * measurement (see DEFAULT_OPTIONS comment) -- centering content against it
+ * (2026-09-15) pushed content too far down once the real label turned out
+ * shorter than 60mm, since GAP-sensing cuts/starts each physical label at
+ * its own real boundary regardless of what SIZE declares. Whichever marker
+ * number sits right at (or just before) the physical tear/perforation line
+ * IS the real label height in mm -- pass that back as `heightMm` in
+ * TsplLabelOptions from then on.
+ */
+export function formatRulerTestTspl(widthMm = 48, gapMm = 2): Buffer {
+  const heightMm = 100;
+  const widthDots = widthMm * DOTS_PER_MM;
+  const marginX = 10;
+  const commandLines: string[] = [
+    `SIZE ${widthMm} mm,${heightMm} mm`,
+    `GAP ${gapMm} mm,0 mm`,
+    'DENSITY 8',
+    'DIRECTION 0',
+    'CLS',
+  ];
+  for (let mm = 5; mm < heightMm; mm += 5) {
+    commandLines.push(textCmd(marginX, mm * DOTS_PER_MM, FONT.SMALL, `${mm}mm`));
+  }
+  commandLines.push(`BAR 0,${(heightMm - 1) * DOTS_PER_MM},${widthDots},2`);
+  commandLines.push('PRINT 1,1');
   return Buffer.from(commandLines.join(CRLF) + CRLF, 'utf8');
 }
 
