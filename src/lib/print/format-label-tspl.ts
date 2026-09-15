@@ -55,6 +55,25 @@ function textCmd(x: number, y: number, font: string, content: string): string {
   return `TEXT ${x},${y},"${font}",0,1,1,"${escapeTspl(content)}"`;
 }
 
+/**
+ * Picks the biggest built-in font that fits `text` on a SINGLE line within
+ * maxWidthDots, trying LARGE -> MEDIUM -> SMALL in that order. Item names
+ * should read sideways on one line, not stack top-to-bottom -- confirmed
+ * live 2026-09-15: a longer real menu name ("Butterscotch Cloud Coffee")
+ * forced onto FONT.LARGE always wraps into an awkward multi-line stack no
+ * matter how the wrap width is tuned, since LARGE simply can't fit that many
+ * characters per line on this label. Falls back to wrapping at SMALL (the
+ * font with the most characters per line) only if the text doesn't fit on
+ * one line even at the smallest option.
+ */
+function fitToOneLine(text: string, maxWidthDots: number): { font: string; lines: string[] } {
+  for (const font of [FONT.LARGE, FONT.MEDIUM, FONT.SMALL]) {
+    const maxChars = Math.floor(maxWidthDots / FONT_CHAR_WIDTH_DOTS[font]);
+    if (text.length <= maxChars) return { font, lines: [text] };
+  }
+  return { font: FONT.SMALL, lines: wrapByDots(text, FONT.SMALL, maxWidthDots) };
+}
+
 function wrapByDots(text: string, font: string, maxWidthDots: number): string[] {
   const maxChars = Math.max(1, Math.floor(maxWidthDots / FONT_CHAR_WIDTH_DOTS[font]));
   const lines: string[] = [];
@@ -170,10 +189,10 @@ function formatItemLabelsTspl(
       const name = item.menuItem?.name || item.name || defaultName;
       const hasSizeInNotes = item.notes && item.notes.toLowerCase().includes('size:');
       const sizeStr = item.size && item.size !== '-' && !hasSizeInNotes ? ` (${item.size})` : '';
-      const nameLines = wrapByDots(`${name}${sizeStr}`, FONT.LARGE, contentWidth);
+      const { font: nameFont, lines: nameLines } = fitToOneLine(`${name}${sizeStr}`, contentWidth);
       for (const nl of nameLines) {
-        commandLines.push(textCmd(marginX, y, FONT.LARGE, nl));
-        y += FONT_LINE_HEIGHT_DOTS[FONT.LARGE];
+        commandLines.push(textCmd(marginX, y, nameFont, nl));
+        y += FONT_LINE_HEIGHT_DOTS[nameFont];
       }
 
       // Notes (sugar/ice/milk/etc.), joined on "|"-separated line(s)
