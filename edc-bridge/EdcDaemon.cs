@@ -108,15 +108,26 @@ public sealed class EdcDaemon
     // result even when the EDC's own screen and printed receipt show the payment
     // genuinely APPROVED. There is no known-reliable fix yet (see
     // Pesan_Yokke_ResponseTimeout.txt, still awaiting vendor response) -- this
-    // retries the documented Inquiry function a few times as a best-effort recovery
-    // before giving up, which is why staff must still be ready to check the EDC's
-    // own screen/receipt manually if a job comes back FAILED here.
+    // retries the documented Inquiry function as a best-effort recovery before
+    // giving up, which is why staff must still be ready to check the EDC's own
+    // screen/receipt manually if a job comes back FAILED here.
+    //
+    // Cut from 3 attempts (~30s) to 1 (~10s) 2026-09-15: the kiosk's "Batalkan"
+    // doesn't tell the EDC/daemon anything (it only marks the order cancelled in
+    // the DB, see EdcPaymentFlow.tsx) -- jobs here always run their full retry
+    // cycle regardless. Confirmed live: cancelling a QRIS payment and immediately
+    // trying to pay again got stuck behind the cancelled job's still-running 3x
+    // retry loop before the new one could even start. Fewer attempts narrows the
+    // window that can be blocked by a stale job, at the cost of less chance to
+    // recover a transaction that genuinely succeeded but failed to relay --
+    // accepted tradeoff per explicit request, not a default anyone should assume
+    // is risk-free.
     private async Task<EdcJobPatch> ProcessQrisJobAsync(int amount, CancellationToken cancellationToken)
     {
         var result = _edcClient.GenerateQris(amount.ToString());
         if (IsQrisSuccess(result)) return BuildQrisPatch(result);
 
-        const int maxInquiryAttempts = 3;
+        const int maxInquiryAttempts = 1;
         var inquiryDelayMs = TimeSpan.FromSeconds(10);
         for (var attempt = 1; attempt <= maxInquiryAttempts; attempt++)
         {
