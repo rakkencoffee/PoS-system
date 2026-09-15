@@ -134,6 +134,89 @@ const DEFAULT_OPTIONS: Required<Omit<TsplLabelOptions, 'offsetMm'>> = {
   density: 8,
 };
 
+/**
+ * Draws one label's content starting at `startY`, returning the drawn TEXT
+ * commands plus the y position right after the last line (i.e. total content
+ * height when called with startY=0). Extracted so formatItemLabelsTspl can
+ * call it twice: once to measure content height, once for real with a
+ * vertically-centered startY -- see the centering comment below.
+ */
+function buildLabelContent(
+  startY: number,
+  item: ReceiptItem,
+  data: ReceiptData,
+  defaultName: string,
+  currentItem: number,
+  totalItems: number,
+  queueNum: string,
+  widthDots: number,
+  marginX: number,
+  contentWidth: number
+): { lines: string[]; endY: number } {
+  const lines: string[] = [];
+  let y = startY;
+
+  // Header: queue number (left) + item index of total (right)
+  const itemNote = `${String(currentItem).padStart(2, '0')}/${String(totalItems).padStart(2, '0')}`;
+  lines.push(textCmd(marginX, y, FONT.MEDIUM, `No.${queueNum}`));
+  const idxX = Math.max(marginX, widthDots - marginX - itemNote.length * FONT_CHAR_WIDTH_DOTS[FONT.MEDIUM]);
+  lines.push(textCmd(idxX, y, FONT.MEDIUM, itemNote));
+  y += FONT_LINE_HEIGHT_DOTS[FONT.MEDIUM];
+
+  // Customer name
+  const customerLabel = data.customerName || 'Customer';
+  lines.push(textCmd(marginX, y, FONT.SMALL, customerLabel));
+  y += FONT_LINE_HEIGHT_DOTS[FONT.SMALL] + 6;
+
+  // Item name (+ size, unless already folded into notes as "Size: ...")
+  const name = item.menuItem?.name || item.name || defaultName;
+  const hasSizeInNotes = item.notes && item.notes.toLowerCase().includes('size:');
+  const sizeStr = item.size && item.size !== '-' && !hasSizeInNotes ? ` (${item.size})` : '';
+  const { font: nameFont, lines: nameLines } = fitToOneLine(`${name}${sizeStr}`, contentWidth);
+  nameLines.forEach((nl, i) => {
+    lines.push(textCmd(marginX, y, nameFont, nl));
+    // Same fix as the notes lines below: consecutive lines at the same
+    // font sit visibly tighter than every other transition on the label
+    // without this extra margin (confirmed live 2026-09-15 for FONT.SMALL,
+    // the size fitToOneLine falls back to when a name doesn't fit on one
+    // line even at the smallest font) -- only needed *between* wrapped
+    // lines, not after the last one (the existing +6 before notes/date
+    // already covers that gap).
+    y += FONT_LINE_HEIGHT_DOTS[nameFont] + (i < nameLines.length - 1 ? 6 : 0);
+  });
+
+  // Notes (sugar/ice/milk/etc.), joined on "|"-separated line(s)
+  if (item.notes) {
+    const notesArray = item.notes.split(',').map((n) => n.trim()).filter(Boolean);
+    const cleaned = notesArray.map((note) => note.replace(/^Size:\s*/i, '').toUpperCase());
+    const notesLine = cleaned.join(' | ');
+    const noteLines = wrapByDots(notesLine, FONT.SMALL, contentWidth);
+    noteLines.forEach((nl, i) => {
+      lines.push(textCmd(marginX, y, FONT.SMALL, nl));
+      // Physical test 2026-09-14: consecutive wrapped notes lines no
+      // longer overlap (that was the FONT_LINE_HEIGHT_DOTS fix), but sit
+      // visibly tighter than every other transition on the label -- the
+      // only spot with zero extra margin between lines. Match the +6
+      // already used around the customer-name and date lines, but only
+      // *between* notes lines -- the existing +6 right before the date
+      // below already covers the gap after the last one.
+      y += FONT_LINE_HEIGHT_DOTS[FONT.SMALL] + (i < noteLines.length - 1 ? 6 : 0);
+    });
+  }
+
+  // Date, placed right after whatever content came before it.
+  const orderDate = new Date().toLocaleString('id-ID', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    timeZone: 'Asia/Jakarta',
+  });
+  y += 6;
+  lines.push(textCmd(marginX, y, FONT.SMALL, orderDate));
+  y += FONT_LINE_HEIGHT_DOTS[FONT.SMALL];
+
+  return { lines, endY: y };
+}
+
 function formatItemLabelsTspl(
   data: ReceiptData,
   items: ReceiptItem[],
@@ -143,8 +226,13 @@ function formatItemLabelsTspl(
   const { widthMm, heightMm, gapMm, density } = { ...DEFAULT_OPTIONS, ...opts };
   const { offsetMm } = opts;
   const widthDots = widthMm * DOTS_PER_MM;
+  const heightDots = heightMm * DOTS_PER_MM;
   const marginX = 10;
   const contentWidth = widthDots - marginX * 2;
+  // Floor for the gap from the physical top edge -- confirmed live
+  // 2026-09-15 that content starting right at the edge (the old fixed y=8)
+  // looks uncomfortably tight even when nothing is actually clipped.
+  const minTopMarginDots = 24;
 
   if (items.length === 0) return Buffer.alloc(0);
 
@@ -171,70 +259,24 @@ function formatItemLabelsTspl(
       commandLines.push('DIRECTION 0');
       commandLines.push('CLS');
 
-      let y = 8;
-
-      // Header: queue number (left) + item index of total (right)
-      const itemNote = `${String(currentItem).padStart(2, '0')}/${String(totalItems).padStart(2, '0')}`;
-      commandLines.push(textCmd(marginX, y, FONT.MEDIUM, `No.${queueNum}`));
-      const idxX = Math.max(marginX, widthDots - marginX - itemNote.length * FONT_CHAR_WIDTH_DOTS[FONT.MEDIUM]);
-      commandLines.push(textCmd(idxX, y, FONT.MEDIUM, itemNote));
-      y += FONT_LINE_HEIGHT_DOTS[FONT.MEDIUM];
-
-      // Customer name
-      const customerLabel = data.customerName || 'Customer';
-      commandLines.push(textCmd(marginX, y, FONT.SMALL, customerLabel));
-      y += FONT_LINE_HEIGHT_DOTS[FONT.SMALL] + 6;
-
-      // Item name (+ size, unless already folded into notes as "Size: ...")
-      const name = item.menuItem?.name || item.name || defaultName;
-      const hasSizeInNotes = item.notes && item.notes.toLowerCase().includes('size:');
-      const sizeStr = item.size && item.size !== '-' && !hasSizeInNotes ? ` (${item.size})` : '';
-      const { font: nameFont, lines: nameLines } = fitToOneLine(`${name}${sizeStr}`, contentWidth);
-      nameLines.forEach((nl, i) => {
-        commandLines.push(textCmd(marginX, y, nameFont, nl));
-        // Same fix as the notes lines below: consecutive lines at the same
-        // font sit visibly tighter than every other transition on the label
-        // without this extra margin (confirmed live 2026-09-15 for FONT.SMALL,
-        // the size fitToOneLine falls back to when a name doesn't fit on one
-        // line even at the smallest font) -- only needed *between* wrapped
-        // lines, not after the last one (the existing +6 before notes/date
-        // already covers that gap).
-        y += FONT_LINE_HEIGHT_DOTS[nameFont] + (i < nameLines.length - 1 ? 6 : 0);
-      });
-
-      // Notes (sugar/ice/milk/etc.), joined on "|"-separated line(s)
-      if (item.notes) {
-        const notesArray = item.notes.split(',').map((n) => n.trim()).filter(Boolean);
-        const cleaned = notesArray.map((note) => note.replace(/^Size:\s*/i, '').toUpperCase());
-        const notesLine = cleaned.join(' | ');
-        const noteLines = wrapByDots(notesLine, FONT.SMALL, contentWidth);
-        noteLines.forEach((nl, i) => {
-          commandLines.push(textCmd(marginX, y, FONT.SMALL, nl));
-          // Physical test 2026-09-14: consecutive wrapped notes lines no
-          // longer overlap (that was the FONT_LINE_HEIGHT_DOTS fix), but sit
-          // visibly tighter than every other transition on the label -- the
-          // only spot with zero extra margin between lines. Match the +6
-          // already used around the customer-name and date lines, but only
-          // *between* notes lines -- the existing +6 right before the date
-          // below already covers the gap after the last one.
-          y += FONT_LINE_HEIGHT_DOTS[FONT.SMALL] + (i < noteLines.length - 1 ? 6 : 0);
-        });
-      }
-
-      // Date, placed right after whatever content came before it. NOT pinned
-      // near the bottom of heightMm -- that only works if heightMm matches
-      // the real physical label pitch exactly, and it doesn't (confirmed
-      // 2026-09-13: a 60mm canvas with the old bottom-pinned date caused the
-      // date to land past the real label's edge and print on the next
-      // physical label instead). Following the content keeps this correct
-      // regardless of how generous heightMm is.
-      const orderDate = new Date().toLocaleString('id-ID', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-        timeZone: 'Asia/Jakarta',
-      });
-      y += 6;
-      commandLines.push(textCmd(marginX, y, FONT.SMALL, orderDate));
+      // Center content vertically within heightMm instead of always starting
+      // right at the top edge: confirmed live 2026-09-15 that after the
+      // one-line-name fix, content got noticeably shorter (fewer wrapped
+      // lines), leaving a big unused gap at the bottom while the top stayed
+      // cramped. Measure the real content height first (dry run at y=0),
+      // then re-draw starting from whatever y centers that block -- this
+      // assumes heightMm reflects the real physical label pitch reasonably
+      // closely (already the working assumption elsewhere in this file); if
+      // it's overstated the result is just less-than-perfectly-centered, not
+      // clipped, since the content itself never changes.
+      const { endY: contentHeight } = buildLabelContent(
+        0, item, data, defaultName, currentItem, totalItems, String(queueNum), widthDots, marginX, contentWidth
+      );
+      const startY = Math.max(minTopMarginDots, Math.round((heightDots - contentHeight) / 2));
+      const { lines } = buildLabelContent(
+        startY, item, data, defaultName, currentItem, totalItems, String(queueNum), widthDots, marginX, contentWidth
+      );
+      commandLines.push(...lines);
 
       commandLines.push('PRINT 1,1');
 
