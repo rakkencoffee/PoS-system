@@ -6,7 +6,7 @@ import { formatDrinkLabelsTspl } from '@/lib/print/format-label-tspl';
 const ALLOWED_ROLES = ['KITCHEN', 'ADMIN'];
 
 /**
- * GET /api/kds/sticker-test
+ * GET /api/kds/sticker-test?offsetMm=<n>
  *
  * Renders one dummy drink label through the same TSPL formatter as the real
  * sticker endpoint (`/api/kds/sticker/[jobId]`), but from hardcoded sample
@@ -15,22 +15,41 @@ const ALLOWED_ROLES = ['KITCHEN', 'ADMIN'];
  * The sample notes deliberately mirror the comma-separated modifier text
  * that broke wrapping/line-height in earlier iterations, so a test print
  * exercises the same code path a real order would.
+ *
+ * `offsetMm` (optional) is forwarded as TSPL's `OFFSET` command, for
+ * physically calibrating the gap-sensor/print-head vertical registration
+ * (see the note on TsplLabelOptions.offsetMm) -- print a few labels with
+ * different values (e.g. -8, -4, 0, 4, 8) and see which one is fully inside
+ * the physical label instead of getting clipped at the top. The value used
+ * is echoed into the printed customer-name line so each label in a batch is
+ * self-identifying.
  */
-export async function GET() {
+export async function GET(request: Request) {
   const session = await auth();
   const role = (session?.user as any)?.role;
   if (!session || !ALLOWED_ROLES.includes(role)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const offsetParam = new URL(request.url).searchParams.get('offsetMm');
+  const offsetMm = offsetParam !== null && offsetParam !== '' ? Number(offsetParam) : undefined;
+  if (offsetMm !== undefined && !Number.isFinite(offsetMm)) {
+    return NextResponse.json({ error: 'offsetMm must be a number' }, { status: 400 });
+  }
+
   const sample: ReceiptData = {
     orderId: 'TEST-0001',
     queueNumber: '99',
-    customerName: 'Test Print',
+    customerName: offsetMm !== undefined ? `Test OFFSET ${offsetMm}mm` : 'Test Print',
     total: 0,
     items: [
       {
-        name: 'Rakken Signature Roar & Bold',
+        // Real menu item from ProductCache (2026-09-15 query), the longest
+        // actual drink name in the catalog (25 chars) -- picked deliberately
+        // over the old made-up "Rakken Signature Roar & Bold" so this test
+        // print exercises the real worst-case wrap width for the Barista
+        // station instead of an arbitrary/unrealistic one.
+        name: 'Butterscotch Cloud Coffee',
         size: 'Regular',
         quantity: 1,
         notes: 'Sugar: Normal, Ice: Less, Milk: Oat Milk',
@@ -38,6 +57,6 @@ export async function GET() {
     ],
   };
 
-  const buffer = formatDrinkLabelsTspl(sample);
+  const buffer = formatDrinkLabelsTspl(sample, { offsetMm });
   return NextResponse.json({ bytes: buffer.toString('base64') });
 }

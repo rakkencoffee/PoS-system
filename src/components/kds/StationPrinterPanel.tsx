@@ -44,6 +44,7 @@ export function StationPrinterPanel({
 }: StationPrinterPanelProps) {
   const [lastJobId, setLastJobId] = useState<string | null>(null);
   const [status, setStatus] = useState<string>('');
+  const [offsetMm, setOffsetMm] = useState<string>('');
   const connectedRef = useRef(connected);
   connectedRef.current = connected;
   const writeBytesRef = useRef(writeBytes);
@@ -103,8 +104,10 @@ export function StationPrinterPanel({
   const handleTestPrint = async () => {
     if (!testEndpoint) return;
     setStatus('Mencetak test...');
+    const trimmed = offsetMm.trim();
+    const url = trimmed ? `${testEndpoint}?offsetMm=${encodeURIComponent(trimmed)}` : testEndpoint;
     try {
-      const { message } = await printTestLabel(testEndpoint, writeBytesRef.current);
+      const { message } = await printTestLabel(url, writeBytesRef.current);
       setStatus(message);
     } catch (err: any) {
       setStatus(`Gagal: ${err.message}`);
@@ -140,14 +143,26 @@ export function StationPrinterPanel({
         </button>
       )}
       {testEndpoint && (
-        <button
-          onClick={handleTestPrint}
-          disabled={!connected}
-          className="ml-2 text-zinc-400 hover:text-white disabled:opacity-40 disabled:hover:text-zinc-400 transition-colors"
-          title="Cetak label dummy buat tes layout fisik, tanpa order asli"
-        >
-          Test Print
-        </button>
+        <>
+          <input
+            type="number"
+            step="1"
+            inputMode="numeric"
+            value={offsetMm}
+            onChange={(e) => setOffsetMm(e.target.value)}
+            placeholder="Offset mm"
+            title="TSPL OFFSET (mm) buat kalibrasi vertikal label -- kosongkan buat pakai kalibrasi printer apa adanya"
+            className="ml-2 w-24 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1 text-zinc-200 text-xs placeholder:text-zinc-600"
+          />
+          <button
+            onClick={handleTestPrint}
+            disabled={!connected}
+            className="ml-1 text-zinc-400 hover:text-white disabled:opacity-40 disabled:hover:text-zinc-400 transition-colors"
+            title="Cetak label dummy buat tes layout fisik, tanpa order asli"
+          >
+            Test Print
+          </button>
+        </>
       )}
       {status && <span className="text-zinc-500 ml-2">{status}</span>}
     </div>

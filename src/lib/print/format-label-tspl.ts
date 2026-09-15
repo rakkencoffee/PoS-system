@@ -81,6 +81,19 @@ export interface TsplLabelOptions {
   gapMm?: number;
   /** Print darkness, 0 (lightest) - 15 (darkest). Printer default is 8. */
   density?: number;
+  /**
+   * TSPL `OFFSET` command, mm -- fine-tunes where the gap sensor's "top of
+   * label" reference sits relative to where the print head actually starts
+   * printing. Omitted by default (no OFFSET line sent at all), NOT defaulted
+   * to 0, because TSPL persists whatever OFFSET value it's given to the
+   * printer's own memory -- sending "OFFSET 0 mm" on every normal print
+   * would silently wipe out a value the printer was already calibrated to
+   * (via this option, or via the printer's own physical gap-calibration
+   * button) the next time someone prints without passing this. Only pass
+   * this when deliberately (re)calibrating -- see sticker-test route's
+   * ?offsetMm= param.
+   */
+  offsetMm?: number;
 }
 
 // Portrait, not landscape. The roll's paper is 58mm wide, but this class of
@@ -95,7 +108,7 @@ export interface TsplLabelOptions {
 // to overstate on purpose now that the date is placed right after the
 // content instead of pinned near the bottom of the declared height -- see
 // the comment at dateY below.
-const DEFAULT_OPTIONS: Required<TsplLabelOptions> = {
+const DEFAULT_OPTIONS: Required<Omit<TsplLabelOptions, 'offsetMm'>> = {
   widthMm: 48,
   heightMm: 60,
   gapMm: 2,
@@ -109,6 +122,7 @@ function formatItemLabelsTspl(
   opts: TsplLabelOptions = {}
 ): Buffer {
   const { widthMm, heightMm, gapMm, density } = { ...DEFAULT_OPTIONS, ...opts };
+  const { offsetMm } = opts;
   const widthDots = widthMm * DOTS_PER_MM;
   const marginX = 10;
   const contentWidth = widthDots - marginX * 2;
@@ -133,6 +147,7 @@ function formatItemLabelsTspl(
     for (let i = 0; i < qty; i++) {
       commandLines.push(`SIZE ${widthMm} mm,${heightMm} mm`);
       commandLines.push(`GAP ${gapMm} mm,0 mm`);
+      if (offsetMm !== undefined) commandLines.push(`OFFSET ${offsetMm} mm`);
       commandLines.push(`DENSITY ${density}`);
       commandLines.push('DIRECTION 0');
       commandLines.push('CLS');
