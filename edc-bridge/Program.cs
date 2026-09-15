@@ -54,7 +54,7 @@ internal static class Program
         };
 
         using var hiddenForm = CreateHiddenForm();
-        using var dialogCloser = config.AutoCloseDialogs ? new DialogAutoCloser(hiddenForm) : null;
+        using var dialogHider = config.HideDialogsOnDesktop ? new DialogDesktopHider(hiddenForm, hiddenForm.Handle) : null;
         hiddenForm.Shown += async (_, _) =>
         {
             var daemon = new EdcDaemon(config, new EdcClient());
@@ -117,7 +117,7 @@ internal static class Program
         EdcSimpleResult? simpleResult = null;
 
         using var hiddenForm = CreateHiddenForm();
-        // No DialogAutoCloser here (unlike the daemon) -- one-shot manual tests are
+        // No DialogDesktopHider here (unlike the daemon) -- one-shot manual tests are
         // for developer debugging, so every native dialog stays fully visible and
         // un-clicked. This matters especially for QRIS right now: the "safe to
         // auto-click" finding for "Initialize EDC communicate" was only ever
