@@ -190,10 +190,17 @@ function formatItemLabelsTspl(
       const hasSizeInNotes = item.notes && item.notes.toLowerCase().includes('size:');
       const sizeStr = item.size && item.size !== '-' && !hasSizeInNotes ? ` (${item.size})` : '';
       const { font: nameFont, lines: nameLines } = fitToOneLine(`${name}${sizeStr}`, contentWidth);
-      for (const nl of nameLines) {
+      nameLines.forEach((nl, i) => {
         commandLines.push(textCmd(marginX, y, nameFont, nl));
-        y += FONT_LINE_HEIGHT_DOTS[nameFont];
-      }
+        // Same fix as the notes lines below: consecutive lines at the same
+        // font sit visibly tighter than every other transition on the label
+        // without this extra margin (confirmed live 2026-09-15 for FONT.SMALL,
+        // the size fitToOneLine falls back to when a name doesn't fit on one
+        // line even at the smallest font) -- only needed *between* wrapped
+        // lines, not after the last one (the existing +6 before notes/date
+        // already covers that gap).
+        y += FONT_LINE_HEIGHT_DOTS[nameFont] + (i < nameLines.length - 1 ? 6 : 0);
+      });
 
       // Notes (sugar/ice/milk/etc.), joined on "|"-separated line(s)
       if (item.notes) {
