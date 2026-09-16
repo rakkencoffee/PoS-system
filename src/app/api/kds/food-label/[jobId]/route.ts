@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { formatFoodLabels, type ReceiptData } from '@/lib/print/format-receipt';
+import { type ReceiptData } from '@/lib/print/format-receipt';
+import { formatFoodLabelsTspl } from '@/lib/print/format-label-tspl';
 
 const ALLOWED_ROLES = ['KITCHEN', 'ADMIN'];
 
@@ -11,6 +12,15 @@ const ALLOWED_ROLES = ['KITCHEN', 'ADMIN'];
  * Same shape as /api/kds/sticker/[jobId] (Barista, drinks) but for food
  * items -- see that route's comments for the NEW_JOB/PrintJob.id rationale,
  * and for why Order.id is also accepted as a fallback lookup.
+ *
+ * Switched from the ESC/POS formatter (formatFoodLabels) to TSPL
+ * (formatFoodLabelsTspl) 2026-09-16: confirmed live via the Kitchen
+ * printer's own self-test sticker that it's the same TSPL-only class of
+ * unit as Barista's (see format-label-tspl.ts's file comment) -- ESC/POS
+ * writes were "succeeding" over BLE (no error) but silently discarded by
+ * the printer since none of it parsed as valid TSPL/CPCL, so nothing ever
+ * printed. formatFoodLabelsTspl() already existed (written alongside the
+ * Barista fix) but was never wired up here until now.
  */
 export async function GET(
   request: NextRequest,
@@ -31,7 +41,7 @@ export async function GET(
   }
 
   const data = job.payload as unknown as ReceiptData;
-  const buffer = formatFoodLabels(data);
+  const buffer = formatFoodLabelsTspl(data);
 
   if (buffer.length === 0) {
     return new NextResponse(null, { status: 204 });
