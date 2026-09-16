@@ -77,7 +77,7 @@ const SUGAR_ICE_CONFIG: Record<string, { sugar: string[]; ice: string[] }> = {
   'kakao coffee shakerato': { sugar: ['less', 'normal'], ice: ['less', 'normal'] },
   'kakao coffee shakareto': { sugar: ['less', 'normal'], ice: ['less', 'normal'] },
   'peach coffee shakerato': { sugar: ['less', 'normal'], ice: ['less', 'normal'] },
-  'mocha coffee cloud': { sugar: ['less', 'normal'], ice: [] },
+  'mocha coffee cloud': { sugar: ['less', 'normal'], ice: ['less', 'normal'] },
   'uji matcha latte': { sugar: [], ice: ['less', 'normal'] },
   'matchakura cloud latte': { sugar: ['less', 'normal'], ice: ['less', 'normal'] },
   'kokuto matcha latte': { sugar: ['less', 'normal'], ice: ['less', 'normal'] },
