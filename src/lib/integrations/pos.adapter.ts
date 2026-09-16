@@ -10,24 +10,61 @@
  */
 
 import * as olsera from "./olsera.service";
-import type { OlseraProduct, OlseraProductGroup } from "./olsera.service";
+import type { OlseraProduct, OlseraProductGroup, OlseraProductAddOn } from "./olsera.service";
 import { logOrderStatusChange, type StatusLogSource } from "@/lib/order-status-log";
 import { BAG_OPTIONS } from "@/lib/bag-options";
 import { Prisma } from "@prisma/client";
+import { redis } from "@/lib/redis";
 
 const BAG_PRODUCT_IDS = new Set(BAG_OPTIONS.map((b) => String(b.olseraProductId)));
 
 const USE_OLSERA = process.env.USE_OLSERA === "true";
 
 // ──────────────────────────────
-// In-Memory Cache for Test Resiliency
+// Shared Olsera catalog cache (Redis, not in-memory)
 // ──────────────────────────────
-let olseraCache = {
-  products: null as NormalizedMenuItem[] | null,
-  categories: null as NormalizedCategory[] | null,
-  timestamp: 0,
-};
-const CACHE_TTL_MS = 60000; // 1 minute cache
+// Previously an in-memory module-level object: worked within one warm
+// serverless instance, but Vercel routes concurrent requests across
+// multiple instances and a cold start gets a blank cache every time --
+// confirmed 2026-09-16 as a real contributor to slow menu loads (most
+// requests were re-fetching Olsera live instead of hitting a 1-minute-old
+// cache). Redis is shared across every instance, so a cache populated by
+// one request's cold start actually helps the next request too, regardless
+// of which instance handles it. Stores the raw Olsera API results (not the
+// mapped/filtered output) so getMenuItems() and getCategories() each still
+// do their own independent mapping/filtering from one shared fetch.
+const OLSERA_CACHE_KEY = "olsera:raw-catalog";
+const CACHE_TTL_SECONDS = 60; // same effective window as the old 1-minute in-memory cache
+
+interface OlseraRawCatalog {
+  products: OlseraProduct[];
+  groups: OlseraProductGroup[];
+  addOns: OlseraProductAddOn[];
+}
+
+async function getOlseraCatalog(): Promise<OlseraRawCatalog> {
+  try {
+    const cached = await redis.get<OlseraRawCatalog>(OLSERA_CACHE_KEY);
+    if (cached) return cached;
+  } catch (err) {
+    console.warn("[Olsera cache] Redis read failed, fetching live:", err);
+  }
+
+  const [products, groups, addOns] = await Promise.all([
+    olsera.getProducts(),
+    olsera.getProductGroups(),
+    olsera.getProductAddOnsGlobal(),
+  ]);
+  const fresh: OlseraRawCatalog = { products, groups, addOns };
+
+  try {
+    await redis.set(OLSERA_CACHE_KEY, fresh, { ex: CACHE_TTL_SECONDS });
+  } catch (err) {
+    console.warn("[Olsera cache] Redis write failed (non-blocking):", err);
+  }
+
+  return fresh;
+}
 
 // ──────────────────────────────
 // Normalized data types used by the UI
@@ -220,22 +257,9 @@ export async function getMenuItems(filters?: {
   includeUnavailable?: boolean;
 }): Promise<NormalizedMenuItem[]> {
   if (USE_OLSERA) {
-    const isCacheExpired = Date.now() - olseraCache.timestamp > CACHE_TTL_MS;
-
-    if (isCacheExpired || !olseraCache.products) {
-      const [products, groups, addOns] = await Promise.all([
-        olsera.getProducts(),
-        olsera.getProductGroups(),
-        olsera.getProductAddOnsGlobal(),
-      ]);
-      // Reverse the order so newest/added-later items appear first as per user request
-      olseraCache.products = products
-        .map((p) => mapOlseraProduct(p, groups, addOns))
-        .reverse();
-      olseraCache.timestamp = Date.now();
-    }
-
-    let items = olseraCache.products || [];
+    const { products, groups, addOns } = await getOlseraCatalog();
+    // Reverse the order so newest/added-later items appear first as per user request
+    let items = products.map((p) => mapOlseraProduct(p, groups, addOns)).reverse();
 
     // Apply filters
     if (!filters?.includeUnavailable) {
@@ -277,23 +301,17 @@ export async function getCategories(): Promise<NormalizedCategory[]> {
   };
 
   if (USE_OLSERA) {
-    const isCacheExpired = Date.now() - olseraCache.timestamp > CACHE_TTL_MS;
-
-    if (isCacheExpired || !olseraCache.categories) {
-      const groups = await olsera.getProductGroups();
-      olseraCache.categories = groups
-        .map(mapOlseraGroup)
-        // "Packaging" only exists so bag/kemasan products have an Olsera
-        // product ID to sync against at checkout — it's never a browsable
-        // menu category on the kiosk.
-        .filter((c) => c.slug !== "packaging")
-        .sort(
-          (a, b) =>
-            (CATEGORY_ORDER[a.slug] ?? 99) - (CATEGORY_ORDER[b.slug] ?? 99),
-        );
-    }
-
-    return olseraCache.categories || [];
+    const { groups } = await getOlseraCatalog();
+    return groups
+      .map(mapOlseraGroup)
+      // "Packaging" only exists so bag/kemasan products have an Olsera
+      // product ID to sync against at checkout — it's never a browsable
+      // menu category on the kiosk.
+      .filter((c) => c.slug !== "packaging")
+      .sort(
+        (a, b) =>
+          (CATEGORY_ORDER[a.slug] ?? 99) - (CATEGORY_ORDER[b.slug] ?? 99),
+      );
   }
   // Fallback removed
   throw new Error("Local database (Prisma) is no longer supported.");

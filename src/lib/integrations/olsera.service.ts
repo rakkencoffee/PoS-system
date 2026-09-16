@@ -327,35 +327,57 @@ export interface OlseraProductGroup {
 /**
  * Fetch all products from Olsera (with pagination)
  */
+/**
+ * Fetches one page of products, throwing on a non-ok response the same way
+ * the old sequential loop did.
+ */
+async function fetchProductPage(page: number, perPage: number): Promise<OlseraProduct[]> {
+  const res = await olseraFetch(`/product?page=${page}&per_page=${perPage}`);
+  if (!res.ok) {
+    const text = await res.text();
+    console.error('Olsera getProducts error:', text);
+    throw new Error(`Failed to fetch products: ${res.status}`);
+  }
+  const data = await res.json();
+  return data.data || data;
+}
+
+/**
+ * Fetches every product page. Olsera's API gives no total-count/last-page
+ * metadata up front (confirmed 2026-09-16 -- nothing else in this file reads
+ * one), so we can't know how many pages exist before asking -- instead this
+ * fetches pages in parallel BATCHES (round-trips only scale with how many
+ * batches are needed, not with total page count) and stops once a page in a
+ * batch comes back short of perPage (or empty), the same end-of-data signal
+ * the old sequential version used. Previously this was a plain `while(true)`
+ * loop awaiting one page at a time -- for any catalog spanning multiple
+ * pages that meant N full network round-trips to Olsera in serial, a real
+ * contributor to slow menu loads (see cache change alongside this one).
+ */
 export async function getProducts(): Promise<OlseraProduct[]> {
+  const perPage = 100;
+  const batchSize = 4; // up to 400 products per round-trip batch
   const allProducts: OlseraProduct[] = [];
-  let page = 1;
-  const perPage = 50; // Request more items per page to reduce API calls
+  let nextPage = 1;
+  let reachedEnd = false;
 
-  while (true) {
-    const res = await olseraFetch(`/product?page=${page}&per_page=${perPage}`);
-    if (!res.ok) {
-      const text = await res.text();
-      console.error('Olsera getProducts error:', text);
-      throw new Error(`Failed to fetch products: ${res.status}`);
+  while (!reachedEnd) {
+    const pages = Array.from({ length: batchSize }, (_, i) => nextPage + i);
+    const results = await Promise.all(pages.map((page) => fetchProductPage(page, perPage)));
+
+    for (const products of results) {
+      if (!products || products.length === 0) {
+        reachedEnd = true;
+        break;
+      }
+      allProducts.push(...products);
+      if (products.length < perPage) {
+        reachedEnd = true;
+        break;
+      }
     }
 
-    const data = await res.json();
-    const products: OlseraProduct[] = data.data || data;
-
-    if (!products || products.length === 0) {
-      break; // No more pages
-    }
-
-    allProducts.push(...products);
-    console.log(`[Olsera API] Fetched page ${page}: ${products.length} products (total: ${allProducts.length})`);
-
-    // If we got fewer items than per_page, we've reached the last page
-    if (products.length < perPage) {
-      break;
-    }
-
-    page++;
+    nextPage += batchSize;
   }
 
   console.log(`[Olsera API] Total products fetched: ${allProducts.length}`);
