@@ -29,6 +29,17 @@ export function useBlePrinter() {
   // the likely cause of a reconnect silently failing right when a customer
   // was mid-checkout. Every caller now shares one in-flight attempt instead.
   const reconnectingRef = useRef<Promise<boolean> | null>(null);
+  // Serializes every writeBytes() call against the shared BLE characteristic.
+  // Two label prints can legitimately overlap in time -- the automatic
+  // NEW_JOB print in StationPrinterPanel and the manual per-order "Print
+  // Label" fallback in KdsView both call this same writeBytes, and multiple
+  // kiosk devices checking out near-simultaneously can fire two NEW_JOB
+  // events close together. Without serialization, two concurrent chunk-write
+  // loops interleave their writes on the one physical printer's GATT
+  // characteristic, garbling both labels instead of printing either
+  // correctly. Chained with .then(fn, fn) so one write failing doesn't wedge
+  // the queue for every print after it.
+  const writeQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   const bindDevice = useCallback(async (device: BluetoothDevice) => {
     const server = await device.gatt?.connect();
@@ -115,15 +126,21 @@ export function useBlePrinter() {
     setDeviceName(null);
   }, []);
 
-  const writeBytes = useCallback(async (bytes: Uint8Array) => {
-    const characteristic = characteristicRef.current;
-    if (!characteristic) throw new Error('Printer belum connect.');
+  const writeBytes = useCallback((bytes: Uint8Array): Promise<void> => {
+    const run = async () => {
+      const characteristic = characteristicRef.current;
+      if (!characteristic) throw new Error('Printer belum connect.');
 
-    for (let offset = 0; offset < bytes.length; offset += BLE_WRITE_CHUNK_SIZE) {
-      const chunk = bytes.slice(offset, offset + BLE_WRITE_CHUNK_SIZE);
-      await characteristic.writeValueWithoutResponse(chunk);
-      await sleep(BLE_WRITE_DELAY_MS);
-    }
+      for (let offset = 0; offset < bytes.length; offset += BLE_WRITE_CHUNK_SIZE) {
+        const chunk = bytes.slice(offset, offset + BLE_WRITE_CHUNK_SIZE);
+        await characteristic.writeValueWithoutResponse(chunk);
+        await sleep(BLE_WRITE_DELAY_MS);
+      }
+    };
+
+    const result = writeQueueRef.current.then(run, run);
+    writeQueueRef.current = result.catch(() => {});
+    return result;
   }, []);
 
   return { connected, deviceName, connect, tryAutoReconnect, disconnect, writeBytes };
