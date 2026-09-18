@@ -362,6 +362,7 @@ async function createAndDispatchPrintJob(params: {
   queueNumber?: number;
   customerName?: string;
   items: {
+    productId?: string;
     quantity: number;
     price?: number;
     name?: string;
@@ -400,6 +401,18 @@ async function createAndDispatchPrintJob(params: {
       const sizeMatch = displayNotes.match(/Size:\s*([^,)]+)/i);
       if (sizeMatch) displaySize = sizeMatch[1];
 
+      // Defaulting an unmatched item to "other" used to misroute it: "other"
+      // sits in the same non-drink bucket isDrinkItem() checks against, so
+      // a genuine Barista drink whose name didn't exactly match the menu
+      // catalog (a transient getMenuItems() fetch failure, or any naming
+      // drift) silently printed on Kitchen's printer instead -- confirmed
+      // live 2026-09-18. Only bag/packaging items get that explicit "other"
+      // treatment now (correct on purpose, they're not on the visible menu
+      // catalog at all); everything else left unmatched falls through to
+      // isDrinkItem()'s own name-keyword fallback instead of being
+      // pre-empted by a fake category.
+      const isBagItem = BAG_PRODUCT_IDS.has(String(item.productId || ""));
+      const matchedCategory = catMap.get(item.name || "");
       return {
         id: idx,
         menuItem: { name: item.name || "Item" },
@@ -407,7 +420,7 @@ async function createAndDispatchPrintJob(params: {
         price: item.price || 0,
         notes: displayNotes,
         size: displaySize,
-        categorySlug: catMap.get(item.name || "") || "other",
+        categorySlug: matchedCategory || (isBagItem ? "other" : undefined),
       };
     });
 
