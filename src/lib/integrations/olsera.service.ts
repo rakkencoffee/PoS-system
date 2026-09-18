@@ -522,7 +522,7 @@ export async function getClosedOrderDetail(orderId: number): Promise<any> {
  * Update Olsera order status
  * Mapping KDS to Olsera: PENDING->P, PREPARING->A, READY->S, COMPLETED->Z
  */
-export async function updateOrderStatus(orderId: number, status: 'P' | 'A' | 'S' | 'Z' | 'X'): Promise<any> {
+export async function updateOrderStatus(orderId: number, status: 'P' | 'A' | 'S' | 'Z' | 'X', _isRetry = false): Promise<any> {
   const formData = new URLSearchParams();
   formData.append('order_id', String(orderId));
   formData.append('status', status);
@@ -545,7 +545,7 @@ export async function updateOrderStatus(orderId: number, status: 'P' | 'A' | 'S'
 
   if (!res.ok) {
     const text = await res.text();
-    
+
     // IDEMPOTENCY CHECK: If status is already what we want, Olsera returns 406.
     // We catch this and treat it as a success to avoid terminal clutter.
     if (res.status === 406 && (text.includes('sebelumnya sudah') || text.includes('already'))) {
@@ -553,13 +553,29 @@ export async function updateOrderStatus(orderId: number, status: 'P' | 'A' | 'S'
       return { success: true, message: 'Already in target status' };
     }
 
+    // TRANSIENT LOCK: Olsera rejects a status update with 406 "there are still
+    // other processes that have not been completed" when it's still busy
+    // processing a previous call for the same order (e.g. the auto-settlement
+    // sequence fires updateOrderPayment -> markOrderAsPaid -> updateOrderStatus
+    // back-to-back with no delay). This is not a real failure -- retry once
+    // after a short delay before giving up.
+    const isTransientLock = res.status === 406 && /other process|belum selesai|masih (ada )?proses/i.test(text);
+    if (isTransientLock && !_isRetry) {
+      console.warn(`[Olsera API] Order ${orderId} locked by another process, retrying status update to ${status} in 1s...`);
+      await new Promise((r) => setTimeout(r, 1000));
+      return updateOrderStatus(orderId, status, true);
+    }
+
     console.error(`Olsera updateOrderStatus error for ${orderId}:`, text);
-    throw new Error(`Failed to update order status: ${res.status}`);
+    // Include the real reason from Olsera (not just the HTTP status) so
+    // callers can tell a genuine "order unpaid" rejection apart from a
+    // transient lock/race -- see /api/orders/[id]/route.ts's classification.
+    throw new Error(`Failed to update order status: ${res.status} - ${text}`);
   }
 
   const result = await res.json();
   console.log(`[Olsera API] Successfully updated order ${orderId} to status ${status}`);
-  
+
   // Invalidate Cache so next fetch gets new status
   orderDetailCache.delete(orderId);
   orderDetailCache.delete(String(orderId));

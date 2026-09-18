@@ -557,16 +557,22 @@ export async function PATCH(
           console.log(`Successfully synced Olsera order ${olseraOrderId} to combined status ${olseraStatus}`);
         } catch (err: any) {
           console.error('Initial sync failed for order:', olseraOrderId, err.message);
-          
-          if (err.message.includes('406') || err.message.includes('payment info')) {
-            // Unpaid orders cannot be processed by the kitchen
-            // Do NOT auto-pay them, as it will falsify financial records
-            return NextResponse.json({ 
+
+          // Only classify as "unpaid" when Olsera's own reason text actually says
+          // so -- updateOrderStatus() now includes that text in err.message (not
+          // just the HTTP status), so a transient 406 lock/race no longer gets
+          // misreported as an unpaid order (it already retries once on its own
+          // before reaching here; do NOT auto-pay, that would falsify financial records).
+          if (err.message.includes('payment info') || err.message.includes('acknowledge received payment')) {
+            return NextResponse.json({
               error: 'Pesanan Belum Dibayar',
               details: 'Pesanan ini belum lunas di Olsera. Harap selesaikan pembayaran sebelum memproses pesanan di dapur.'
             }, { status: 400 });
           } else {
-            return NextResponse.json({ error: 'Failed to sync status to Olsera' }, { status: 500 });
+            return NextResponse.json({
+              error: 'Gagal sinkronisasi status ke Olsera',
+              details: 'Status di sistem lokal sudah tersimpan, tapi gagal disinkronkan ke Olsera. Coba ulangi aksi ini.',
+            }, { status: 500 });
           }
         }
       }
