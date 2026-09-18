@@ -249,6 +249,14 @@ function mapOlseraGroup(group: OlseraProductGroup): NormalizedCategory {
 /**
  * Get all menu items (products)
  */
+// Categories that exist in Olsera purely for internal bookkeeping and must
+// never reach the customer-facing kiosk -- "bahan-baku" (raw materials,
+// added 2026-09-18 for stock/inventory tracking) so ingredient entries
+// never show up as a sellable item. ("packaging" used to be hidden here too,
+// but per request 2026-09-18 it's now shown on the kiosk like any other
+// category.)
+const HIDDEN_CATEGORY_SLUGS = new Set(["bahan-baku"]);
+
 export async function getMenuItems(filters?: {
   category?: string;
   search?: string;
@@ -259,7 +267,10 @@ export async function getMenuItems(filters?: {
   if (USE_OLSERA) {
     const { products, groups, addOns } = await getOlseraCatalog();
     // Reverse the order so newest/added-later items appear first as per user request
-    let items = products.map((p) => mapOlseraProduct(p, groups, addOns)).reverse();
+    let items = products
+      .map((p) => mapOlseraProduct(p, groups, addOns))
+      .reverse()
+      .filter((i) => !HIDDEN_CATEGORY_SLUGS.has(i.categorySlug));
 
     // Apply filters
     if (!filters?.includeUnavailable) {
@@ -304,10 +315,7 @@ export async function getCategories(): Promise<NormalizedCategory[]> {
     const { groups } = await getOlseraCatalog();
     return groups
       .map(mapOlseraGroup)
-      // "Packaging" only exists so bag/kemasan products have an Olsera
-      // product ID to sync against at checkout — it's never a browsable
-      // menu category on the kiosk.
-      .filter((c) => c.slug !== "packaging")
+      .filter((c) => !HIDDEN_CATEGORY_SLUGS.has(c.slug))
       .sort(
         (a, b) =>
           (CATEGORY_ORDER[a.slug] ?? 99) - (CATEGORY_ORDER[b.slug] ?? 99),
