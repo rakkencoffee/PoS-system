@@ -206,15 +206,20 @@ function buildLabelContent(
     });
   }
 
-  // Date, placed right after whatever content came before it.
+  // Date, placed right after whatever content came before it. FONT.MEDIUM
+  // (not SMALL, same as the queue-number header) -- confirmed live
+  // 2026-09-18 the date/time was too small to read comfortably on the
+  // physical printout. Shared by both stations (formatDrinkLabelsTspl and
+  // formatFoodLabelsTspl both call this same function), so this applies
+  // identically to Barista and Kitchen.
   const orderDate = new Date().toLocaleString('id-ID', {
     dateStyle: 'medium',
     timeStyle: 'short',
     timeZone: 'Asia/Jakarta',
   });
   y += 6;
-  lines.push(textCmd(marginX, y, FONT.SMALL, orderDate));
-  y += FONT_LINE_HEIGHT_DOTS[FONT.SMALL];
+  lines.push(textCmd(marginX, y, FONT.MEDIUM, orderDate));
+  y += FONT_LINE_HEIGHT_DOTS[FONT.MEDIUM];
 
   return { lines, endY: y };
 }
