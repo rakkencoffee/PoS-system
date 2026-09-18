@@ -5,20 +5,6 @@ public sealed record DaemonConfig
     public required string ApiBaseUrl { get; init; }
     public required string ApiKey { get; init; }
     public int PollIntervalMs { get; init; } = 3000;
-    // Default false (flipped 2026-09-15): moving dialogs to a hidden virtual desktop
-    // (see DialogDesktopHider) turned out to just trade one problem for a worse one --
-    // some native dialogs (e.g. "Error response from Host") block POS4CAT_Ctl.dll from
-    // accepting the next request until a human clicks OK, and nobody is ever on the
-    // hidden desktop to click it, permanently wedging the terminal. Decision: let
-    // native dialogs render wherever they naturally appear (normally the kiosk's own
-    // desktop) so staff/customer can actually see and dismiss them; the kiosk's own
-    // "Scan QR" overlay was removed to match (see EdcPaymentFlow.tsx). Set true only
-    // to bring back the old hidden-desktop behavior, which still requires EdcBridge.exe
-    // to be launched while that desktop is active -- see start-kiosk.ps1 (now unused by
-    // default). An even earlier same-desktop overlay approach (AutoCloseDialogs) was
-    // retired 2026-09-15 too: it let the dialog visually block the kiosk page, since
-    // overlay and browser shared the same desktop.
-    public bool HideDialogsOnDesktop { get; init; } = false;
 
     // Which physical kiosk device (and therefore which physical EDC terminal)
     // this daemon instance belongs to — must match the ?device= value that
@@ -63,10 +49,6 @@ public sealed record DaemonConfig
         if (values.TryGetValue("PollIntervalMs", out var pollStr) && int.TryParse(pollStr, out var parsed))
             pollIntervalMs = parsed;
 
-        var hideDialogsOnDesktop = false;
-        if (values.TryGetValue("HideDialogsOnDesktop", out var hideDialogsStr) && bool.TryParse(hideDialogsStr, out var hideDialogsParsed))
-            hideDialogsOnDesktop = hideDialogsParsed;
-
         values.TryGetValue("DeviceId", out var deviceId);
 
         return new DaemonConfig
@@ -74,7 +56,6 @@ public sealed record DaemonConfig
             ApiBaseUrl = apiBaseUrl.TrimEnd('/'),
             ApiKey = apiKey,
             PollIntervalMs = pollIntervalMs,
-            HideDialogsOnDesktop = hideDialogsOnDesktop,
             DeviceId = string.IsNullOrWhiteSpace(deviceId) ? null : deviceId,
         };
     }

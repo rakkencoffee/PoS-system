@@ -11,22 +11,3 @@ PollIntervalMs=3000
 # can grab the same pending job and prompt two different terminals for the
 # same order. Leave blank only when there is a single EDC in play (testing).
 DeviceId=A
-
-# Keep false for kiosk/production use (default, flipped 2026-09-15). Native dialogs
-# from POS4CAT_Ctl.dll now render wherever they naturally appear instead of being
-# moved to a hidden virtual desktop -- some of them (e.g. "Error response from Host")
-# block the DLL from accepting the next request until a human clicks OK, and hiding
-# them meant nobody ever could, permanently wedging the terminal. Staff/customers are
-# expected to see and dismiss these now; the kiosk's own "Scan QR" overlay was removed
-# to match (see EdcPaymentFlow.tsx).
-#
-# Set true only to bring back the old hidden-desktop behavior (see
-# DialogDesktopHider.cs) -- this REQUIRES EdcBridge.exe itself to be launched while
-# that hide desktop (e.g. Desktop 3) is the active one, via start-kiosk.ps1 (not used
-# by default anymore).
-#
-# Do not re-enable the even older same-desktop overlay approach (previously
-# AutoCloseDialogs) regardless of this setting — it was retired 2026-09-15 after live
-# testing showed the overlay still visually blocked the kiosk page, since both sat on
-# the same desktop.
-HideDialogsOnDesktop=false

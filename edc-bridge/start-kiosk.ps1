@@ -6,10 +6,9 @@
 # approach was abandoned the same day -- some dialogs (e.g. "Error response
 # from Host") block POS4CAT_Ctl.dll from accepting the next request until a
 # human clicks OK, and hiding them meant nobody ever could, permanently
-# wedging the terminal. Dialogs are now left to render normally (see
-# daemon.config's HideDialogsOnDesktop, default false) -- staff/customers see
-# and dismiss them directly, so there's no need to launch EdcBridge.exe on a
-# different desktop than the kiosk browser anymore.
+# wedging the terminal. Dialogs are now left to render normally -- staff/
+# customers see and dismiss them directly, so there's no need to launch
+# EdcBridge.exe on a different desktop than the kiosk browser anymore.
 #
 # Intended to run once per logon (Task Scheduler trigger "At log on", with
 # Windows auto-login configured on the kiosk device -- see setup-autostart.ps1).
