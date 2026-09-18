@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/lib/auth';
 
 const USE_OLSERA = process.env.USE_OLSERA === 'true';
+
+// Same roles KdsAuthGate.tsx already requires before rendering the Kitchen/
+// Barista screens -- that check was purely client-side, so anyone who hit
+// this endpoint directly (skipping the UI) got every order's data with no
+// login at all. Staff already sign in through KdsAuthGate before ever
+// reaching a page that calls this, so enforcing it here too is invisible to
+// them.
+const ALLOWED_ROLES = ['KITCHEN', 'ADMIN'];
 
 /**
  * Start of "today" in WIB (UTC+7), as a UTC Date instant -- matches the
@@ -18,6 +27,12 @@ function startOfTodayWIB(): Date {
 
 export async function GET(request: NextRequest) {
   try {
+    const session = await auth();
+    const role = (session?.user as any)?.role;
+    if (!session?.user || !ALLOWED_ROLES.includes(role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
     const today = searchParams.get('today');

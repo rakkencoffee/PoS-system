@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { verifyOrderItems, computeVoucherDiscount } from "@/lib/order-pricing";
 
 /**
  * POST /api/payment/create
@@ -11,22 +12,60 @@ import { NextRequest, NextResponse } from "next/server";
  *   items: [{ productId, variantId?, quantity, name, price, note? }],
  *   totalAmount: number
  * }
+ * `price`/`totalAmount`/`discountAmount` from the client are only used as a
+ * hint of what the client thinks it's paying — the actual charge is always
+ * recomputed server-side from the Olsera catalog (see @/lib/order-pricing),
+ * never trusted as-is.
  *
  * Response: { simulated: true, orderId, orderNo, queueNumber }
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { items, totalAmount, customerName, customerPhone, discountAmount, voucherCode, paymentMethod, deviceId } =
+    const { items, customerName, customerPhone, voucherCode, paymentMethod, deviceId } =
       body;
     const isEdcCard = paymentMethod === "EDC_CARD";
     const isEdcQris = paymentMethod === "EDC_QRIS";
 
-    if (!items || !items.length || typeof totalAmount !== "number") {
+    if (!items || !items.length) {
       return NextResponse.json(
-        { error: "Items and totalAmount are required" },
+        { error: "Items are required" },
         { status: 400 },
       );
+    }
+
+    // SECURITY: never trust price/total/discount fields the client sends --
+    // recompute every item's price from the live Olsera catalog (same one the
+    // kiosk itself reads from) so the amount charged to the EDC terminal and
+    // recorded in Olsera can't be manipulated by editing the checkout request.
+    const priceCheck = await verifyOrderItems(items);
+    if (!priceCheck.ok) {
+      return NextResponse.json({ error: priceCheck.error }, { status: 400 });
+    }
+
+    // Voucher discount is likewise recomputed server-side (same rules
+    // /api/payment/validate-voucher used for the "Apply" preview) rather than
+    // trusted from the client's discountAmount -- packaging (bags) is not
+    // discount-eligible, matching the checkout page's own totals.
+    let discountAmount = 0;
+    if (voucherCode) {
+      const nonBagItems = priceCheck.items.filter((i) => !i.isBag);
+      const itemsSubtotal = nonBagItems.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
+      const discountCheck = await computeVoucherDiscount(
+        voucherCode,
+        itemsSubtotal,
+        nonBagItems.map((i, idx) => ({
+          id: idx,
+          category: i.categorySlug,
+          name: i.name,
+          price: i.unitPrice,
+          quantity: i.quantity,
+        })),
+      );
+      if (!discountCheck.ok) {
+        return NextResponse.json({ error: discountCheck.error }, { status: 400 });
+      }
+      discountAmount = discountCheck.discountAmount;
     }
 
     // Generate unique order ID
@@ -41,17 +80,17 @@ export async function POST(request: NextRequest) {
     try {
       const posAdapter = await import("@/lib/integrations/pos.adapter");
       const adapterOrder = await posAdapter.createOrder(
-        items.map((item: any) => ({
+        items.map((item: any, idx: number) => ({
           productId: item.productId,
           variantId: item.variantId,
           quantity: item.quantity,
-          price: item.price,
+          price: priceCheck.items[idx].unitPrice,
           name: item.name,
           note: item.notes || item.note || "",
           options: item.options // Pass options for receipt formatting
         })),
         customerName,
-        discountAmount || 0,
+        discountAmount,
         voucherCode,
         customerPhone
       );
@@ -76,7 +115,11 @@ export async function POST(request: NextRequest) {
     }
 
     const finalOrderId = dbOrderId ? String(dbOrderId) : orderId;
-    const finalGrossAmount = Math.max(0, totalAmount - (discountAmount || 0));
+    // priceCheck.subtotal already covers every submitted item (drinks/food +
+    // packaging); discountAmount was computed only against the non-bag
+    // subtotal above, so subtracting it here still leaves packaging
+    // un-discounted, matching the checkout page's own total math.
+    const finalGrossAmount = Math.max(0, priceCheck.subtotal - discountAmount);
 
     if (isEdcCard || isEdcQris) {
       // Payment goes through the physical EDC (see edc-bridge/) instead of

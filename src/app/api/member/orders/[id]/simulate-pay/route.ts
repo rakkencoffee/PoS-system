@@ -12,8 +12,8 @@ import { sendPushToMember } from '@/lib/push';
  * kiosk uses, then writes the member's PointLedger EARN entry and updates
  * their tier cache in one transaction so the ledger and cache can't drift.
  *
- * Body: { totalAmount } — trusted from the client the same way the kiosk's
- * /api/payment/create already does (see docs/reference/LOYALTY-MEMBER-APP.md).
+ * Body: {} — the settlement amount is always the order's own `total` in the
+ * database (set when the order was created), never trusted from the client.
  */
 export async function POST(
   request: NextRequest,
@@ -23,16 +23,15 @@ export async function POST(
   if (guardError) return guardError;
 
   const { id: orderId } = await params;
-  const { totalAmount } = await request.json();
-
-  if (typeof totalAmount !== 'number' || totalAmount <= 0) {
-    return NextResponse.json({ error: 'totalAmount is required' }, { status: 400 });
-  }
 
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order || order.channel !== 'MEMBER_APP' || !order.memberId) {
     return NextResponse.json({ error: 'Member order not found' }, { status: 404 });
   }
+  if (!order.total || order.total <= 0) {
+    return NextResponse.json({ error: 'Order has no valid total to settle' }, { status: 400 });
+  }
+  const totalAmount = order.total;
 
   try {
     const posAdapter = await import('@/lib/integrations/pos.adapter');

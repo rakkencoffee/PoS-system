@@ -1,19 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { safeEqual } from '@/lib/safe-equal';
 
 const EDC_BRIDGE_API_KEY = process.env.EDC_BRIDGE_API_KEY || '';
+
+function isAuthorized(request: NextRequest): boolean {
+  const apiKey = request.headers.get('x-api-key');
+  return !!EDC_BRIDGE_API_KEY && !!apiKey && safeEqual(apiKey, EDC_BRIDGE_API_KEY);
+}
 
 /**
  * POST /api/edc-jobs
  *
- * Called by the kiosk after choosing "Bayar Kartu EDC" at checkout.
- * Creates a new EDC payment job for an existing order — the local edc-bridge
- * daemon (USB-connected to the physical Ingenico terminal) polls for it,
- * pushes the amount to the EDC, and reports the result back via PATCH.
+ * NOT currently called by any kiosk code (checkout creates the EdcJob row
+ * directly via Prisma inside /api/payment/create, which is also where the
+ * amount is verified against the real order total) -- kept here only for the
+ * edc-bridge daemon, which already sends the same x-api-key header on every
+ * request (see edc-bridge/EdcDaemon.cs). Requiring it here too closes what
+ * used to be an unauthenticated endpoint that trusted an arbitrary `amount`.
  *
  * Body: { orderId: string, amount: number, deviceId?: string, method?: "CARD" | "QRIS" }
  */
 export async function POST(request: NextRequest) {
+  if (!isAuthorized(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const { orderId, amount, deviceId, method } = await request.json();
 
@@ -65,8 +77,7 @@ export async function POST(request: NextRequest) {
  *     for local single-EDC testing).
  */
 export async function GET(request: NextRequest) {
-  const apiKey = request.headers.get('x-api-key');
-  if (!EDC_BRIDGE_API_KEY || apiKey !== EDC_BRIDGE_API_KEY) {
+  if (!isAuthorized(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

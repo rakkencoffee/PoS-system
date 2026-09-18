@@ -8,7 +8,7 @@ export async function GET() {
     if (USE_OLSERA) {
       // Use the existing pos.adapter which handles Olsera product fetching
       const posAdapter = await import('@/lib/integrations/pos.adapter');
-      const items = await posAdapter.getMenuItems();
+      const items = await posAdapter.getMenuItems({ includeUnavailable: true });
       return NextResponse.json(items);
     }
     throw new Error('Local database (Prisma) is no longer supported.');

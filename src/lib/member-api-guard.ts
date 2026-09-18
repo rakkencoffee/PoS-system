@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { safeEqual } from '@/lib/safe-equal';
 
 /**
  * Guard for /api/member/* routes — these are called server-to-server by the
@@ -9,7 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export function requireMemberApiKey(request: NextRequest): NextResponse | null {
   const apiKey = request.headers.get('x-api-key');
   const expected = process.env.MEMBER_APP_API_KEY;
-  if (!expected || apiKey !== expected) {
+  if (!expected || !apiKey || !safeEqual(apiKey, expected)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   return null;

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { safeEqual } from '@/lib/safe-equal';
 
 const EDC_BRIDGE_API_KEY = process.env.EDC_BRIDGE_API_KEY || '';
 
@@ -19,7 +20,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const apiKey = request.headers.get('x-api-key');
-  if (!EDC_BRIDGE_API_KEY || apiKey !== EDC_BRIDGE_API_KEY) {
+  if (!EDC_BRIDGE_API_KEY || !apiKey || !safeEqual(apiKey, EDC_BRIDGE_API_KEY)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -61,26 +62,38 @@ export async function PATCH(
 
     console.log(`[EdcQueue] Job ${id} updated to ${status}`);
 
-    // Settle the order the instant the daemon confirms the EDC approved the
-    // charge — this is the actual payment-succeeded trigger, not a
-    // client-side poll (keeps working even if the kiosk tab is closed).
-    if (status === 'APPROVED') {
-      const posAdapter = await import('@/lib/integrations/pos.adapter');
-      await posAdapter.updateOrderPaymentStatus(job.orderId, 'paid', job.amount, 'edc_bridge');
-    }
-
     // Push the new status straight to whatever kiosk tab is showing this
-    // job's EdcPaymentFlow. Its own poll() loop exits permanently the first
-    // time it reads FAILED/REJECTED (see EdcPaymentFlow.tsx) -- without this,
-    // staff manually flipping a genuinely-successful job to APPROVED via
-    // ResolveEdcJob.ps1 had no way to reach that tab except a manual "Cek
-    // Status Lagi" click. Best-effort: if this fails, the manual recheck
-    // button is still there as a fallback.
+    // job's EdcPaymentFlow FIRST -- this is the near-instant "Payment
+    // Approved" signal the kiosk reacts to, so it must not sit behind the
+    // settlement chain below (Olsera sync + Pusher broadcasts + a local DB
+    // retry loop that can take up to ~7s in the worst case). Its own poll()
+    // loop exits permanently the first time it reads FAILED/REJECTED (see
+    // EdcPaymentFlow.tsx) -- without this, staff manually flipping a
+    // genuinely-successful job to APPROVED via ResolveEdcJob.ps1 had no way
+    // to reach that tab except a manual "Cek Status Lagi" click. Best-effort:
+    // if this fails, the manual recheck button is still there as a fallback.
     try {
       const { pusherServer } = await import('@/lib/pusher');
       await pusherServer.trigger(`edc-job-${job.orderId}`, 'STATUS_UPDATE', { status: job.status });
     } catch (err) {
       console.warn(`[EdcQueue] Failed to broadcast STATUS_UPDATE for job ${id}:`, err);
+    }
+
+    // Settle the order (Olsera sync, KDS/admin Pusher broadcasts, local
+    // mirror update, print-job trigger) the instant the daemon confirms the
+    // EDC approved the charge -- this is the actual payment-succeeded
+    // trigger, not a client-side poll (keeps working even if the kiosk tab
+    // is closed). Deferred via after() (same pattern /api/payment/create
+    // already uses) so the daemon's PATCH response and the Pusher push above
+    // don't wait on it -- updateOrderPaymentStatus already swallows its own
+    // errors internally, so this only changes *when* settlement runs
+    // relative to the response, not how errors are handled.
+    if (status === 'APPROVED') {
+      const { after } = await import('next/server');
+      after(async () => {
+        const posAdapter = await import('@/lib/integrations/pos.adapter');
+        await posAdapter.updateOrderPaymentStatus(job.orderId, 'paid', job.amount, 'edc_bridge');
+      });
     }
 
     return NextResponse.json({
