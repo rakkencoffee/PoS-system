@@ -423,7 +423,25 @@ export async function PATCH(
 
         if (!localOrder) {
           console.log(`[Sync] Creating local record for Olsera order ${id}`);
-          detail = await olsera.getOrderDetail(olseraOrderId);
+          // Same open-then-closed fallback used elsewhere in this route (see
+          // below) -- this call used to be unguarded, so an order that had
+          // already moved to Olsera's closed-order list by the time this
+          // self-heal ran (its "open order" detail 406s) crashed the whole
+          // PATCH with an uncaught error instead of the KDS action just
+          // failing gracefully (confirmed live 2026-09-18: Kitchen's
+          // "Selesai" button on a stale order surfaced this as a raw
+          // "Failed to fetch open order detail: 406").
+          try {
+            detail = await olsera.getOrderDetail(olseraOrderId);
+          } catch (detailError) {
+            console.warn(`[Sync] Order ${olseraOrderId} not in open orders while self-healing, checking closed orders...`);
+            try {
+              detail = await olsera.getClosedOrderDetail(olseraOrderId);
+            } catch (closedError: any) {
+              console.error(`[Sync] Could not fetch detail for ${olseraOrderId} from open or closed orders -- proceeding with a minimal local record:`, closedError.message);
+              detail = {};
+            }
+          }
           const rawItems = detail.items || detail.orderitems || [];
           
           // Build category lookup
