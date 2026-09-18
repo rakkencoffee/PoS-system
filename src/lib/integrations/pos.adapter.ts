@@ -1036,69 +1036,65 @@ export async function updateOrderPaymentStatus(
           }
         }
 
-        // Step 3: Broadcast to KDS via Pusher
-        // The Barista will manually move it to PREPARING (A) by clicking "Start Making"
+        // Step 3+4: Broadcast to KDS / order-tracking / Admin Reports via
+        // Pusher. These three are independent of each other, so they're
+        // fired concurrently -- awaiting them one after another used to add
+        // up to ~900ms of pure network latency in front of the print-job
+        // trigger below on every single settlement.
         console.log(
           `[Auto-Settlement] Order ${orderId} marked as PAID. Broadcasting to KDS...`,
         );
 
-        try {
+        {
           const { pusherServer } = await import("@/lib/pusher");
-          await pusherServer.trigger("kitchen", "ORDER_CREATED", {
-            order: {
-              id: orderId,
-              queueNumber: olseraOrderId % 1000,
-              status: "PENDING",
-              totalAmount: orderDetail.total || paymentAmount || 0,
-              paymentMethod: "SIMULATED",
-              createdAt: orderDetail.order_date || new Date().toISOString(),
-              items: Array.isArray(orderDetail.items)
-                ? orderDetail.items.map((item: any, idx: number) => ({
-                    id: idx,
-                    menuItem: {
-                      name: item.product_name || item.name || "Item",
-                    },
-                    quantity: item.qty || item.quantity || 1,
-                    size: item.variant_name || "-",
-                  }))
-                : [],
-            },
-          });
-          console.log(`[Pusher] ORDER_CREATED broadcast for ${orderId}`);
-        } catch (pusherErr) {
-          console.warn(
-            "[Pusher] Failed to broadcast ORDER_CREATED:",
-            pusherErr,
-          );
-        }
+          const [orderCreatedResult, statusUpdateResult, salesUpdatedResult] = await Promise.allSettled([
+            pusherServer.trigger("kitchen", "ORDER_CREATED", {
+              order: {
+                id: orderId,
+                queueNumber: olseraOrderId % 1000,
+                status: "PENDING",
+                totalAmount: orderDetail.total || paymentAmount || 0,
+                paymentMethod: "SIMULATED",
+                createdAt: orderDetail.order_date || new Date().toISOString(),
+                items: Array.isArray(orderDetail.items)
+                  ? orderDetail.items.map((item: any, idx: number) => ({
+                      id: idx,
+                      menuItem: {
+                        name: item.product_name || item.name || "Item",
+                      },
+                      quantity: item.qty || item.quantity || 1,
+                      size: item.variant_name || "-",
+                    }))
+                  : [],
+              },
+            }),
+            // Per-order channel — this is what the Member App checkout/tracking
+            // pages subscribe to, so payment confirmation (from any settlement
+            // path: EDC, simulate-pay, Tripay webhook) reaches them instantly.
+            pusherServer.trigger(`order-${orderId}`, "STATUS_UPDATE", {
+              status: "PAID",
+              baristaStatus: "PENDING",
+              kitchenStatus: "PENDING",
+            }),
+            pusherServer.trigger("admin-reports", "SALES_UPDATED", {
+              orderId,
+              amount: actualOlseraTotal,
+            }),
+          ]);
 
-        // Per-order channel — this is what the Member App checkout/tracking
-        // pages subscribe to, so payment confirmation (from any settlement
-        // path: EDC, simulate-pay, Tripay webhook) reaches them instantly.
-        try {
-          const { pusherServer } = await import("@/lib/pusher");
-          await pusherServer.trigger(`order-${orderId}`, "STATUS_UPDATE", {
-            status: "PAID",
-            baristaStatus: "PENDING",
-            kitchenStatus: "PENDING",
-          });
-        } catch (pusherErr) {
-          console.warn(`[Pusher] Failed to broadcast order-${orderId} STATUS_UPDATE:`, pusherErr);
-        }
-
-        // Step 4: Broadcast to Admin Reports (Sprint 4)
-        try {
-          const { pusherServer } = await import("@/lib/pusher");
-          await pusherServer.trigger("admin-reports", "SALES_UPDATED", {
-            orderId,
-            amount: actualOlseraTotal,
-          });
-          console.log(`[Pusher] SALES_UPDATED broadcast for ${orderId}`);
-        } catch (adminPusherErr) {
-          console.warn(
-            "[Pusher] Failed to broadcast SALES_UPDATED:",
-            adminPusherErr,
-          );
+          if (orderCreatedResult.status === "fulfilled") {
+            console.log(`[Pusher] ORDER_CREATED broadcast for ${orderId}`);
+          } else {
+            console.warn("[Pusher] Failed to broadcast ORDER_CREATED:", orderCreatedResult.reason);
+          }
+          if (statusUpdateResult.status === "rejected") {
+            console.warn(`[Pusher] Failed to broadcast order-${orderId} STATUS_UPDATE:`, statusUpdateResult.reason);
+          }
+          if (salesUpdatedResult.status === "fulfilled") {
+            console.log(`[Pusher] SALES_UPDATED broadcast for ${orderId}`);
+          } else {
+            console.warn("[Pusher] Failed to broadcast SALES_UPDATED:", salesUpdatedResult.reason);
+          }
         }
 
         // Step 5: Update local Prisma status (Sprint 4)
