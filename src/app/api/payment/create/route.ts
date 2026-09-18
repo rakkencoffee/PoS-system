@@ -86,6 +86,29 @@ export async function POST(request: NextRequest) {
       // and PATCHing the job APPROVED is what actually settles the order
       // (see /api/edc-jobs/[id] PATCH handler).
       const { prisma } = await import("@/lib/db");
+
+      // EdcJob.orderId has a hard FK to Order.id. createOrder()'s own early
+      // local-row insert (pos.adapter.ts) is best-effort and swallows its own
+      // failure as "non-fatal, background sync will retry" -- under concurrent
+      // load (e.g. two kiosk devices checking out at once) that insert can
+      // transiently fail (DB connection contention), leaving no Order row for
+      // this EdcJob to reference and crashing checkout with a foreign key
+      // violation (confirmed live 2026-09-18). Upsert here as a self-healing
+      // fallback: a no-op if createOrder()'s own insert already succeeded,
+      // otherwise creates the same minimal placeholder row it would have.
+      await prisma.order.upsert({
+        where: { id: finalOrderId },
+        update: {},
+        create: {
+          id: finalOrderId,
+          stationId: "KIOSK",
+          cashierId: "cmo83g6140000vq5g10u03858",
+          queueNumber: dbQueueNumber || null,
+          total: 0,
+          status: "PENDING",
+        },
+      });
+
       const edcJob = await prisma.edcJob.create({
         data: {
           orderId: finalOrderId,
