@@ -172,7 +172,13 @@ export default function CheckoutNewPage() {
       // KioskPrinterProvider watches this independently of whether this
       // checkout page stays mounted until the payment actually resolves.
       queueKioskPrint(data.orderId);
-      setIsProcessing(false);
+      // isProcessing stays true through the EDC wait (not just order creation)
+      // so the Pay button keeps its spinner instead of reverting to a
+      // clickable state while a job is already in flight on the physical
+      // terminal -- EdcPaymentFlow itself renders nothing (see its own
+      // comment: the EDC's native dialogs are the single source of
+      // status feedback), this is just an in-page "still working" cue.
+      setPaymentStatus('Menunggu pembayaran di mesin EDC...');
     } catch (error: any) {
       handleCheckoutError(error);
     }
@@ -742,6 +748,8 @@ export default function CheckoutNewPage() {
           onCancel={() => {
             cancelEdcOrder(edcOrder.orderId);
             setEdcOrder(null);
+            setIsProcessing(false);
+            setPaymentStatus('');
             checkoutInProgress.current = false;
           }}
         />

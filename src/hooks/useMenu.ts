@@ -31,9 +31,19 @@ export interface MenuItem {
   addOns?: { id: number; name: string; price: number }[];
 }
 
+// Kept in the cache for a full kiosk shift even after the last component
+// using it unmounts (e.g. idle-timeout back to "/") -- default gcTime (5min)
+// meant a customer arriving more than 5min after the last one saw the full
+// loading skeleton again instead of an instant, possibly-stale-by-a-minute
+// menu. React Query still silently revalidates in the background per
+// QueryProvider's global staleTime (5min), so this only affects how long
+// data stays visible while that happens, not correctness.
+const KIOSK_GC_TIME_MS = 60 * 60 * 1000; // 1 hour
+
 export function useCategories() {
   return useQuery({
     queryKey: ['categories'],
+    gcTime: KIOSK_GC_TIME_MS,
     queryFn: async (): Promise<Category[]> => {
       try {
         const res = await fetch('/api/categories');
@@ -60,6 +70,7 @@ export function useCategories() {
 export function useMenuItems(categorySlug?: string) {
   return useQuery({
     queryKey: ['menu', categorySlug || 'all'],
+    gcTime: KIOSK_GC_TIME_MS,
     queryFn: async (): Promise<MenuItem[]> => {
       const params = new URLSearchParams();
       if (categorySlug && categorySlug !== 'all') {
