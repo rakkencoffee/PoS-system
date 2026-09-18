@@ -56,19 +56,56 @@ export async function GET(request: NextRequest) {
             orderBy: { createdAt: 'asc' },
             take: 50,
           });
-          localMap = new Map(localActiveOrders.map((lo) => [lo.id, lo]));
-          // olseraTransactionId is only ever populated by a rare recovery
-          // path, not the normal create flow -- filtering on it here (an
-          // earlier version of this fix did) silently matched zero orders
-          // every time, confirmed via production logs 2026-09-01 right
-          // after placing a fresh order. Order.id is always `OLSERA-<id>`
-          // (or `OFFLINE-<id>`) per pos.adapter.ts's early synchronous
-          // create, so extract the numeric id from there instead.
-          activeOrdersToEnrich = localActiveOrders
-            .map((lo) => ({ id: lo.id.replace(/^OLSERA-/, '').replace(/^OFFLINE-/, '') }))
+          // Split into Olsera-backed vs local-only orders. A genuine Olsera
+          // order's id is always exactly "OLSERA-<digits>" -- createOrder()
+          // falls back to a local-only id (e.g. "SF-...") when the Olsera
+          // create call itself fails (confirmed live 2026-09-18, load during
+          // a multi-device test), and such orders have no real Olsera order
+          // to fetch detail from at all. Enriching them via Olsera used to
+          // always fail (406/404 on a nonsense id), showing a permanent
+          // "Menu (Detail Loading...)" placeholder, and re-prefixing the
+          // already-non-numeric id below produced ids like "OLSERA-SF-..."
+          // that no PATCH could ever resolve back to the real local row.
+          const isOlseraBackedId = (id: string) => /^OLSERA-\d+$/.test(id);
+          const olseraBackedOrders = localActiveOrders.filter((lo) => isOlseraBackedId(lo.id));
+          const localOnlyOrders = localActiveOrders.filter((lo) => !isOlseraBackedId(lo.id));
+
+          localMap = new Map(olseraBackedOrders.map((lo) => [lo.id, lo]));
+          activeOrdersToEnrich = olseraBackedOrders
+            .map((lo) => ({ id: lo.id.replace(/^OLSERA-/, '') }))
             .filter((o) => o.id);
 
-          console.log(`[API] Local active orders (not fully completed) today: ${activeOrdersToEnrich.length}`);
+          console.log(`[API] Local active orders (not fully completed) today: ${activeOrdersToEnrich.length} Olsera-backed, ${localOnlyOrders.length} local-only`);
+
+          // Local-only orders never had a real Olsera counterpart -- build
+          // their KDS entries straight from local data (they still went
+          // through the full checkout item/queueNumber flow) instead of
+          // routing them through the Olsera enrichment pipeline below.
+          orders.push(...localOnlyOrders.map((lo) => {
+            const bothCompleted = lo.baristaStatus === 'COMPLETED' && lo.kitchenStatus === 'COMPLETED';
+            const anyPreparing = lo.baristaStatus === 'PREPARING' || lo.kitchenStatus === 'PREPARING';
+            return {
+              id: lo.id,
+              orderNo: '',
+              queueNumber: lo.queueNumber || 0,
+              status: bothCompleted ? 'COMPLETED' : anyPreparing ? 'PREPARING' : 'PENDING',
+              baristaStatus: lo.baristaStatus,
+              kitchenStatus: lo.kitchenStatus,
+              totalAmount: lo.total,
+              paymentMethod: lo.paymentMethod || 'SIMULATED',
+              createdAt: lo.createdAt,
+              customerName: '',
+              items: lo.items.map((item, idx) => ({
+                id: idx,
+                menuItem: { name: item.name || 'Item' },
+                quantity: item.quantity,
+                size: '-',
+                subtotal: item.subtotal,
+                categorySlug: 'other',
+                notes: item.notes || '',
+              })),
+            };
+          }));
         } else {
           // 1. Fetch List of Orders from Olsera
           const rawList = await olsera.olseraFetch('/order/openorder?per_page=100').then(res => res.json().then(d => d.data || d || []));

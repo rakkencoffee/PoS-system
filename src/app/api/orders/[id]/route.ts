@@ -391,6 +391,21 @@ export async function PATCH(
         olseraOrderId = parseInt(id.replace('OLSERA-', ''));
       }
 
+      // A genuine Olsera-backed order's id is always exactly "OLSERA-<digits>".
+      // Some orders never actually made it into Olsera at all -- createOrder()
+      // falls back to a local-only id (e.g. "SF-...") when the Olsera create
+      // call itself fails (confirmed live 2026-09-18, load during a
+      // multi-device test) -- and a since-fixed bug in GET /api/orders?today=true
+      // re-prefixed that already-non-numeric id with another "OLSERA-",
+      // producing ids like "OLSERA-SF-...". Either way, `id.replace('OLSERA-','')`
+      // leaves something non-numeric, so `olseraOrderId` is NaN here. There is
+      // no real Olsera order to sync to in either case, so every Olsera call
+      // below is skipped for these -- syncing was always going to fail (and did,
+      // as "Failed to fetch open order detail: 406" / "Gagal sinkronisasi
+      // status ke Olsera"), permanently blocking staff from ever completing
+      // the order through the normal KDS button.
+      const hasValidOlseraId = !id.includes('TEST') && `OLSERA-${olseraOrderId}` === id;
+
       let detail: any = null;
       let localOrder: any = null;
 
@@ -423,23 +438,28 @@ export async function PATCH(
 
         if (!localOrder) {
           console.log(`[Sync] Creating local record for Olsera order ${id}`);
-          // Same open-then-closed fallback used elsewhere in this route (see
-          // below) -- this call used to be unguarded, so an order that had
-          // already moved to Olsera's closed-order list by the time this
-          // self-heal ran (its "open order" detail 406s) crashed the whole
-          // PATCH with an uncaught error instead of the KDS action just
-          // failing gracefully (confirmed live 2026-09-18: Kitchen's
-          // "Selesai" button on a stale order surfaced this as a raw
-          // "Failed to fetch open order detail: 406").
-          try {
-            detail = await olsera.getOrderDetail(olseraOrderId);
-          } catch (detailError) {
-            console.warn(`[Sync] Order ${olseraOrderId} not in open orders while self-healing, checking closed orders...`);
+          if (!hasValidOlseraId) {
+            console.warn(`[Sync] "${id}" has no real Olsera order behind it -- skipping Olsera detail fetch, self-healing with a minimal local-only record.`);
+            detail = {};
+          } else {
+            // Same open-then-closed fallback used elsewhere in this route (see
+            // below) -- this call used to be unguarded, so an order that had
+            // already moved to Olsera's closed-order list by the time this
+            // self-heal ran (its "open order" detail 406s) crashed the whole
+            // PATCH with an uncaught error instead of the KDS action just
+            // failing gracefully (confirmed live 2026-09-18: Kitchen's
+            // "Selesai" button on a stale order surfaced this as a raw
+            // "Failed to fetch open order detail: 406").
             try {
-              detail = await olsera.getClosedOrderDetail(olseraOrderId);
-            } catch (closedError: any) {
-              console.error(`[Sync] Could not fetch detail for ${olseraOrderId} from open or closed orders -- proceeding with a minimal local record:`, closedError.message);
-              detail = {};
+              detail = await olsera.getOrderDetail(olseraOrderId);
+            } catch (detailError) {
+              console.warn(`[Sync] Order ${olseraOrderId} not in open orders while self-healing, checking closed orders...`);
+              try {
+                detail = await olsera.getClosedOrderDetail(olseraOrderId);
+              } catch (closedError: any) {
+                console.error(`[Sync] Could not fetch detail for ${olseraOrderId} from open or closed orders -- proceeding with a minimal local record:`, closedError.message);
+                detail = {};
+              }
             }
           }
           const rawItems = detail.items || detail.orderitems || [];
@@ -489,8 +509,8 @@ export async function PATCH(
               status: 'PENDING',
               baristaStatus: hasCoffee ? 'PENDING' : 'COMPLETED',
               kitchenStatus: hasFood ? 'PENDING' : 'COMPLETED',
-              olseraTransactionId: String(olseraOrderId),
-              olseraSynced: true
+              olseraTransactionId: hasValidOlseraId ? String(olseraOrderId) : null,
+              olseraSynced: hasValidOlseraId
             }
           });
         }
@@ -569,34 +589,38 @@ export async function PATCH(
           }
         }
 
-        try {
-          // Only sync if Olsera status needs to change
-          await olsera.updateOrderStatus(olseraOrderId, olseraStatus);
-          console.log(`Successfully synced Olsera order ${olseraOrderId} to combined status ${olseraStatus}`);
-        } catch (err: any) {
-          console.error('Initial sync failed for order:', olseraOrderId, err.message);
+        if (!hasValidOlseraId) {
+          console.warn(`[Sync] "${id}" has no real Olsera order behind it -- skipping Olsera status sync, local status update stands alone.`);
+        } else {
+          try {
+            // Only sync if Olsera status needs to change
+            await olsera.updateOrderStatus(olseraOrderId, olseraStatus);
+            console.log(`Successfully synced Olsera order ${olseraOrderId} to combined status ${olseraStatus}`);
+          } catch (err: any) {
+            console.error('Initial sync failed for order:', olseraOrderId, err.message);
 
-          // Only classify as "unpaid" when Olsera's own reason text actually says
-          // so -- updateOrderStatus() now includes that text in err.message (not
-          // just the HTTP status), so a transient 406 lock/race no longer gets
-          // misreported as an unpaid order (it already retries once on its own
-          // before reaching here; do NOT auto-pay, that would falsify financial records).
-          if (err.message.includes('payment info') || err.message.includes('acknowledge received payment')) {
-            return NextResponse.json({
-              error: 'Pesanan Belum Dibayar',
-              details: 'Pesanan ini belum lunas di Olsera. Harap selesaikan pembayaran sebelum memproses pesanan di dapur.'
-            }, { status: 400 });
-          } else {
-            return NextResponse.json({
-              error: 'Gagal sinkronisasi status ke Olsera',
-              details: 'Status di sistem lokal sudah tersimpan, tapi gagal disinkronkan ke Olsera. Coba ulangi aksi ini.',
-            }, { status: 500 });
+            // Only classify as "unpaid" when Olsera's own reason text actually says
+            // so -- updateOrderStatus() now includes that text in err.message (not
+            // just the HTTP status), so a transient 406 lock/race no longer gets
+            // misreported as an unpaid order (it already retries once on its own
+            // before reaching here; do NOT auto-pay, that would falsify financial records).
+            if (err.message.includes('payment info') || err.message.includes('acknowledge received payment')) {
+              return NextResponse.json({
+                error: 'Pesanan Belum Dibayar',
+                details: 'Pesanan ini belum lunas di Olsera. Harap selesaikan pembayaran sebelum memproses pesanan di dapur.'
+              }, { status: 400 });
+            } else {
+              return NextResponse.json({
+                error: 'Gagal sinkronisasi status ke Olsera',
+                details: 'Status di sistem lokal sudah tersimpan, tapi gagal disinkronkan ke Olsera. Coba ulangi aksi ini.',
+              }, { status: 500 });
+            }
           }
         }
       }
 
       // Fetch detail if not already fetched during self-healing
-      if (!detail && !id.includes('TEST')) {
+      if (!detail && !id.includes('TEST') && hasValidOlseraId) {
         try {
           detail = await olsera.getOrderDetail(olseraOrderId);
         } catch (detailError) {
@@ -621,7 +645,7 @@ export async function PATCH(
       const updatedOrder = {
         id: id,
         orderNo: detail?.order_no || '',
-        queueNumber: localOrder?.queueNumber || (olseraOrderId ? (olseraOrderId % 1000) : parseInt(id.replace(/[^0-9]/g, '').slice(-3) || '123')),
+        queueNumber: localOrder?.queueNumber || (hasValidOlseraId ? (olseraOrderId % 1000) : parseInt(id.replace(/[^0-9]/g, '').slice(-3) || '123')),
         status: localOrder ? localOrder.status : body.status,
         baristaStatus: localOrder?.baristaStatus,
         kitchenStatus: localOrder?.kitchenStatus,
