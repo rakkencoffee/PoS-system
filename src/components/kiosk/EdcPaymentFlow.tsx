@@ -20,6 +20,17 @@ interface EdcPaymentFlowProps {
 const POLL_INTERVAL_MS = 2000;
 const MAX_POLL_TIME_MS = 3 * 60 * 1000; // 3 minutes — EDC waits for card tap/insert/swipe
 
+// GenerateQris()'s own COMStatus() is documented as unreliable (see
+// EdcDaemon.cs) -- it can report FAILED even though the customer completes
+// payment on the physical terminal moments later. Cancelling (and voiding in
+// Olsera) the instant FAILED/REJECTED is read raced that window and orphaned
+// a genuinely-paid order with no printed nota/label (confirmed live
+// 2026-09-2x). Instead of cancelling immediately, keep polling for this long
+// after the first FAILED/REJECTED read in case a late APPROVED still lands --
+// closes the race without needing staff to intervene for the common case
+// (order genuinely abandoned) either, just delays that outcome.
+const CANCEL_GRACE_PERIOD_MS = 20 * 1000;
+
 // Renders nothing (2026-09-15): the kiosk used to show its own full-screen
 // "Scan QR di layar mesin EDC" / failure+retry overlay here, but that
 // duplicated -- and sometimes visually competed with -- the EDC's own native
@@ -44,6 +55,12 @@ export function EdcPaymentFlow({ orderId, onApproved, onCancel }: EdcPaymentFlow
     stopPollingRef.current = false;
 
     const startTime = Date.now();
+    // Set the moment a FAILED/REJECTED/CANCELLED read first happens; cleared
+    // if the status ever recovers to something in-flight again. `onCancel()`
+    // only actually fires once this deadline passes without an APPROVED
+    // showing up -- see CANCEL_GRACE_PERIOD_MS above.
+    let graceDeadline: number | null = null;
+
     while (!stopPollingRef.current && Date.now() - startTime < MAX_POLL_TIME_MS) {
       await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
       if (stopPollingRef.current) return;
@@ -58,16 +75,27 @@ export function EdcPaymentFlow({ orderId, onApproved, onCancel }: EdcPaymentFlow
           return;
         }
         if (data.status === 'REJECTED' || data.status === 'FAILED' || data.status === 'CANCELLED') {
-          // Raw EDC/DLL error stays in the console for staff -- there's no
-          // customer-facing message anymore, the EDC's own native dialog
-          // (left unhidden/unclicked on purpose, see comment above) is what
-          // communicates this now. Just fall back to the checkout screen so
-          // the customer can tap pay again themselves.
-          console.warn(`[EdcPaymentFlow] Job ${data.status.toLowerCase()}:`, data.errorMessage);
-          onCancel();
-          return;
+          if (graceDeadline === null) {
+            console.warn(
+              `[EdcPaymentFlow] Job ${data.status.toLowerCase()}, waiting ${CANCEL_GRACE_PERIOD_MS / 1000}s for a possible late approval before cancelling:`,
+              data.errorMessage
+            );
+            graceDeadline = Date.now() + CANCEL_GRACE_PERIOD_MS;
+          } else if (Date.now() >= graceDeadline) {
+            // Raw EDC/DLL error stays in the console for staff -- there's no
+            // customer-facing message anymore, the EDC's own native dialog
+            // (left unhidden/unclicked on purpose, see comment above) is what
+            // communicates this now. Fall back to the checkout screen so the
+            // customer can tap pay again themselves.
+            console.warn('[EdcPaymentFlow] No approval after grace period, cancelling.');
+            onCancel();
+            return;
+          }
+          continue;
         }
-        // PENDING / PROCESSING / NOT_FOUND — keep polling
+        // PENDING / PROCESSING / NOT_FOUND — keep polling, and drop any grace
+        // window in progress since the status is back to in-flight.
+        graceDeadline = null;
       } catch {
         // transient network hiccup — keep polling
       }
