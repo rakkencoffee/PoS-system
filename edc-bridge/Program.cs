@@ -54,7 +54,6 @@ internal static class Program
         };
 
         using var hiddenForm = CreateHiddenForm();
-        using var foregrounder = new DialogForegrounder();
         hiddenForm.Shown += async (_, _) =>
         {
             var daemon = new EdcDaemon(config, new EdcClient());
@@ -117,7 +116,6 @@ internal static class Program
         EdcSimpleResult? simpleResult = null;
 
         using var hiddenForm = CreateHiddenForm();
-        using var foregrounder = new DialogForegrounder();
         // Native dialogs stay fully visible and un-clicked here, same as the daemon.
         // This matters especially for QRIS right now: the "safe to
         // auto-click" finding for "Initialize EDC communicate" was only ever
