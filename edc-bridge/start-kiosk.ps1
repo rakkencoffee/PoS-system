@@ -31,6 +31,14 @@ Start-Process -FilePath $EdcBridgeExe -WorkingDirectory $edcBridgeDir
 Start-Sleep -Milliseconds $EdcBridgeWarmupMs
 
 Write-Host "[start-kiosk] Launching kiosk browser..."
-Start-Process -FilePath $ChromeExe -ArgumentList "--kiosk `"$KioskUrl`" --noerrdialogs --disable-session-crashed-bubble --incognito"
+# Deliberately NOT --incognito: the kiosk's receipt printer is paired over Web
+# Bluetooth (see useBlePrinter.ts), and Chrome only remembers that pairing
+# permission for the profile's lifetime -- incognito's profile is thrown away
+# on close, so every restart forced staff to re-pair the printer from
+# scratch (confirmed live 2026-09-2x). A normal (non-incognito) profile
+# persists the pairing across restarts, matching how the physical EDC
+# terminal itself already "just stays connected" -- no ongoing downside here
+# since this Chrome window only ever loads the one kiosk URL.
+Start-Process -FilePath $ChromeExe -ArgumentList "--kiosk `"$KioskUrl`" --noerrdialogs --disable-session-crashed-bubble"
 
 Write-Host "[start-kiosk] Done."
