@@ -287,6 +287,18 @@ function MenuPageContent() {
   useEffect(() => {
     if (debouncedSearch || !categories.length) return;
     const onScroll = () => {
+      // Once the page is scrolled to its bottom, the last category's section
+      // may be too short to ever push its own top past the 200px threshold
+      // below (there's no more room to scroll) -- without this, that last
+      // category's pill never highlights no matter how far down it's viewed.
+      const atBottom =
+        window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
+      if (atBottom) {
+        const last = categories[categories.length - 1];
+        if (last && last.slug !== selectedCategory) setSelectedCategory(last.slug);
+        return;
+      }
+
       const visible = categories
         .map((c: Category) => {
           const el = document.getElementById(`mnew-${c.slug}`);

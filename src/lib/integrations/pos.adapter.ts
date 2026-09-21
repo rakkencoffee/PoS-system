@@ -547,6 +547,14 @@ export async function createOrder(
   discountAmount: number = 0,
   voucherCode?: string,
   customerPhone?: string,
+  // Per-item discount breakdown, keyed by the item's index in `items` above
+  // (order-pricing.ts's computeVoucherDiscount/computeAutoPromoDiscount both
+  // already compute exactly this). When provided, it's used as-is for the
+  // Olsera line-item sync below instead of re-deriving which items should be
+  // discounted from category heuristics -- callers that don't have a
+  // breakdown (e.g. member benefit redemption) can omit it and keep the old
+  // proportional-spread fallback.
+  itemDiscounts: Record<string, number> = {},
 ): Promise<{ orderId: string; olseraOrderId?: number; orderNo?: string; queueNumber?: number; itemSyncPromise?: Promise<void> }> {
   if (USE_OLSERA) {
     // CRM (F5): if the customer left a phone number, try to match an existing
@@ -694,52 +702,70 @@ export async function createOrder(
         if (olseraItems.length === 0) {
           console.error(`[Sync] Skipping item sync because no order items were returned from Olsera for order ${orderId}`);
         } else {
-          // Category-aware voucher restriction
-          const isRestrictedToNonCoffee = 
-            voucherCode?.toUpperCase() === 'RAKKEN002' ||
-            (discountAmount > 0 && items.some(item => {
-              const categorySlug = catMap.get(item.name || "");
-              return categorySlug === 'non-coffee';
-            }) && items.some(item => {
-              const categorySlug = catMap.get(item.name || "");
-              return categorySlug !== 'non-coffee';
-            }) && discountAmount < totalOrderAmount * 0.22);
-
-          // Packaging (bags) is a service fee, not discountable stock — never
-          // eligible for voucher discount regardless of restriction mode.
-          const nonBagItems = items.filter(item => !BAG_PRODUCT_IDS.has(String(item.productId || '')));
-
-          let eligibleItems = nonBagItems;
-          if (isRestrictedToNonCoffee) {
-            eligibleItems = nonBagItems.filter(item => {
-              const categorySlug = catMap.get(item.name || "");
-              return categorySlug === 'non-coffee';
-            });
-          }
-          if (eligibleItems.length === 0) {
-            eligibleItems = nonBagItems;
-          }
-
-          const eligibleTotalAmount = eligibleItems.reduce((acc, item) => acc + (item.price || 0) * item.quantity, 0);
-          let remainingDiscount = discountAmount;
-
+          const hasExplicitBreakdown = Object.keys(itemDiscounts).length > 0;
           const calculatedDiscounts = new Map<string, number>();
 
-          for (let idx = 0; idx < eligibleItems.length; idx++) {
-            const item = eligibleItems[idx];
-            const itemPrice = item.price || 0;
-            let itemDiscount = 0;
-            
-            if (discountAmount > 0 && eligibleTotalAmount > 0) {
-              if (idx === eligibleItems.length - 1) {
-                itemDiscount = remainingDiscount;
-              } else {
-                const share = (itemPrice * item.quantity) / eligibleTotalAmount;
-                itemDiscount = Math.round(discountAmount * share);
-                remainingDiscount -= itemDiscount;
-              }
+          if (hasExplicitBreakdown) {
+            // Caller (order-pricing.ts) already decided exactly which item(s)
+            // get discounted -- e.g. a 100%-off voucher concentrates its
+            // whole discount on the single cheapest eligible item rather than
+            // spreading it, which the proportional fallback below can't
+            // express. Keyed by index into `items` (see param doc above).
+            for (let idx = 0; idx < items.length; idx++) {
+              const item = items[idx];
+              calculatedDiscounts.set(
+                `${item.productId}-${item.variantId || ''}`,
+                itemDiscounts[String(idx)] || 0,
+              );
             }
-            calculatedDiscounts.set(`${item.productId}-${item.variantId || ''}`, itemDiscount);
+          } else {
+            // Fallback for callers with no per-item breakdown (e.g. member
+            // benefit redemption): spread discountAmount proportionally
+            // across eligible items, same as before.
+            const isRestrictedToNonCoffee =
+              voucherCode?.toUpperCase() === 'RAKKEN002' ||
+              (discountAmount > 0 && items.some(item => {
+                const categorySlug = catMap.get(item.name || "");
+                return categorySlug === 'non-coffee';
+              }) && items.some(item => {
+                const categorySlug = catMap.get(item.name || "");
+                return categorySlug !== 'non-coffee';
+              }) && discountAmount < totalOrderAmount * 0.22);
+
+            // Packaging (bags) is a service fee, not discountable stock — never
+            // eligible for voucher discount regardless of restriction mode.
+            const nonBagItems = items.filter(item => !BAG_PRODUCT_IDS.has(String(item.productId || '')));
+
+            let eligibleItems = nonBagItems;
+            if (isRestrictedToNonCoffee) {
+              eligibleItems = nonBagItems.filter(item => {
+                const categorySlug = catMap.get(item.name || "");
+                return categorySlug === 'non-coffee';
+              });
+            }
+            if (eligibleItems.length === 0) {
+              eligibleItems = nonBagItems;
+            }
+
+            const eligibleTotalAmount = eligibleItems.reduce((acc, item) => acc + (item.price || 0) * item.quantity, 0);
+            let remainingDiscount = discountAmount;
+
+            for (let idx = 0; idx < eligibleItems.length; idx++) {
+              const item = eligibleItems[idx];
+              const itemPrice = item.price || 0;
+              let itemDiscount = 0;
+
+              if (discountAmount > 0 && eligibleTotalAmount > 0) {
+                if (idx === eligibleItems.length - 1) {
+                  itemDiscount = remainingDiscount;
+                } else {
+                  const share = (itemPrice * item.quantity) / eligibleTotalAmount;
+                  itemDiscount = Math.round(discountAmount * share);
+                  remainingDiscount -= itemDiscount;
+                }
+              }
+              calculatedDiscounts.set(`${item.productId}-${item.variantId || ''}`, itemDiscount);
+            }
           }
 
           for (let idx = 0; idx < items.length; idx++) {

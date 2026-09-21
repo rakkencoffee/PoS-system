@@ -203,7 +203,19 @@ export async function computeVoucherDiscount(
     const eligibleTotal = eligibleItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
     if (eligibleItems.length > 0) {
-      if (isPercentage) {
+      const isFreeItemVoucher = isPercentage && discountRate >= 0.999;
+      if (isFreeItemVoucher) {
+        // 100%-off voucher: read as "one free item" (the single cheapest
+        // eligible item), not a whole-cart discount -- this is how RAKKEN
+        // ARCADE prizes get redeemed (crew hands the winner a 100%-off code
+        // personally, customer types it in at checkout; see PRODUCT.md,
+        // arcade stays otherwise disconnected from this system). Applying
+        // 100% to every eligible item instead would give away the whole
+        // eligible portion of the cart, not just the one intended prize.
+        const cheapestItem = eligibleItems.reduce((min, item) => (item.price < min.price ? item : min));
+        itemDiscounts[cheapestItem.id] = cheapestItem.price;
+        finalDiscountAmount = cheapestItem.price;
+      } else if (isPercentage) {
         eligibleItems.forEach((item) => {
           const itemSubtotal = item.price * item.quantity;
           itemDiscounts[item.id] = Math.floor(itemSubtotal * discountRate);
@@ -234,4 +246,57 @@ export async function computeVoucherDiscount(
   }
 
   return { ok: true, message: result.message, discountAmount: finalDiscountAmount, itemDiscounts };
+}
+
+// ──────────────────────────────
+// Automatic "buy coffee, get a Refreshment free" promo -- unlike
+// computeVoucherDiscount above, the customer never types anything for this
+// one. Its active-date window and usage limit still live in Olsera as an
+// ordinary Kupon Diskon (reusing validateVoucherRemote's own date/expiry/
+// usage checks below) so staff can turn the promo on/off or change its dates
+// from the Olsera dashboard without a redeploy -- Olsera's own voucher API
+// has no notion of "buy category A, get category B free" though, so which
+// item actually goes free is decided here, not by whatever discount_rate is
+// configured on the Kupon Diskon record.
+//
+// AUTO_PROMO_CODE must exactly match the Kupon Diskon code created in Olsera
+// when this promo goes live. Until that code exists there, getVoucherByCode
+// returns null and this silently no-ops -- safe to deploy ahead of time.
+// ──────────────────────────────
+
+const AUTO_PROMO_CODE = "AUTOFREEREFRESH";
+const AUTO_PROMO_TRIGGER_CATEGORY_SLUGS = ["rakken-signature", "rakken-style"];
+const AUTO_PROMO_REWARD_CATEGORY_SLUG = "refreshment";
+
+export type AutoPromoResult =
+  | { active: false }
+  | { active: true; message: string; discountAmount: number; itemDiscounts: Record<string, number> };
+
+export async function computeAutoPromoDiscount(items: DiscountableItem[]): Promise<AutoPromoResult> {
+  if (!Array.isArray(items) || items.length === 0) return { active: false };
+
+  const voucher = await olseraApi.getVoucherByCode(AUTO_PROMO_CODE);
+  if (!voucher) return { active: false }; // promo not created in Olsera yet
+
+  const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const validation = await olseraApi.validateVoucherRemote(AUTO_PROMO_CODE, subtotal);
+  if (!validation.valid) return { active: false }; // outside active date range, expired, or usage limit hit
+
+  const hasCoffee = items.some((item) =>
+    AUTO_PROMO_TRIGGER_CATEGORY_SLUGS.includes(String(item.category || "").toLowerCase()),
+  );
+  if (!hasCoffee) return { active: false };
+
+  const eligibleRewards = items.filter(
+    (item) => String(item.category || "").toLowerCase() === AUTO_PROMO_REWARD_CATEGORY_SLUG,
+  );
+  if (eligibleRewards.length === 0) return { active: false };
+
+  const cheapest = eligibleRewards.reduce((min, item) => (item.price < min.price ? item : min));
+  return {
+    active: true,
+    message: `Promo aktif: 1 ${cheapest.name} gratis`,
+    discountAmount: cheapest.price,
+    itemDiscounts: { [String(cheapest.id)]: cheapest.price },
+  };
 }

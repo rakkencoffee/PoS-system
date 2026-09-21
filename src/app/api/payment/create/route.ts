@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyOrderItems, computeVoucherDiscount } from "@/lib/order-pricing";
+import { verifyOrderItems, computeVoucherDiscount, computeAutoPromoDiscount } from "@/lib/order-pricing";
 
 /**
  * POST /api/payment/create
@@ -47,25 +47,54 @@ export async function POST(request: NextRequest) {
     // /api/payment/validate-voucher used for the "Apply" preview) rather than
     // trusted from the client's discountAmount -- packaging (bags) is not
     // discount-eligible, matching the checkout page's own totals.
-    let discountAmount = 0;
+    const nonBagItems = priceCheck.items.filter((i) => !i.isBag);
+    const itemsSubtotal = nonBagItems.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
+    // `id` is the item's index in priceCheck.items/the original request
+    // `items` array (NOT a re-index of this bag-filtered list) -- pos.adapter's
+    // createOrder() receives that same array in that same order, so this id
+    // is what lets it apply the per-item discount to the right Olsera line
+    // item without re-deriving eligibility itself.
+    const discountableItems = priceCheck.items
+      .map((i, idx) => ({ i, idx }))
+      .filter(({ i }) => !i.isBag)
+      .map(({ i, idx }) => ({
+        id: idx,
+        category: i.categorySlug,
+        name: i.name,
+        price: i.unitPrice,
+        quantity: i.quantity,
+      }));
+
+    const itemDiscounts: Record<string, number> = {};
     if (voucherCode) {
-      const nonBagItems = priceCheck.items.filter((i) => !i.isBag);
-      const itemsSubtotal = nonBagItems.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
-      const discountCheck = await computeVoucherDiscount(
-        voucherCode,
-        itemsSubtotal,
-        nonBagItems.map((i, idx) => ({
-          id: idx,
-          category: i.categorySlug,
-          name: i.name,
-          price: i.unitPrice,
-          quantity: i.quantity,
-        })),
-      );
+      const discountCheck = await computeVoucherDiscount(voucherCode, itemsSubtotal, discountableItems);
       if (!discountCheck.ok) {
         return NextResponse.json({ error: discountCheck.error }, { status: 400 });
       }
-      discountAmount = discountCheck.discountAmount;
+      Object.assign(itemDiscounts, discountCheck.itemDiscounts);
+    }
+
+    // Automatic date-gated promo (no code typed by the customer) -- runs on
+    // every order regardless of voucherCode, see computeAutoPromoDiscount for
+    // how its active window is controlled from Olsera.
+    const autoPromo = await computeAutoPromoDiscount(discountableItems);
+    if (autoPromo.active) {
+      for (const [id, amount] of Object.entries(autoPromo.itemDiscounts)) {
+        itemDiscounts[id] = (itemDiscounts[id] || 0) + amount;
+      }
+    }
+
+    // Clamp each item's combined discount to its own line subtotal so a
+    // manual voucher and the automatic promo can never stack past 100% off
+    // the same item (e.g. both happening to target the same cheapest item).
+    // itemDiscounts is mutated in place to the clamped values so it can be
+    // passed to posAdapter.createOrder below for the Olsera line-item sync.
+    let discountAmount = 0;
+    for (const item of discountableItems) {
+      const lineSubtotal = item.price * item.quantity;
+      const combined = Math.min(itemDiscounts[String(item.id)] || 0, lineSubtotal);
+      itemDiscounts[String(item.id)] = combined;
+      discountAmount += combined;
     }
 
     // Generate unique order ID
@@ -92,7 +121,8 @@ export async function POST(request: NextRequest) {
         customerName,
         discountAmount,
         voucherCode,
-        customerPhone
+        customerPhone,
+        itemDiscounts
       );
       dbOrderId = adapterOrder.orderId;
       dbOrderNo = adapterOrder.orderNo || null;
@@ -121,7 +151,12 @@ export async function POST(request: NextRequest) {
     // un-discounted, matching the checkout page's own total math.
     const finalGrossAmount = Math.max(0, priceCheck.subtotal - discountAmount);
 
-    if (isEdcCard || isEdcQris) {
+    // A 100%-off voucher (see order-pricing.ts's "free item" handling) can
+    // bring the total to exactly Rp0 -- the physical EDC terminal can't
+    // process a zero-amount Purchase/GenQRIS, so a fully-covered order skips
+    // the EDC entirely and settles the same way a simulated payment does
+    // below, regardless of which payment method the kiosk UI had selected.
+    if ((isEdcCard || isEdcQris) && finalGrossAmount > 0) {
       // Payment goes through the physical EDC (see edc-bridge/) instead of
       // being auto-settled. The order stays PENDING/unpaid — the local
       // edc-bridge daemon polls /api/edc-jobs, pushes the amount to the
