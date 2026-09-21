@@ -17,6 +17,7 @@ param(
     [string]$EdcBridgeExe = (Join-Path $PSScriptRoot 'EdcBridge.exe'),
     [string]$KioskUrl = 'https://menu.rakkencoffee.com/?device=A',
     [string]$ChromeExe = 'C:\Program Files\Google\Chrome\Application\chrome.exe',
+    [string]$ChromeProfileDir = (Join-Path $PSScriptRoot 'chrome-profile'),
     [int]$EdcBridgeWarmupMs = 3000
 )
 
@@ -43,9 +44,36 @@ Write-Host "[start-kiosk] Launching kiosk browser..."
 # A normal profile means Chrome's regular first-run experience applies too,
 # though -- confirmed live 2026-09-2x this popped its "Choose your search
 # engine" tab on top of the kiosk URL after dropping --incognito (which used
-# to skip first-run entirely). The three extra flags below suppress that and
-# the rest of first-run (welcome tour, default-browser nag) without touching
+# to skip first-run entirely). The three flags below suppress that and the
+# rest of first-run (welcome tour, default-browser nag) without touching
 # whether the profile itself persists.
-Start-Process -FilePath $ChromeExe -ArgumentList "--kiosk `"$KioskUrl`" --noerrdialogs --disable-session-crashed-bubble --no-first-run --no-default-browser-check --disable-search-engine-choice-screen"
+#
+# --user-data-dir points at a folder dedicated to this kiosk instead of
+# Windows' shared default Chrome profile -- confirmed live 2026-09-2x that
+# profile had accumulated a "restore previous session" state (kiosk PCs get
+# power-cut/hard-reset far more often than a normal PC, which Chrome treats
+# as an unclean exit), so every relaunch opened BOTH a restored blank tab AND
+# the kiosk URL as a second tab (matches Chromium issue 517177). A dedicated
+# profile starts clean; the exit_type patch below keeps it that way even
+# after a future unclean shutdown, by telling Chrome the last exit was
+# already normal before it gets the chance to think otherwise.
+if (-not (Test-Path $ChromeProfileDir)) {
+    New-Item -ItemType Directory -Path $ChromeProfileDir | Out-Null
+}
+$prefsPath = Join-Path $ChromeProfileDir 'Default\Preferences'
+if (Test-Path $prefsPath) {
+    try {
+        $prefs = Get-Content -LiteralPath $prefsPath -Raw | ConvertFrom-Json
+        if ($prefs.profile) {
+            $prefs.profile.exit_type = 'Normal'
+            $prefs | ConvertTo-Json -Depth 100 -Compress | Set-Content -LiteralPath $prefsPath -NoNewline
+            Write-Host "[start-kiosk] Marked previous Chrome profile exit as Normal (skips session-restore prompt)."
+        }
+    } catch {
+        Write-Host "[start-kiosk] Could not patch Chrome Preferences exit_type (non-fatal): $_"
+    }
+}
+
+Start-Process -FilePath $ChromeExe -ArgumentList "--kiosk `"$KioskUrl`" --user-data-dir=`"$ChromeProfileDir`" --noerrdialogs --disable-session-crashed-bubble --no-first-run --no-default-browser-check --disable-search-engine-choice-screen"
 
 Write-Host "[start-kiosk] Done."
