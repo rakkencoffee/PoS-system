@@ -39,6 +39,13 @@ Write-Host "[start-kiosk] Launching kiosk browser..."
 # persists the pairing across restarts, matching how the physical EDC
 # terminal itself already "just stays connected" -- no ongoing downside here
 # since this Chrome window only ever loads the one kiosk URL.
-Start-Process -FilePath $ChromeExe -ArgumentList "--kiosk `"$KioskUrl`" --noerrdialogs --disable-session-crashed-bubble"
+#
+# A normal profile means Chrome's regular first-run experience applies too,
+# though -- confirmed live 2026-09-2x this popped its "Choose your search
+# engine" tab on top of the kiosk URL after dropping --incognito (which used
+# to skip first-run entirely). The three extra flags below suppress that and
+# the rest of first-run (welcome tour, default-browser nag) without touching
+# whether the profile itself persists.
+Start-Process -FilePath $ChromeExe -ArgumentList "--kiosk `"$KioskUrl`" --noerrdialogs --disable-session-crashed-bubble --no-first-run --no-default-browser-check --disable-search-engine-choice-screen"
 
 Write-Host "[start-kiosk] Done."
