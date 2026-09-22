@@ -404,7 +404,6 @@ export default function CartNewPage() {
   }, [bagQuantities]);
 
   const bagTotal = bagLines.reduce((sum, l) => sum + l.subtotal, 0);
-  const grandTotal = totalAmount + bagTotal;
 
   const { data: allMenuItems = [] } = useMenuItems('all');
   const { data: refreshmentOptions = [] } = useMenuItems(AUTO_PROMO_REWARD_CATEGORY_SLUG);
@@ -417,6 +416,28 @@ export default function CartNewPage() {
   const hasQualifyingDrink = items.some((item) =>
     AUTO_PROMO_TRIGGER_CATEGORY_SLUGS.includes(String(item.categorySlug || '').toLowerCase())
   );
+
+  // Preview-only mirror of order-pricing.ts's computeAutoPromoDiscount
+  // (same condition checkout's own preview uses) -- without this, the
+  // picked "free" item's full price still showed up in the cart page's own
+  // Total, even though checkout and the actual charge both already
+  // excluded it (confirmed live 2026-09-22).
+  const qualifyingDrinkUnits = items.reduce(
+    (sum, item) =>
+      AUTO_PROMO_TRIGGER_CATEGORY_SLUGS.includes(String(item.categorySlug || '').toLowerCase())
+        ? sum + item.quantity
+        : sum,
+    0,
+  );
+  const freeRefreshmentItem = freeRefreshmentCartItemId
+    ? items.find((i) => i.id === freeRefreshmentCartItemId)
+    : undefined;
+  const autoPromoDiscount =
+    promoStatus?.active && qualifyingDrinkUnits >= 2 && freeRefreshmentItem
+      ? freeRefreshmentItem.subtotal / freeRefreshmentItem.quantity
+      : 0;
+
+  const grandTotal = Math.max(0, totalAmount - autoPromoDiscount) + bagTotal;
   const showFreePicker = !!promoStatus?.active && hasQualifyingDrink && refreshmentOptions.length > 0;
   const selectedFreeMenuItemId = freeRefreshmentCartItemId
     ? items.find((i) => i.id === freeRefreshmentCartItemId)?.menuItemId ?? null
@@ -617,6 +638,12 @@ export default function CartNewPage() {
                         <span className="text-[15px] font-[600] text-[#323131]" style={JKT}>{formatCurrency(bagTotal)}</span>
                       </div>
                     )}
+                    {autoPromoDiscount > 0 && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-[14px] text-[#0f7d3b]" style={JKT}>Promo Buy 1 Get 1</span>
+                        <span className="text-[15px] font-[600] text-[#0f7d3b]" style={JKT}>-{formatCurrency(autoPromoDiscount)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between items-center pt-2 border-t border-[#f3e0be] mt-2">
                       <span className="text-[17px] font-[600] text-[#323131]" style={JKT}>Total</span>
                       <span className="text-[22px] font-bold text-[#A8131E]" style={JKT}>{formatCurrency(grandTotal)}</span>
@@ -796,6 +823,12 @@ export default function CartNewPage() {
                   <div className="flex justify-between items-center">
                     <span className="text-[14px] text-[#998075]" style={JKT}>Kemasan</span>
                     <span className="text-[15px] font-[600] text-[#323131]" style={JKT}>{formatCurrency(bagTotal)}</span>
+                  </div>
+                )}
+                {autoPromoDiscount > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-[14px] text-[#0f7d3b]" style={JKT}>Promo Buy 1 Get 1</span>
+                    <span className="text-[15px] font-[600] text-[#0f7d3b]" style={JKT}>-{formatCurrency(autoPromoDiscount)}</span>
                   </div>
                 )}
                 <div className="h-px bg-[#f3e0be] my-1" />
