@@ -313,32 +313,32 @@ function FreeRefreshmentPicker({
   return (
     <div className="bg-[#fff2de] border border-[#f3e0be] rounded-2xl p-4">
       <h3 className="text-[16px] font-[600] text-[#231a05]" style={JKT}>
-        Promo Buy 1 Get 1 aktif -- pilih 1 Refreshment gratis
+        Promo Buy 1 Get 1 Aktif!
       </h3>
       <p className="text-[12px] text-[#998075] mt-0.5 mb-3" style={JKT}>
-        Berlaku selama kamu beli minimal 1 minuman lagi. Sudah termasuk otomatis di total pembayaran.
+        Pilih 1 Refreshment favoritmu, gratis!
       </p>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
         {options.map((opt) => {
           const isSelected = String(opt.id) === String(selectedMenuItemId);
           return (
             <button
               key={opt.id}
               onClick={() => onPick(opt)}
-              className={`text-left rounded-xl border p-2 transition-all active:scale-[0.97] ${
+              className={`text-left rounded-xl border p-1.5 transition-all active:scale-[0.97] ${
                 isSelected
                   ? 'border-[#A8131E] bg-white shadow-sm'
                   : 'border-[#f3e0be] bg-white/60 hover:bg-white'
               }`}
             >
-              <div className="w-full aspect-square rounded-lg overflow-hidden bg-[#F5F5F5] mb-1.5">
+              <div className="w-full aspect-square rounded-lg overflow-hidden bg-[#F5F5F5] mb-1">
                 {opt.image && (
                   <img src={opt.image} alt={opt.name} className="w-full h-full object-cover" />
                 )}
               </div>
-              <p className="text-[12px] font-[600] text-[#323131] line-clamp-2" style={JKT}>{opt.name}</p>
+              <p className="text-[11px] font-[600] text-[#323131] line-clamp-2" style={JKT}>{opt.name}</p>
               {isSelected && (
-                <span className="text-[10px] font-[700] text-[#A8131E] uppercase tracking-wide" style={JKT}>
+                <span className="text-[9px] font-[700] text-[#A8131E] uppercase tracking-wide" style={JKT}>
                   Dipilih -- Gratis
                 </span>
               )}
