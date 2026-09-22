@@ -408,14 +408,17 @@ export default function CheckoutNewPage() {
           <section className="w-[45%] h-full bg-surface p-page-gutter flex flex-col justify-center border-l border-surface-variant">
             <div className="max-w-[480px] mx-auto w-full space-y-section-sep">
               
-              {/* Customer Name info */}
-              <div className="bg-background/40 p-card-inner border border-surface-variant rounded-2xl">
+              {/* Customer Name info -- plain, no nested card box (matches the */}
+              {/* cart page's own de-nesting: this panel is already plain     */}
+              {/* white, a bordered/shadowed inner card was a redundant       */}
+              {/* second container, not a distinct region). */}
+              <div>
                 <span className="font-tag text-tag text-taupe uppercase">Customer Name</span>
                 <h4 className="font-h3 text-h3 text-near-black font-extrabold">{customerName || 'Self Service Guest'}</h4>
               </div>
 
-              {/* Payment Summary Card */}
-              <div className="bg-background p-page-gutter rounded-3xl shadow-lg border border-surface-variant">
+              {/* Payment Summary -- plain, no card box (see note above) */}
+              <div>
                 <h3 className="font-h3 text-h3 text-near-black mb-standard font-bold">Payment Summary</h3>
 
                 {/* Voucher Section -- lives here (not next to the product
@@ -425,7 +428,7 @@ export default function CheckoutNewPage() {
                   <label className="font-tag text-tag text-taupe uppercase block mb-compact">Have a voucher?</label>
                   <div className="flex gap-standard">
                     <input
-                      className="flex-1 bg-surface border-1.5 border-surface-variant rounded-xl px-standard py-compact focus:ring-primary focus:border-primary placeholder-taupe focus:outline-none"
+                      className="flex-1 bg-off-white border-1.5 border-surface-variant rounded-xl px-standard py-compact focus:ring-primary focus:border-primary placeholder-taupe focus:outline-none"
                       placeholder="Enter code (e.g. COFFEE20)"
                       type="text"
                       readOnly={appliedDiscount > 0 || isProcessing}
@@ -533,7 +536,7 @@ export default function CheckoutNewPage() {
               {/* Assistance / Info */}
               <div className="flex items-center justify-center gap-standard opacity-60">
                 <span className="material-symbols-outlined text-taupe">help</span>
-                <span className="font-tag text-tag text-taupe">Need help? Ask our Barista</span>
+                <span className="font-tag text-tag text-taupe">Need help? Ask our Crew</span>
               </div>
             </div>
           </section>

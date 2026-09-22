@@ -126,9 +126,9 @@ function KioskCartItemCard({
   onEdit: () => void;
 }) {
   return (
-    <div className={`bg-white rounded-xl p-4 flex gap-3 items-center shadow-sm hover:shadow-md transition-shadow group border ${isFree ? 'border-[#A8131E]' : 'border-[#f3e0be]'}`}>
+    <div className={`bg-white rounded-lg p-3 flex gap-3 items-center shadow-sm hover:shadow-md transition-shadow group border ${isFree ? 'border-[#A8131E]' : 'border-[#f3e0be]'}`}>
       {/* Image */}
-      <div className="w-24 h-24 rounded-lg overflow-hidden bg-[#F5F5F5] shrink-0">
+      <div className="w-16 h-16 rounded-lg overflow-hidden bg-[#F5F5F5] shrink-0">
         {item.image ? (
           <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
         ) : (
@@ -141,48 +141,48 @@ function KioskCartItemCard({
         <div className="flex justify-between items-start">
           <div className="flex-1 min-w-0 pr-2">
             <div className="flex items-center gap-1.5">
-              <h3 className="text-[18px] font-[600] text-[#323131] truncate" style={JKT}>{item.name}</h3>
+              <h3 className="text-[14px] font-[600] text-[#323131] truncate" style={JKT}>{item.name}</h3>
               {isFree && (
-                <span className="shrink-0 text-[10px] font-[700] text-white bg-[#A8131E] px-2 py-0.5 rounded-full uppercase tracking-wide" style={JKT}>
+                <span className="shrink-0 text-[9px] font-[700] text-white bg-[#A8131E] px-1.5 py-0.5 rounded-full uppercase tracking-wide" style={JKT}>
                   Gratis
                 </span>
               )}
             </div>
-            <p className="text-[12px] text-[#998075] mt-0.5 line-clamp-1" style={JKT}>{buildCustomText(item)}</p>
+            <p className="text-[11px] text-[#998075] mt-0.5 line-clamp-1" style={JKT}>{buildCustomText(item)}</p>
             {item.toppings && item.toppings.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-1.5">
+              <div className="flex flex-wrap gap-1 mt-1">
                 {item.toppings.map((t) => (
-                  <span key={t.id} className="text-[11px] bg-[#fff2de] text-[#A8131E] px-2 py-0.5 rounded-full font-[500]" style={JKT}>
+                  <span key={t.id} className="text-[10px] bg-[#fff2de] text-[#A8131E] px-1.5 py-0.5 rounded-full font-[500]" style={JKT}>
                     +{t.name} {formatCurrency(t.price)}
                   </span>
                 ))}
               </div>
             )}
           </div>
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-0.5 shrink-0">
             <button
               onClick={onEdit}
-              className="p-1.5 text-[#998075] hover:text-[#A8131E] hover:bg-[#F5E6E8] rounded-lg transition-colors active:scale-95"
+              className="p-1 text-[#998075] hover:text-[#A8131E] hover:bg-[#F5E6E8] rounded-lg transition-colors active:scale-95"
               title="Edit"
             >
-              <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>edit</span>
+              <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>edit</span>
             </button>
             <button
               onClick={onRemove}
-              className="p-1.5 text-[#998075] hover:text-[#ba1a1a] hover:bg-[#ffdad6] rounded-lg transition-colors active:scale-95"
+              className="p-1 text-[#998075] hover:text-[#ba1a1a] hover:bg-[#ffdad6] rounded-lg transition-colors active:scale-95"
               title="Hapus"
             >
-              <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>delete</span>
+              <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>delete</span>
             </button>
           </div>
         </div>
-        <div className="flex justify-between items-center mt-3">
+        <div className="flex justify-between items-center mt-2">
           {isFree ? (
-            <span className="text-[20px] font-bold text-[#A8131E]" style={JKT}>Gratis</span>
+            <span className="text-[16px] font-bold text-[#A8131E]" style={JKT}>Gratis</span>
           ) : (
-            <span className="text-[20px] font-bold text-[#A8131E]" style={JKT}>{formatCurrency(item.subtotal)}</span>
+            <span className="text-[16px] font-bold text-[#A8131E]" style={JKT}>{formatCurrency(item.subtotal)}</span>
           )}
-          <QuantityStepper qty={item.quantity} onDec={onDec} onInc={onInc} />
+          <QuantityStepper qty={item.quantity} onDec={onDec} onInc={onInc} size="sm" />
         </div>
       </div>
     </div>
@@ -268,22 +268,22 @@ function BagOptionsSection({
   bordered?: boolean;
 }) {
   return (
-    <div className={bordered ? 'border-t border-[#f3e0be] pt-4' : ''}>
-      <h3 className="text-[15px] font-[600] text-[#323131] mb-3" style={JKT}>Tambah Kemasan</h3>
-      <div className="space-y-2">
+    <div className={bordered ? 'border-t border-[#f3e0be] pt-3' : ''}>
+      <h3 className="text-[13px] font-[600] text-[#323131] mb-2" style={JKT}>Tambah Kemasan</h3>
+      <div className="space-y-1.5">
         {lines.map((line) => (
           <div
             key={line.key}
-            className="flex items-center gap-3 p-3 rounded-xl border border-[#f3e0be]"
+            className="flex items-center gap-2 p-2.5 rounded-xl border border-[#f3e0be]"
           >
             <div className="flex-1 min-w-0">
               <div className="flex justify-between items-center gap-2">
-                <span className="text-[14px] font-[600] text-[#323131]" style={JKT}>{line.label}</span>
-                <span className="text-[13px] font-[600] text-[#A8131E] shrink-0" style={JKT}>{formatCurrency(line.price)}</span>
+                <span className="text-[12px] font-[600] text-[#323131]" style={JKT}>{line.label}</span>
+                <span className="text-[12px] font-[600] text-[#A8131E] shrink-0" style={JKT}>{formatCurrency(line.price)}</span>
               </div>
-              <p className="text-[11px] text-[#998075]" style={JKT}>{line.description}</p>
+              <p className="text-[10px] text-[#998075]" style={JKT}>{line.description}</p>
               {line.qty > 0 && (
-                <p className="text-[12px] text-[#5a403f] mt-1" style={JKT}>
+                <p className="text-[11px] text-[#5a403f] mt-0.5" style={JKT}>
                   {line.qty}x = {formatCurrency(line.subtotal)}
                 </p>
               )}
@@ -513,6 +513,10 @@ export default function CartNewPage() {
           50% { opacity:0.7; transform:scale(1.1); }
         }
         .live-pulse { animation: live-pulse 1.5s infinite ease-in-out; }
+        .cart-scroll { scrollbar-width: thin; scrollbar-color: #f3e0be transparent; }
+        .cart-scroll::-webkit-scrollbar { width: 6px; }
+        .cart-scroll::-webkit-scrollbar-track { background: transparent; }
+        .cart-scroll::-webkit-scrollbar-thumb { background: #f3e0be; border-radius: 10px; }
       `}} />
 
       {/* ══════════════════════════════════════════════════ */}
@@ -538,18 +542,18 @@ export default function CartNewPage() {
             <EmptyCart onBrowse={() => router.push('/menu')} isMobile={false} />
           </main>
         ) : (
-          <main className="h-[calc(100dvh-76px)] flex max-w-[1440px] mx-auto w-full">
+          <main className="h-[calc(100dvh-76px)] flex w-full">
 
             {/* ── LEFT: Item List (scrolls on its own) ── */}
-            <div className="w-[60%] h-full overflow-y-auto px-12 py-8">
-              <header className="mb-8">
-                <h2 className="text-[28px] font-bold text-[#231a05]" style={JKT}>Keranjang Belanja</h2>
-                <p className="text-[14px] text-[#998075] mt-1" style={JKT}>
+            <div className="cart-scroll w-[60%] h-full overflow-y-auto px-8 py-6">
+              <header className="mb-5">
+                <h2 className="text-[24px] font-bold text-[#231a05]" style={JKT}>Keranjang Belanja</h2>
+                <p className="text-[13px] text-[#998075] mt-1" style={JKT}>
                   Periksa kembali pesanan anda sebelum melanjutkan ke pembayaran.
                 </p>
               </header>
 
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {items.map((item) => (
                   <KioskCartItemCard
                     key={item.id}
@@ -573,27 +577,33 @@ export default function CartNewPage() {
                 {/* Add more bento */}
                 <button
                   onClick={() => router.push('/menu')}
-                  className="w-full bg-[#fff2de] border border-[#f3e0be] border-dashed rounded-xl p-6 flex flex-col items-center justify-center text-center gap-2 opacity-80 hover:opacity-100 transition-opacity cursor-pointer active:scale-[0.99]"
+                  className="w-full bg-[#fff2de] border border-[#f3e0be] border-dashed rounded-xl p-4 flex flex-col items-center justify-center text-center gap-1 opacity-80 hover:opacity-100 transition-opacity cursor-pointer active:scale-[0.99]"
                 >
-                  <span className="material-symbols-outlined text-[#A8131E]" style={{ fontSize: '32px' }}>add_circle</span>
-                  <p className="text-[17px] font-[600] text-[#5a403f]" style={JKT}>Ingin tambah minuman lagi?</p>
-                  <p className="text-[13px] text-[#998075]" style={JKT}>Lihat menu rekomendasi kami untuk kamu.</p>
+                  <span className="material-symbols-outlined text-[#A8131E]" style={{ fontSize: '24px' }}>add_circle</span>
+                  <p className="text-[14px] font-[600] text-[#5a403f]" style={JKT}>Ingin tambah minuman lagi?</p>
+                  <p className="text-[12px] text-[#998075]" style={JKT}>Lihat menu rekomendasi kami untuk kamu.</p>
                 </button>
               </div>
             </div>
 
-            {/* ── RIGHT: Summary Panel -- fixed height, no scroll of its own ── */}
-            <aside className="w-[40%] h-full border-l border-[#f3e0be] bg-[#fff8f2] px-12 py-8 flex flex-col justify-center overflow-hidden">
-                <div className="bg-white border border-[#f3e0be] rounded-xl p-6 shadow-lg">
-                  <h3 className="text-[22px] font-[600] text-[#323131] mb-4" style={JKT}>Detail Pesanan</h3>
+            {/* ── RIGHT: Summary Panel -- plain white (not a card-on-cream-panel */}
+            {/* look), separated from the left column by a hairline only. No     */}
+            {/* inner max-width cap -- content fills the panel's own padding so  */}
+            {/* it doesn't strand itself with dead space. Fixed height, no       */}
+            {/* scroll -- sizing kept compact (confirmed live 2026-09-22 that a  */}
+            {/* larger pass got clipped under the header on the real kiosk-      */}
+            {/* sized screen this was tested on, ~1050px wide/tall).             */}
+            <aside className="w-[40%] h-full border-l border-[#f3e0be] bg-white px-9 py-6 flex flex-col justify-center overflow-hidden">
+              <div className="w-full max-w-sm mx-auto">
+                <h3 className="text-[18px] font-[600] text-[#323131] mb-3" style={JKT}>Detail Pesanan</h3>
 
                   {/* Customer Name */}
-                  <div className="mb-6">
-                    <label className="block text-[13px] font-[500] text-[#998075] mb-1 uppercase tracking-widest" style={JKT}>
+                  <div className="mb-3">
+                    <label className="block text-[11px] font-[500] text-[#998075] mb-1 uppercase tracking-widest" style={JKT}>
                       Nama Kamu
                     </label>
                     <input
-                      className={`w-full bg-[#F5F5F5] rounded-lg px-4 py-3 text-[14px] text-[#231a05] outline-none transition-all focus:ring-2 focus:bg-white border ${
+                      className={`w-full bg-[#F5F5F5] rounded-lg px-3 py-2.5 text-[13px] text-[#231a05] outline-none transition-all focus:ring-2 focus:bg-white border ${
                         isNameValid
                           ? 'border-[#f3e0be] focus:ring-[#A8131E]/20 focus:border-[#A8131E]'
                           : 'border-[#ffdad6] focus:ring-[#ba1a1a]/20 focus:border-[#ba1a1a]'
@@ -604,27 +614,27 @@ export default function CartNewPage() {
                       onChange={(e) => setCustomerName(e.target.value)}
                     />
                     {!isNameValid && customerName.length > 0 && (
-                      <p className="text-[11px] text-[#ba1a1a] mt-1" style={JKT}>Nama minimal 2 karakter</p>
+                      <p className="text-[10px] text-[#ba1a1a] mt-1" style={JKT}>Nama minimal 2 karakter</p>
                     )}
                   </div>
 
                   {/* Phone (optional, CRM) */}
-                  <div className="mb-6">
-                    <label className="block text-[13px] font-[500] text-[#998075] mb-1 uppercase tracking-widest" style={JKT}>
+                  <div className="mb-3">
+                    <label className="block text-[11px] font-[500] text-[#998075] mb-1 uppercase tracking-widest" style={JKT}>
                       No. HP <span className="normal-case tracking-normal text-[#bbab93]">(opsional)</span>
                     </label>
                     <input
                       type="tel"
                       inputMode="numeric"
-                      className="w-full bg-[#F5F5F5] rounded-lg px-4 py-3 text-[14px] text-[#231a05] outline-none transition-all focus:ring-2 focus:bg-white border border-[#f3e0be] focus:ring-[#A8131E]/20 focus:border-[#A8131E]"
+                      className="w-full bg-[#F5F5F5] rounded-lg px-3 py-2.5 text-[13px] text-[#231a05] outline-none transition-all focus:ring-2 focus:bg-white border border-[#f3e0be] focus:ring-[#A8131E]/20 focus:border-[#A8131E]"
                       style={JKT}
                       placeholder="Untuk kumpulkan poin / member"
                       value={customerPhone}
                       onChange={(e) => setCustomerPhone(e.target.value.replace(/[^\d+]/g, ''))}
                     />
                     {returningName && (
-                      <p className="text-[12px] text-[#0f7d3b] mt-1.5 flex items-center gap-1" style={JKT}>
-                        <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>waving_hand</span>
+                      <p className="text-[11px] text-[#0f7d3b] mt-1 flex items-center gap-1" style={JKT}>
+                        <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>waving_hand</span>
                         Selamat datang kembali, {returningName}!
                       </p>
                     )}
@@ -634,26 +644,26 @@ export default function CartNewPage() {
                   <BagOptionsSection lines={bagLines} onChange={setBagQuantity} />
 
                   {/* Price Breakdown */}
-                  <div className="space-y-2 border-t border-[#f3e0be] pt-4 mb-6 mt-4">
+                  <div className="space-y-1.5 border-t border-[#f3e0be] pt-3 mb-3 mt-3">
                     <div className="flex justify-between items-center">
-                      <span className="text-[14px] text-[#998075]" style={JKT}>Subtotal ({itemCount} item)</span>
-                      <span className="text-[15px] font-[600] text-[#323131]" style={JKT}>{formatCurrency(totalAmount)}</span>
+                      <span className="text-[12px] text-[#998075]" style={JKT}>Subtotal ({itemCount} item)</span>
+                      <span className="text-[13px] font-[600] text-[#323131]" style={JKT}>{formatCurrency(totalAmount)}</span>
                     </div>
                     {bagTotal > 0 && (
                       <div className="flex justify-between items-center">
-                        <span className="text-[14px] text-[#998075]" style={JKT}>Kemasan</span>
-                        <span className="text-[15px] font-[600] text-[#323131]" style={JKT}>{formatCurrency(bagTotal)}</span>
+                        <span className="text-[12px] text-[#998075]" style={JKT}>Kemasan</span>
+                        <span className="text-[13px] font-[600] text-[#323131]" style={JKT}>{formatCurrency(bagTotal)}</span>
                       </div>
                     )}
                     {autoPromoDiscount > 0 && (
                       <div className="flex justify-between items-center">
-                        <span className="text-[14px] text-[#0f7d3b]" style={JKT}>Promo Buy 1 Get 1</span>
-                        <span className="text-[15px] font-[600] text-[#0f7d3b]" style={JKT}>-{formatCurrency(autoPromoDiscount)}</span>
+                        <span className="text-[12px] text-[#0f7d3b]" style={JKT}>Promo Buy 1 Get 1</span>
+                        <span className="text-[13px] font-[600] text-[#0f7d3b]" style={JKT}>-{formatCurrency(autoPromoDiscount)}</span>
                       </div>
                     )}
-                    <div className="flex justify-between items-center pt-2 border-t border-[#f3e0be] mt-2">
-                      <span className="text-[17px] font-[600] text-[#323131]" style={JKT}>Total</span>
-                      <span className="text-[22px] font-bold text-[#A8131E]" style={JKT}>{formatCurrency(grandTotal)}</span>
+                    <div className="flex justify-between items-center pt-1.5 border-t border-[#f3e0be] mt-1.5">
+                      <span className="text-[14px] font-[600] text-[#323131]" style={JKT}>Total</span>
+                      <span className="text-[18px] font-bold text-[#A8131E]" style={JKT}>{formatCurrency(grandTotal)}</span>
                     </div>
                   </div>
 
@@ -661,7 +671,7 @@ export default function CartNewPage() {
                   <button
                     onClick={handleCheckout}
                     disabled={!isNameValid}
-                    className={`w-full py-3 rounded-full text-[17px] font-[600] flex items-center justify-center gap-2 shadow-md active:scale-[0.97] transition-all ${
+                    className={`w-full py-2.5 rounded-full text-[14px] font-[600] flex items-center justify-center gap-2 shadow-md active:scale-[0.97] transition-all ${
                       isNameValid
                         ? 'bg-[#A8131E] text-white hover:bg-[#7D0F18]'
                         : 'bg-[#f3e0be] text-[#998075] cursor-not-allowed'
@@ -669,13 +679,8 @@ export default function CartNewPage() {
                     style={JKT}
                   >
                     {isNameValid ? 'Lanjut ke Checkout' : 'Masukkan Nama Dahulu'}
-                    <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>arrow_forward</span>
+                    <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>arrow_forward</span>
                   </button>
-
-                  <div className="mt-3 flex items-center justify-center gap-1.5 text-[#998075]">
-                    <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>verified_user</span>
-                    <span className="text-[12px]" style={JKT}>Pembayaran Aman &amp; Terenkripsi</span>
-                  </div>
                 </div>
             </aside>
           </main>
