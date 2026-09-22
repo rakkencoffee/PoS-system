@@ -147,6 +147,22 @@ export function KioskPrinterProvider({ children }: { children: React.ReactNode }
             await resolveApproved(entry.orderId);
             return;
           }
+          if (data.status === 'NOT_FOUND') {
+            // No EdcJob exists for this order at all. /api/payment/create
+            // creates the EdcJob synchronously before it ever responds, so
+            // by the time checkout calls queueKioskPrint() a genuine EDC
+            // order's job is already in the DB -- NOT_FOUND therefore
+            // uniquely means this order skipped the EDC entirely (a 100%-off
+            // voucher/promo brought the total to Rp0, see checkout page's
+            // `data.simulated` branch) and was already settled/paid at
+            // creation time. There is no job to wait on, so print
+            // immediately instead of subscribing to a Pusher channel that
+            // will never receive an event for it (confirmed live 2026-09-22:
+            // the nota silently never printed for a Rp0 order).
+            console.log(`[KioskPrinterProvider] No EDC job for order ${entry.orderId} (already settled), printing immediately...`);
+            await resolveApproved(entry.orderId);
+            return;
+          }
         }
       } catch (err) {
         console.warn(`[KioskPrinterProvider] Failed to reconcile status for ${entry.orderId} on watch start:`, err);
