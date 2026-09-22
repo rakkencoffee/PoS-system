@@ -46,6 +46,16 @@ model Order {
   // sendiri di computeVoucherDiscount, bukan voucher.usage dari Olsera yang
   // akan selalu kebaca 0.
   voucherCode         String?
+  // Olsera's own formatted invoice number (e.g. "OL26051500000205") -- shown
+  // as the small mono-text under the queue number on KDS cards. Persisted so
+  // /api/orders?today=true can build KDS entries straight from this table
+  // instead of re-fetching each active order's detail from Olsera live (see
+  // api/orders/route.ts) without losing this label.
+  orderNo             String?
+  // Shown as the amber "customer name" badge on KDS cards -- persisted for
+  // the same reason as orderNo above (today-path KDS build needs it without
+  // a live Olsera re-fetch).
+  customerName        String?
   channel             OrderChannel     @default(KIOSK) // KIOSK (existing) vs MEMBER_APP (loyalty, lihat PRD Bab 3)
   memberId            String?
   tripayReference     String?          @unique // reference dari Tripay create-transaction, dipakai webhook buat lookup

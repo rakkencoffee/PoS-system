@@ -609,6 +609,8 @@ export async function createOrder(
           total: 0,
           status: "PENDING",
           voucherCode: voucherCode?.toUpperCase().trim() || null,
+          orderNo: orderNo || null,
+          customerName: customerName || null,
         },
       });
     } catch (earlyCreateErr) {
@@ -882,6 +884,8 @@ export async function createOrder(
             baristaStatus: hasCoffee ? "PENDING" : "COMPLETED",
             kitchenStatus: hasFood ? "PENDING" : "COMPLETED",
             voucherCode: voucherCode?.toUpperCase().trim() || null,
+            orderNo: orderNo || null,
+            customerName: customerName || null,
             items: { create: itemsCreate },
           },
         });

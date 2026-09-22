@@ -47,13 +47,26 @@ export async function GET(request: NextRequest) {
         let localMap = new Map<string, any>();
 
         if (today === 'true') {
-          // "Active for KDS" must come from OUR OWN baristaStatus/kitchenStatus,
-          // not Olsera's order status/paid list -- Olsera can transition an
-          // order to a closed status within seconds of our instant-settlement
-          // (payment is simulated, not a real gateway round-trip), well before
-          // staff have actually made the drink/food. Filtering on Olsera's
-          // list status here made paid orders vanish off the KDS board under a
-          // minute after being placed (confirmed via production logs 2026-09-01).
+          // KDS's "today" view used to re-fetch every active order's detail
+          // live from Olsera (same batched loop the `else` branch below still
+          // uses) even though everything it needs -- item name/qty/price/
+          // notes, plus now orderNo/customerName too -- is already sitting in
+          // our own Order/OrderItem rows from checkout. With N active orders
+          // that meant N/5 batches of external API round-trips on EVERY poll
+          // (60s interval) and EVERY Pusher-triggered refetch (any kiosk
+          // placing an order invalidates every open KDS tab), which is what
+          // made the board feel heavy on the barista tablet (confirmed via
+          // code review 2026-09-22) -- this branch now builds KDS entries
+          // straight from the database instead, no live Olsera calls at all.
+          //
+          // "Active for KDS" must come from OUR OWN baristaStatus/
+          // kitchenStatus, not Olsera's order status/paid list -- Olsera can
+          // transition an order to a closed status within seconds of our
+          // instant-settlement (payment is simulated, not a real gateway
+          // round-trip), well before staff have actually made the drink/
+          // food. Filtering on Olsera's list status here made paid orders
+          // vanish off the KDS board under a minute after being placed
+          // (confirmed via production logs 2026-09-01).
           const localActiveOrders = await prisma.order.findMany({
             where: {
               createdAt: { gte: startOfTodayWIB() },
@@ -71,37 +84,22 @@ export async function GET(request: NextRequest) {
             orderBy: { createdAt: 'asc' },
             take: 50,
           });
-          // Split into Olsera-backed vs local-only orders. A genuine Olsera
-          // order's id is always exactly "OLSERA-<digits>" -- createOrder()
-          // falls back to a local-only id (e.g. "SF-...") when the Olsera
-          // create call itself fails (confirmed live 2026-09-18, load during
-          // a multi-device test), and such orders have no real Olsera order
-          // to fetch detail from at all. Enriching them via Olsera used to
-          // always fail (406/404 on a nonsense id), showing a permanent
-          // "Menu (Detail Loading...)" placeholder, and re-prefixing the
-          // already-non-numeric id below produced ids like "OLSERA-SF-..."
-          // that no PATCH could ever resolve back to the real local row.
-          const isOlseraBackedId = (id: string) => /^OLSERA-\d+$/.test(id);
-          const olseraBackedOrders = localActiveOrders.filter((lo) => isOlseraBackedId(lo.id));
-          const localOnlyOrders = localActiveOrders.filter((lo) => !isOlseraBackedId(lo.id));
 
-          localMap = new Map(olseraBackedOrders.map((lo) => [lo.id, lo]));
-          activeOrdersToEnrich = olseraBackedOrders
-            .map((lo) => ({ id: lo.id.replace(/^OLSERA-/, '') }))
-            .filter((o) => o.id);
+          // Category still needs the master menu catalog (name -> slug) --
+          // OrderItem has no categorySlug column of its own -- but this list
+          // is Redis-cached for 60s (see pos.adapter.ts), so it's a shared,
+          // cheap read, not a per-order Olsera round-trip.
+          const { getMenuItems } = await import('@/lib/integrations/pos.adapter');
+          const menuItemsMaster = await getMenuItems();
+          const masterCategoryMap = new Map<string, string>();
+          menuItemsMaster.forEach((m) => masterCategoryMap.set(m.name.toLowerCase(), m.categorySlug));
 
-          console.log(`[API] Local active orders (not fully completed) today: ${activeOrdersToEnrich.length} Olsera-backed, ${localOnlyOrders.length} local-only`);
-
-          // Local-only orders never had a real Olsera counterpart -- build
-          // their KDS entries straight from local data (they still went
-          // through the full checkout item/queueNumber flow) instead of
-          // routing them through the Olsera enrichment pipeline below.
-          orders.push(...localOnlyOrders.map((lo) => {
+          orders = localActiveOrders.map((lo) => {
             const bothCompleted = lo.baristaStatus === 'COMPLETED' && lo.kitchenStatus === 'COMPLETED';
             const anyPreparing = lo.baristaStatus === 'PREPARING' || lo.kitchenStatus === 'PREPARING';
             return {
               id: lo.id,
-              orderNo: '',
+              orderNo: lo.orderNo || '',
               queueNumber: lo.queueNumber || 0,
               status: bothCompleted ? 'COMPLETED' : anyPreparing ? 'PREPARING' : 'PENDING',
               baristaStatus: lo.baristaStatus,
@@ -109,18 +107,20 @@ export async function GET(request: NextRequest) {
               totalAmount: lo.total,
               paymentMethod: lo.paymentMethod || 'SIMULATED',
               createdAt: lo.createdAt,
-              customerName: '',
+              customerName: lo.customerName || '',
               items: lo.items.map((item, idx) => ({
                 id: idx,
                 menuItem: { name: item.name || 'Item' },
                 quantity: item.quantity,
                 size: '-',
                 subtotal: item.subtotal,
-                categorySlug: 'other',
+                categorySlug: masterCategoryMap.get((item.name || '').toLowerCase()) || 'other',
                 notes: item.notes || '',
               })),
             };
-          }));
+          });
+
+          console.log(`[API] Built ${orders.length} KDS orders straight from local DB (no live Olsera re-fetch)`);
         } else {
           // 1. Fetch List of Orders from Olsera
           const rawList = await olsera.olseraFetch('/order/openorder?per_page=100').then(res => res.json().then(d => d.data || d || []));
@@ -153,6 +153,7 @@ export async function GET(request: NextRequest) {
           localMap = new Map(localOrders.map((lo: any) => [lo.id, lo]));
         }
 
+        if (today !== 'true') {
         // 4. Fetch details for active orders in small concurrent batches.
         // getOrderDetail() already has its own 429 detection + backoff retry,
         // so a fixed per-call sleep here was redundant on top of that — this
@@ -280,6 +281,7 @@ export async function GET(request: NextRequest) {
         });
 
         console.log(`[API] Returning ${orders.length} normalized orders to KDS`);
+        }
 
         // 6. If filtering for KDS (status provided), restrict to active only
         if (status) {

@@ -8,7 +8,6 @@ import { useBlePrinter } from '@/hooks/useBlePrinter';
 import { printStationLabel } from '@/lib/print/station-print';
 
 const LABEL_ENDPOINT_BASE = '/api/kds/food-label';
-const TEST_ENDPOINT = '/api/kds/food-label-test';
 
 export default function KitchenPage() {
   // Lifted here (not inside StationPrinterPanel) so the manual "Print Label"
@@ -35,7 +34,6 @@ export default function KitchenPage() {
         headerExtra={
           <StationPrinterPanel
             labelEndpointBase={LABEL_ENDPOINT_BASE}
-            testEndpoint={TEST_ENDPOINT}
             emptyMessage="Tidak ada makanan di order ini."
             connected={connected}
             deviceName={deviceName}

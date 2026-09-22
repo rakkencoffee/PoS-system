@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { printStationLabel, printTestLabel } from '@/lib/print/station-print';
+import { printStationLabel } from '@/lib/print/station-print';
 import { STATION_PRINTER_NAME_PREFIXES } from '@/lib/print/ble-config';
 
 interface StationPrinterPanelProps {
@@ -9,11 +9,6 @@ interface StationPrinterPanelProps {
   labelEndpointBase: string;
   /** Shown when the endpoint returns 204 (no matching items on that order for this station). */
   emptyMessage: string;
-  /** e.g. "/api/kds/sticker-test" -- when set, shows a "Test Print" button
-      that prints dummy sample data with no order/PrintJob involved, so
-      staff can validate physical layout without a real transaction. Omit
-      for stations that don't have a test endpoint (e.g. Kitchen). */
-  testEndpoint?: string;
   /** Shared useBlePrinter() instance, lifted to the page so KdsView's manual
       "Print Label" button and this panel's auto-print use the same BLE
       connection instead of each holding (and fighting over) their own. */
@@ -36,7 +31,6 @@ interface StationPrinterPanelProps {
 export function StationPrinterPanel({
   labelEndpointBase,
   emptyMessage,
-  testEndpoint,
   connected,
   deviceName,
   connect,
@@ -45,7 +39,6 @@ export function StationPrinterPanel({
 }: StationPrinterPanelProps) {
   const [lastJobId, setLastJobId] = useState<string | null>(null);
   const [status, setStatus] = useState<string>('');
-  const [offsetMm, setOffsetMm] = useState<string>('');
   const connectedRef = useRef(connected);
   connectedRef.current = connected;
   const writeBytesRef = useRef(writeBytes);
@@ -114,30 +107,6 @@ export function StationPrinterPanel({
     }
   };
 
-  const handleTestPrint = async () => {
-    if (!testEndpoint) return;
-    setStatus('Mencetak test...');
-    const trimmed = offsetMm.trim();
-    const url = trimmed ? `${testEndpoint}?offsetMm=${encodeURIComponent(trimmed)}` : testEndpoint;
-    try {
-      const { message } = await printTestLabel(url, writeBytesRef.current);
-      setStatus(message);
-    } catch (err: any) {
-      setStatus(`Gagal: ${err.message}`);
-    }
-  };
-
-  const handleRulerTest = async () => {
-    if (!testEndpoint) return;
-    setStatus('Mencetak ruler...');
-    try {
-      const { message } = await printTestLabel(`${testEndpoint}?ruler=1`, writeBytesRef.current);
-      setStatus(message);
-    } catch (err: any) {
-      setStatus(`Gagal: ${err.message}`);
-    }
-  };
-
   return (
     <div className="flex items-center gap-3 px-5 py-3 bg-zinc-900 border border-zinc-800 rounded-2xl text-sm font-bold">
       <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-zinc-600'}`} />
@@ -174,36 +143,6 @@ export function StationPrinterPanel({
         >
           Print Ulang
         </button>
-      )}
-      {testEndpoint && (
-        <>
-          <input
-            type="number"
-            step="1"
-            inputMode="numeric"
-            value={offsetMm}
-            onChange={(e) => setOffsetMm(e.target.value)}
-            placeholder="Offset mm"
-            title="TSPL OFFSET (mm) buat kalibrasi vertikal label -- kosongkan buat pakai kalibrasi printer apa adanya"
-            className="ml-2 w-24 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1 text-zinc-200 text-xs placeholder:text-zinc-600"
-          />
-          <button
-            onClick={handleTestPrint}
-            disabled={!connected}
-            className="ml-1 text-zinc-400 hover:text-white disabled:opacity-40 disabled:hover:text-zinc-400 transition-colors"
-            title="Cetak label dummy buat tes layout fisik, tanpa order asli"
-          >
-            Test Print
-          </button>
-          <button
-            onClick={handleRulerTest}
-            disabled={!connected}
-            className="ml-1 text-zinc-400 hover:text-white disabled:opacity-40 disabled:hover:text-zinc-400 transition-colors"
-            title="Cetak penggaris mm buat baca tinggi fisik label yang sebenarnya (baca angka pas garis sobekan)"
-          >
-            Ruler Test
-          </button>
-        </>
       )}
       {status && <span className="text-zinc-500 ml-2">{status}</span>}
     </div>
