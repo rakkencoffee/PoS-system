@@ -271,6 +271,33 @@ export async function computeVoucherDiscount(
     }
   }
 
+  // Some vouchers cap the nominal discount regardless of their percentage
+  // rate (e.g. "30% Off, maks Rp15.000") -- see VoucherCap in schema.prisma
+  // for why this lives in our own DB instead of Olsera's voucher config.
+  const cap = await prisma.voucherCap.findUnique({ where: { code: uppercaseCode } });
+  if (cap && finalDiscountAmount > cap.maxDiscount) {
+    const itemIds = Object.keys(itemDiscounts);
+    if (itemIds.length > 0) {
+      // Re-spread the capped total across the same items, proportional to
+      // how much each originally carried -- same last-item-gets-the-
+      // remainder rounding as the nominal-voucher split above, so the sum
+      // always lands exactly on cap.maxDiscount instead of drifting a few
+      // rupiah off from independently-rounded shares.
+      const scale = cap.maxDiscount / finalDiscountAmount;
+      let allocated = 0;
+      itemIds.forEach((id, idx) => {
+        if (idx === itemIds.length - 1) {
+          itemDiscounts[id] = cap.maxDiscount - allocated;
+        } else {
+          const scaled = Math.round(itemDiscounts[id] * scale);
+          itemDiscounts[id] = scaled;
+          allocated += scaled;
+        }
+      });
+    }
+    finalDiscountAmount = cap.maxDiscount;
+  }
+
   return { ok: true, message: result.message, discountAmount: finalDiscountAmount, itemDiscounts };
 }
 

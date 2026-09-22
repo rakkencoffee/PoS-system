@@ -112,6 +112,21 @@ model OrderItem {
   @@index([orderId])
 }
 
+// Caps the nominal discount a percentage voucher can give, regardless of
+// its rate -- e.g. "30% Off, maks Rp15.000". Olsera's own voucher record has
+// no field for this (only discount_with/discount_rate/discount_amount, see
+// olsera.service.ts), so it's tracked here instead, keyed by the same
+// uppercase voucher code Order.voucherCode stores -- same reason
+// usage_limit enforcement moved to our own DB (Olsera can't express it).
+// Admin manages rows here directly (Prisma Studio, or
+// scripts/set-voucher-cap.mjs) since there's no dedicated UI for it yet.
+model VoucherCap {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  maxDiscount Int
+  createdAt   DateTime @default(now())
+}
+
 model ShiftLog {
   id          String    @id @default(cuid())
   stationId   String
