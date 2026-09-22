@@ -517,8 +517,14 @@ export default function CartNewPage() {
 
       {/* ══════════════════════════════════════════════════ */}
       {/* KIOSK LAYOUT  —  lg+                              */}
+      {/* Fixed-height split pane (same pattern as checkout/page.tsx):    */}
+      {/* the page itself never scrolls -- only the left item list does, */}
+      {/* so Detail Pesanan on the right stays pinned exactly on screen  */}
+      {/* instead of relying on `sticky` (fragile against ancestor       */}
+      {/* overflow/height quirks -- confirmed live 2026-09-22 not        */}
+      {/* actually staying put).                                        */}
       {/* ══════════════════════════════════════════════════ */}
-      <div className="hidden lg:block">
+      <div className="hidden lg:flex flex-col h-screen overflow-hidden">
 
         <KioskHeader
           searchValue={searchQuery}
@@ -527,23 +533,23 @@ export default function CartNewPage() {
           itemCount={itemCount}
         />
 
-        {/* Main Content */}
-        <main className="max-w-[1440px] mx-auto px-12 py-8 pb-24">
-          {/* Page Header */}
-          <header className="mb-8">
-            <h2 className="text-[28px] font-bold text-[#231a05]" style={JKT}>Keranjang Belanja</h2>
-            <p className="text-[14px] text-[#998075] mt-1" style={JKT}>
-              Periksa kembali pesanan anda sebelum melanjutkan ke pembayaran.
-            </p>
-          </header>
-
-          {itemCount === 0 ? (
+        {itemCount === 0 ? (
+          <main className="h-[calc(100dvh-76px)] flex items-center justify-center px-12">
             <EmptyCart onBrowse={() => router.push('/menu')} isMobile={false} />
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-10 gap-8 items-start">
+          </main>
+        ) : (
+          <main className="h-[calc(100dvh-76px)] flex max-w-[1440px] mx-auto w-full">
 
-              {/* ── LEFT: Item List (6/10) ── */}
-              <div className="lg:col-span-6 space-y-3">
+            {/* ── LEFT: Item List (scrolls on its own) ── */}
+            <div className="w-[60%] h-full overflow-y-auto px-12 py-8">
+              <header className="mb-8">
+                <h2 className="text-[28px] font-bold text-[#231a05]" style={JKT}>Keranjang Belanja</h2>
+                <p className="text-[14px] text-[#998075] mt-1" style={JKT}>
+                  Periksa kembali pesanan anda sebelum melanjutkan ke pembayaran.
+                </p>
+              </header>
+
+              <div className="space-y-3">
                 {items.map((item) => (
                   <KioskCartItemCard
                     key={item.id}
@@ -574,9 +580,10 @@ export default function CartNewPage() {
                   <p className="text-[13px] text-[#998075]" style={JKT}>Lihat menu rekomendasi kami untuk kamu.</p>
                 </button>
               </div>
+            </div>
 
-              {/* ── RIGHT: Summary Panel (4/10) ── */}
-              <aside className="lg:col-span-4 sticky top-24 space-y-3">
+            {/* ── RIGHT: Summary Panel -- fixed height, no scroll of its own ── */}
+            <aside className="w-[40%] h-full border-l border-[#f3e0be] bg-[#fff8f2] px-12 py-8 flex flex-col justify-center overflow-hidden">
                 <div className="bg-white border border-[#f3e0be] rounded-xl p-6 shadow-lg">
                   <h3 className="text-[22px] font-[600] text-[#323131] mb-4" style={JKT}>Detail Pesanan</h3>
 
@@ -670,10 +677,9 @@ export default function CartNewPage() {
                     <span className="text-[12px]" style={JKT}>Pembayaran Aman &amp; Terenkripsi</span>
                   </div>
                 </div>
-              </aside>
-            </div>
-          )}
-        </main>
+            </aside>
+          </main>
+        )}
       </div>
 
       {/* ══════════════════════════════════════════════════ */}
