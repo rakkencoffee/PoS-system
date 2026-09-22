@@ -253,24 +253,37 @@ export async function computeVoucherDiscount(
 }
 
 // ──────────────────────────────
-// Automatic "buy coffee, get a Refreshment free" promo -- unlike
+// Automatic "buy 1 drink, get a Refreshment free" promo -- unlike
 // computeVoucherDiscount above, the customer never types anything for this
-// one. Its active-date window and usage limit still live in Olsera as an
-// ordinary Kupon Diskon (reusing validateVoucherRemote's own date/expiry/
-// usage checks below) so staff can turn the promo on/off or change its dates
-// from the Olsera dashboard without a redeploy -- Olsera's own voucher API
-// has no notion of "buy category A, get category B free" though, so which
-// item actually goes free is decided here, not by whatever discount_rate is
-// configured on the Kupon Diskon record.
-//
-// AUTO_PROMO_CODE must exactly match the Kupon Diskon code created in Olsera
-// when this promo goes live. Until that code exists there, validateVoucherRemote
-// comes back invalid and this silently no-ops -- safe to deploy ahead of time.
+// one. Its active window is a fixed one-off date+time range (e.g. 24 Sep
+// 2026, 10:00-12:00 WIB) -- Olsera's own Kupon Diskon dates are day-
+// granularity only, with no time-of-day, so they can't express this. The
+// window lives in env vars instead (AUTO_PROMO_START/AUTO_PROMO_END, ISO
+// datetimes with an explicit UTC offset e.g. "2026-09-24T10:00:00+07:00"),
+// checked directly against server time -- reschedule or disable by
+// updating/unsetting those in Vercel, no redeploy needed. Which item
+// actually goes free is still decided here regardless, since no voucher
+// system has a "buy category A, get category B free" concept.
 // ──────────────────────────────
 
-const AUTO_PROMO_CODE = "AUTOFREEREFRESH";
-const AUTO_PROMO_TRIGGER_CATEGORY_SLUGS = ["rakken-signature", "rakken-style"];
+// All beverage categories count as the "buy" side, including Refreshment
+// itself (confirmed 2026-09-22: 2x the same Refreshment alone should also
+// qualify, not just coffee+Refreshment combos).
+const AUTO_PROMO_TRIGGER_CATEGORY_SLUGS = ["rakken-signature", "rakken-style", "non-coffee", "refreshment"];
 const AUTO_PROMO_REWARD_CATEGORY_SLUG = "refreshment";
+
+function isAutoPromoActiveNow(): boolean {
+  const start = process.env.AUTO_PROMO_START;
+  const end = process.env.AUTO_PROMO_END;
+  if (!start || !end) return false; // not scheduled -- no-op
+
+  const startMs = new Date(start).getTime();
+  const endMs = new Date(end).getTime();
+  if (Number.isNaN(startMs) || Number.isNaN(endMs)) return false;
+
+  const now = Date.now();
+  return now >= startMs && now <= endMs;
+}
 
 export type AutoPromoResult =
   | { active: false }
@@ -278,17 +291,17 @@ export type AutoPromoResult =
 
 export async function computeAutoPromoDiscount(items: DiscountableItem[]): Promise<AutoPromoResult> {
   if (!Array.isArray(items) || items.length === 0) return { active: false };
+  if (!isAutoPromoActiveNow()) return { active: false };
 
-  // silent: true -- this runs on every single order, and a 404 here just
-  // means the promo hasn't been created in Olsera yet, not a real error.
-  const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const validation = await olseraApi.validateVoucherRemote(AUTO_PROMO_CODE, subtotal, true);
-  if (!validation.valid) return { active: false }; // not created yet, outside active window, expired, or usage limit hit
-
-  const hasCoffee = items.some((item) =>
+  const qualifyingDrinks = items.filter((item) =>
     AUTO_PROMO_TRIGGER_CATEGORY_SLUGS.includes(String(item.category || "").toLowerCase()),
   );
-  if (!hasCoffee) return { active: false };
+  const totalDrinkUnits = qualifyingDrinks.reduce((sum, item) => sum + item.quantity, 0);
+  // A real "buy 1 get 1" needs at least 2 qualifying drink units in the
+  // cart -- otherwise the single unit bought would just be handing itself
+  // away for free, which isn't a BOGO. Since Refreshment itself counts as a
+  // trigger too, 2x the same Refreshment alone satisfies this.
+  if (totalDrinkUnits < 2) return { active: false };
 
   const eligibleRewards = items.filter(
     (item) => String(item.category || "").toLowerCase() === AUTO_PROMO_REWARD_CATEGORY_SLUG,
