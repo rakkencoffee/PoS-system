@@ -164,6 +164,20 @@ export default function CheckoutNewPage() {
         deviceId: getKioskDeviceId(),
       });
 
+      if (data.simulated) {
+        // A 100%-off voucher/promo brought the total to exactly Rp0 -- the
+        // server already skipped the EDC entirely and settled the order (see
+        // /api/payment/create's finalGrossAmount === 0 branch). There is no
+        // edcJobId to wait on here: rendering EdcPaymentFlow for this order
+        // would poll a job that will never exist and never resolve, which is
+        // exactly what looked like checkout doing nothing for several
+        // minutes (confirmed live 2026-09-22). Finalize immediately instead,
+        // same as EdcPaymentFlow's own onApproved callback does.
+        queueKioskPrint(data.orderId);
+        finalizeOrder(data);
+        return;
+      }
+
       // Both go through the physical EDC — order stays unpaid, EdcPaymentFlow
       // polls the job, settlement happens server-side once the daemon reports
       // APPROVED (Purchase for card, GenQRIS for QRIS — see EdcJob.method).
