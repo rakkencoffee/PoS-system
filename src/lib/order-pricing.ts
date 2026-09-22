@@ -2,6 +2,7 @@ import { getMenuItems, type NormalizedMenuItem } from "@/lib/integrations/pos.ad
 import { BAG_OPTIONS } from "@/lib/bag-options";
 import { olseraApi } from "@/lib/integrations/olsera.service";
 import { AUTO_PROMO_TRIGGER_CATEGORY_SLUGS, AUTO_PROMO_REWARD_CATEGORY_SLUG } from "@/lib/promo-categories";
+import { prisma } from "@/lib/db";
 
 /**
  * Server-side pricing verification for checkout.
@@ -186,6 +187,26 @@ export async function computeVoucherDiscount(
   const voucher = result.voucher;
   if (!voucher) {
     return { ok: false, error: "Kode voucher tidak ditemukan." };
+  }
+
+  // Olsera's own `usage` field on this voucher never actually increments --
+  // confirmed 2026-09-22 that Olsera's Open API has no endpoint (dedicated
+  // redeem or generic "discount voucher - update") capable of writing it, so
+  // validateVoucherRemote's usage-limit check above always reads usage=0 and
+  // never blocks anything. This counts real usage from our own Order table
+  // instead, keyed by the voucherCode persisted on each order at checkout
+  // (pos.adapter.ts's createOrder) -- PENDING/CANCELLED orders don't count
+  // since the voucher was never actually redeemed on them.
+  if (!voucher.no_usage_limit && Number(voucher.usage_limit) > 0) {
+    const usedCount = await prisma.order.count({
+      where: {
+        voucherCode: uppercaseCode,
+        status: { notIn: ["PENDING", "CANCELLED"] },
+      },
+    });
+    if (usedCount >= Number(voucher.usage_limit)) {
+      return { ok: false, error: "Voucher sudah mencapai batas penggunaan." };
+    }
   }
 
   const discountRate = parseFloat(voucher.discount_rate || "0");

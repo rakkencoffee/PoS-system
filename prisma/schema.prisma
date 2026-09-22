@@ -37,6 +37,15 @@ model Order {
   olseraSynced        Boolean          @default(false)
   olseraSyncedAt      DateTime?
   olseraTransactionId String?
+  // Kode voucher/kupon yang dipakai di order ini (uppercase, mis. "RKARCADE") --
+  // Olsera's Open API punya field `usage` di /discountvoucher, tapi itu cuma
+  // naik kalau voucher-nya di-redeem lewat aplikasi kasir Olsera sendiri, BUKAN
+  // lewat order yang kita bikin via Open Order API (dicek 2026-09-22: nggak
+  // ada endpoint apapun di API mereka buat lapor balik "kode ini baru dipakai").
+  // Kolom ini yang jadi sumber kebenaran buat nge-enforce Batas Penggunaan
+  // sendiri di computeVoucherDiscount, bukan voucher.usage dari Olsera yang
+  // akan selalu kebaca 0.
+  voucherCode         String?
   channel             OrderChannel     @default(KIOSK) // KIOSK (existing) vs MEMBER_APP (loyalty, lihat PRD Bab 3)
   memberId            String?
   tripayReference     String?          @unique // reference dari Tripay create-transaction, dipakai webhook buat lookup

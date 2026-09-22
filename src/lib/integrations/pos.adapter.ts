@@ -608,6 +608,7 @@ export async function createOrder(
           queueNumber: queueNum || null,
           total: 0,
           status: "PENDING",
+          voucherCode: voucherCode?.toUpperCase().trim() || null,
         },
       });
     } catch (earlyCreateErr) {
@@ -880,6 +881,7 @@ export async function createOrder(
             status: "PENDING",
             baristaStatus: hasCoffee ? "PENDING" : "COMPLETED",
             kitchenStatus: hasFood ? "PENDING" : "COMPLETED",
+            voucherCode: voucherCode?.toUpperCase().trim() || null,
             items: { create: itemsCreate },
           },
         });
