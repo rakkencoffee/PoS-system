@@ -1030,21 +1030,35 @@ export async function updateOrderPaymentStatus(
           );
         }
 
-        if (!alreadyPaidInOlsera && actualOlseraTotal > 0 && paymentModeId) {
+        if (!alreadyPaidInOlsera) {
           try {
-            console.log(
-              `[Auto-Settlement] Initializing settlement for Olsera order ${orderId} with amount: ${actualOlseraTotal}`,
-            );
-            await olsera.updateOrderPayment(
-              olseraOrderId,
-              actualOlseraTotal,
-              paymentModeId,
-            );
+            // A fully-discounted order (e.g. a 100%-off voucher, see
+            // order-pricing.ts's free-item handling) has nothing meaningful
+            // to record as a payment amount, so this is skipped for
+            // actualOlseraTotal === 0 -- but markOrderAsPaid below must still
+            // run regardless of amount. Previously this whole block (payment
+            // AND markOrderAsPaid AND the status fix-up) was gated on
+            // actualOlseraTotal > 0, so a Rp0 order never got acknowledged as
+            // paid in Olsera at all -- confirmed live 2026-09-22: a barista
+            // trying to mark that order COMPLETED got rejected with 406 "You
+            // have to set payment info or acknowledge received payment
+            // before proceed", because Olsera's own record still thought it
+            // was unpaid.
+            if (actualOlseraTotal > 0 && paymentModeId) {
+              console.log(
+                `[Auto-Settlement] Initializing settlement for Olsera order ${orderId} with amount: ${actualOlseraTotal}`,
+              );
+              await olsera.updateOrderPayment(
+                olseraOrderId,
+                actualOlseraTotal,
+                paymentModeId,
+              );
+            }
 
-            // CRITICAL: Also mark as Paid (status=1) so Olsera allows status updates to A/Z later
+            // CRITICAL: Mark as Paid (status=1) so Olsera allows status updates to A/Z later
             await olsera.markOrderAsPaid(olseraOrderId, true);
             console.log(
-              `[Auto-Settlement] Successfully recorded payment info for order ${orderId}`,
+              `[Auto-Settlement] Successfully acknowledged payment for order ${orderId}`,
             );
 
             // FORCE status back to PENDING (P)
