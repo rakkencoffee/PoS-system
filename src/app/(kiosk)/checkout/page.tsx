@@ -326,45 +326,6 @@ export default function CheckoutNewPage() {
               <p className="font-body-lg text-body-lg text-taupe">Items will be prepared immediately after payment.</p>
             </div>
 
-            {/* Voucher Section -- moved above the order list so it stays put
-                as items are added, instead of being pushed further down. */}
-            <div className="mb-section-sep">
-              <label className="font-tag text-tag text-taupe uppercase block mb-compact">Have a voucher?</label>
-              <div className="flex gap-standard">
-                <input
-                  className="flex-1 bg-surface border-1.5 border-surface-variant rounded-xl px-standard py-compact focus:ring-primary focus:border-primary placeholder-taupe focus:outline-none"
-                  placeholder="Enter code (e.g. COFFEE20)"
-                  type="text"
-                  readOnly={appliedDiscount > 0 || isProcessing}
-                  value={voucherCode}
-                  onChange={(e) => { setVoucherCode(e.target.value.toUpperCase()); setVoucherMessage(null); }}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && voucherCode.trim() && appliedDiscount === 0) handleApplyVoucher(); }}
-                />
-                {appliedDiscount > 0 ? (
-                  <button
-                    onClick={() => { setAppliedDiscount(0); setVoucherCode(''); setItemDiscounts({}); setVoucherMessage(null); }}
-                    disabled={isProcessing}
-                    className="px-section-item py-compact bg-error text-white font-h4 text-body-md rounded-xl transition-transform active:scale-95 cursor-pointer disabled:opacity-50"
-                  >
-                    Clear
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleApplyVoucher}
-                    disabled={validateVoucherMutation.isPending || !voucherCode.trim() || isProcessing}
-                    className="px-section-item py-compact bg-tertiary text-white font-h4 text-body-md rounded-xl transition-transform active:scale-95 cursor-pointer disabled:opacity-50"
-                  >
-                    {validateVoucherMutation.isPending ? 'Validating...' : 'Apply'}
-                  </button>
-                )}
-              </div>
-              {voucherMessage && (
-                <div className={`mt-2 text-xs font-semibold ${voucherMessage.type === 'success' ? 'text-green-600' : 'text-error'}`}>
-                  {voucherMessage.text}
-                </div>
-              )}
-            </div>
-
             {/* Order List */}
             <div className="flex flex-col gap-standard mb-section-sep">
               {items.map((item) => (
@@ -456,6 +417,47 @@ export default function CheckoutNewPage() {
               {/* Payment Summary Card */}
               <div className="bg-background p-page-gutter rounded-3xl shadow-lg border border-surface-variant">
                 <h3 className="font-h3 text-h3 text-near-black mb-standard font-bold">Payment Summary</h3>
+
+                {/* Voucher Section -- lives here (not next to the product
+                    list) so applying a code updates the numbers right below
+                    it, instead of sitting apart from the total it affects. */}
+                <div className="mb-section-item">
+                  <label className="font-tag text-tag text-taupe uppercase block mb-compact">Have a voucher?</label>
+                  <div className="flex gap-standard">
+                    <input
+                      className="flex-1 bg-surface border-1.5 border-surface-variant rounded-xl px-standard py-compact focus:ring-primary focus:border-primary placeholder-taupe focus:outline-none"
+                      placeholder="Enter code (e.g. COFFEE20)"
+                      type="text"
+                      readOnly={appliedDiscount > 0 || isProcessing}
+                      value={voucherCode}
+                      onChange={(e) => { setVoucherCode(e.target.value.toUpperCase()); setVoucherMessage(null); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && voucherCode.trim() && appliedDiscount === 0) handleApplyVoucher(); }}
+                    />
+                    {appliedDiscount > 0 ? (
+                      <button
+                        onClick={() => { setAppliedDiscount(0); setVoucherCode(''); setItemDiscounts({}); setVoucherMessage(null); }}
+                        disabled={isProcessing}
+                        className="px-section-item py-compact bg-error text-white font-h4 text-body-md rounded-xl transition-transform active:scale-95 cursor-pointer disabled:opacity-50"
+                      >
+                        Clear
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleApplyVoucher}
+                        disabled={validateVoucherMutation.isPending || !voucherCode.trim() || isProcessing}
+                        className="px-section-item py-compact bg-tertiary text-white font-h4 text-body-md rounded-xl transition-transform active:scale-95 cursor-pointer disabled:opacity-50"
+                      >
+                        {validateVoucherMutation.isPending ? 'Validating...' : 'Apply'}
+                      </button>
+                    )}
+                  </div>
+                  {voucherMessage && (
+                    <div className={`mt-2 text-xs font-semibold ${voucherMessage.type === 'success' ? 'text-green-600' : 'text-error'}`}>
+                      {voucherMessage.text}
+                    </div>
+                  )}
+                </div>
+
                 <div className="space-y-standard mb-section-item">
                   <div className="flex justify-between text-body-lg text-taupe font-body-lg">
                     <span>Subtotal</span>
@@ -574,47 +576,6 @@ export default function CheckoutNewPage() {
             <p className="font-h4 text-near-black font-bold">{customerName || 'Self Service Guest'}</p>
           </div>
 
-          {/* Voucher Row -- moved above the order list so it stays put as
-              items are added, instead of shifting further down the page. */}
-          <section className="space-y-standard">
-            <h3 className="font-h4 text-h4 text-near-black font-semibold">Voucher &amp; Promo</h3>
-            <div className="bg-surface rounded-xl p-card-inner border border-surface-variant shadow-sm space-y-compact">
-              <div className="flex gap-standard">
-                <input
-                  className="flex-1 bg-surface border border-surface-variant rounded-xl px-4 py-2 text-sm focus:ring-primary focus:border-primary placeholder-taupe focus:outline-none font-mono"
-                  placeholder="Kode Voucher"
-                  type="text"
-                  readOnly={appliedDiscount > 0 || isProcessing}
-                  value={voucherCode}
-                  onChange={(e) => { setVoucherCode(e.target.value.toUpperCase()); setVoucherMessage(null); }}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && voucherCode.trim() && appliedDiscount === 0) handleApplyVoucher(); }}
-                />
-                {appliedDiscount > 0 ? (
-                  <button
-                    onClick={() => { setAppliedDiscount(0); setVoucherCode(''); setItemDiscounts({}); setVoucherMessage(null); }}
-                    disabled={isProcessing}
-                    className="px-4 py-2 bg-error text-white font-semibold text-xs rounded-xl cursor-pointer disabled:opacity-50"
-                  >
-                    Clear
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleApplyVoucher}
-                    disabled={validateVoucherMutation.isPending || !voucherCode.trim() || isProcessing}
-                    className="px-4 py-2 bg-tertiary text-white font-semibold text-xs rounded-xl cursor-pointer disabled:opacity-50"
-                  >
-                    Apply
-                  </button>
-                )}
-              </div>
-              {voucherMessage && (
-                <div className={`text-xs font-semibold ${voucherMessage.type === 'success' ? 'text-green-600' : 'text-error'}`}>
-                  {voucherMessage.text}
-                </div>
-              )}
-            </div>
-          </section>
-
           {/* Summary Cards */}
           <section className="space-y-standard">
             <h3 className="font-h4 text-h4 text-near-black font-semibold">Pesanan Anda</h3>
@@ -695,6 +656,46 @@ export default function CheckoutNewPage() {
 
           {/* Bill Details */}
           <section className="bg-surface-container-low rounded-xl p-card-inner space-y-standard">
+            {/* Voucher Section -- lives here (not next to the product list)
+                so applying a code updates the numbers right below it. */}
+            <div>
+              <label className="font-tag text-tag text-taupe uppercase block mb-compact">Have a voucher?</label>
+              <div className="flex gap-standard">
+                <input
+                  className="flex-1 bg-surface border border-surface-variant rounded-xl px-4 py-2 text-sm focus:ring-primary focus:border-primary placeholder-taupe focus:outline-none font-mono"
+                  placeholder="Kode Voucher"
+                  type="text"
+                  readOnly={appliedDiscount > 0 || isProcessing}
+                  value={voucherCode}
+                  onChange={(e) => { setVoucherCode(e.target.value.toUpperCase()); setVoucherMessage(null); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && voucherCode.trim() && appliedDiscount === 0) handleApplyVoucher(); }}
+                />
+                {appliedDiscount > 0 ? (
+                  <button
+                    onClick={() => { setAppliedDiscount(0); setVoucherCode(''); setItemDiscounts({}); setVoucherMessage(null); }}
+                    disabled={isProcessing}
+                    className="px-4 py-2 bg-error text-white font-semibold text-xs rounded-xl cursor-pointer disabled:opacity-50"
+                  >
+                    Clear
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleApplyVoucher}
+                    disabled={validateVoucherMutation.isPending || !voucherCode.trim() || isProcessing}
+                    className="px-4 py-2 bg-tertiary text-white font-semibold text-xs rounded-xl cursor-pointer disabled:opacity-50"
+                  >
+                    Apply
+                  </button>
+                )}
+              </div>
+              {voucherMessage && (
+                <div className={`mt-2 text-xs font-semibold ${voucherMessage.type === 'success' ? 'text-green-600' : 'text-error'}`}>
+                  {voucherMessage.text}
+                </div>
+              )}
+            </div>
+            <div className="h-[1px] bg-surface-variant opacity-50"></div>
+
             <div className="flex justify-between">
               <span className="font-body-md text-taupe">Subtotal ({itemCount} items)</span>
               <span className="font-body-md text-on-surface">{formatCurrency(subtotal)}</span>
