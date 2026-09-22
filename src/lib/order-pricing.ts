@@ -178,7 +178,11 @@ export async function computeVoucherDiscount(
     return { ok: false, error: result.message };
   }
 
-  const voucher = await olseraApi.getVoucherByCode(uppercaseCode);
+  // Reuses the voucher record validateVoucherRemote already fetched instead
+  // of a second getVoucherByCode round-trip for the same code -- that
+  // redundant call roughly doubled how long "Apply" felt to take at
+  // checkout (confirmed live 2026-09-22).
+  const voucher = result.voucher;
   if (!voucher) {
     return { ok: false, error: "Kode voucher tidak ditemukan." };
   }
@@ -260,8 +264,8 @@ export async function computeVoucherDiscount(
 // configured on the Kupon Diskon record.
 //
 // AUTO_PROMO_CODE must exactly match the Kupon Diskon code created in Olsera
-// when this promo goes live. Until that code exists there, getVoucherByCode
-// returns null and this silently no-ops -- safe to deploy ahead of time.
+// when this promo goes live. Until that code exists there, validateVoucherRemote
+// comes back invalid and this silently no-ops -- safe to deploy ahead of time.
 // ──────────────────────────────
 
 const AUTO_PROMO_CODE = "AUTOFREEREFRESH";
@@ -275,12 +279,11 @@ export type AutoPromoResult =
 export async function computeAutoPromoDiscount(items: DiscountableItem[]): Promise<AutoPromoResult> {
   if (!Array.isArray(items) || items.length === 0) return { active: false };
 
-  const voucher = await olseraApi.getVoucherByCode(AUTO_PROMO_CODE);
-  if (!voucher) return { active: false }; // promo not created in Olsera yet
-
+  // silent: true -- this runs on every single order, and a 404 here just
+  // means the promo hasn't been created in Olsera yet, not a real error.
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const validation = await olseraApi.validateVoucherRemote(AUTO_PROMO_CODE, subtotal);
-  if (!validation.valid) return { active: false }; // outside active date range, expired, or usage limit hit
+  const validation = await olseraApi.validateVoucherRemote(AUTO_PROMO_CODE, subtotal, true);
+  if (!validation.valid) return { active: false }; // not created yet, outside active window, expired, or usage limit hit
 
   const hasCoffee = items.some((item) =>
     AUTO_PROMO_TRIGGER_CATEGORY_SLUGS.includes(String(item.category || "").toLowerCase()),

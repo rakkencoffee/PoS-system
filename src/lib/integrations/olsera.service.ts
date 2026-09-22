@@ -910,13 +910,19 @@ export async function getVouchers(): Promise<any[]> {
 
 /**
  * Search for a specific voucher by code (more efficient than fetching all)
- * Uses Olsera's ?search= parameter to filter server-side
+ * Uses Olsera's ?search= parameter to filter server-side.
+ *
+ * `silent` suppresses the failure log -- for a code that's expected to
+ * sometimes not exist yet (e.g. computeAutoPromoDiscount's automatic promo
+ * check, which runs on every order and legitimately 404s until that promo
+ * is created in Olsera). Leave it on (the default) for a customer-typed
+ * voucher code, where a 404 is worth seeing in logs.
  */
-export async function getVoucherByCode(code: string): Promise<any | null> {
+export async function getVoucherByCode(code: string, silent = false): Promise<any | null> {
   const uppercaseCode = code.toUpperCase().trim();
-  const res = await olseraFetch(`/discountvoucher?search=${encodeURIComponent(uppercaseCode)}`);
+  const res = await olseraFetch(`/discountvoucher?search=${encodeURIComponent(uppercaseCode)}`, { silent });
   if (!res.ok) {
-    console.error('Olsera getVoucherByCode error:', await res.text());
+    if (!silent) console.error('Olsera getVoucherByCode error:', await res.text());
     return null;
   }
   const data = await res.json();
@@ -958,18 +964,22 @@ export async function getVoucherDetail(voucherId: number): Promise<any | null> {
  * - usage_limit: max uses (when no_usage_limit=0)
  * - usage: current usage count
  */
-export async function validateVoucherRemote(code: string, totalAmount: number): Promise<{
+export async function validateVoucherRemote(code: string, totalAmount: number, silent = false): Promise<{
   valid: boolean;
   discountAmount: number;
   message: string;
   voucherTitle?: string;
   voucherType?: string;
   voucherValue?: string;
+  // Raw voucher record, so callers that need fields beyond the ones above
+  // (e.g. computeVoucherDiscount's discount_with/discount_rate/title checks)
+  // don't have to make a second getVoucherByCode round-trip for the same code.
+  voucher?: any;
 }> {
   const uppercaseCode = code.toUpperCase().trim();
-  
+
   // 1. Search for voucher by code (efficient — server-side filter)
-  const voucher = await getVoucherByCode(uppercaseCode);
+  const voucher = await getVoucherByCode(uppercaseCode, silent);
 
   if (!voucher) {
     return { valid: false, discountAmount: 0, message: 'Kode voucher tidak ditemukan.' };
@@ -1031,6 +1041,7 @@ export async function validateVoucherRemote(code: string, totalAmount: number): 
     voucherTitle: voucher.title,
     voucherType,
     voucherValue,
+    voucher,
   };
 }
 
