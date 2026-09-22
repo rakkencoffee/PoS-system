@@ -14,6 +14,17 @@ export const BARISTA_PRINTER_SERVICE_UUID = '49535343-fe7d-4ae5-8fa9-9fafd205e45
 export const BARISTA_PRINTER_CHARACTERISTIC_UUID = '49535343-8841-43f4-a8d4-ecbe34729bb3';
 
 /**
+ * BLE local-name prefix advertised by both current Kitchen and Barista label
+ * printer units (confirmed via useBlePrinter.ts's requestDevice history).
+ * Passing this to connect() as a namePrefix filter makes Chrome's device
+ * chooser scan for only matching devices instead of every nearby BLE device
+ * (acceptAllDevices), which is what made pairing feel heavy on lower-spec
+ * tablets. Not guaranteed to match a future replacement unit -- that's what
+ * the "Cari Semua Device" fallback (connect() with no options) is for.
+ */
+export const STATION_PRINTER_NAME_PREFIXES = ['RPP'];
+
+/**
  * Conservative default for BLE writes without a negotiated larger MTU.
  * Left untouched during the 2026-09-01 speed tuning pass -- this is the one
  * proven-safe against real hardware (raising it risks the same kind of

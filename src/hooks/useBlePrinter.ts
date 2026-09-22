@@ -63,7 +63,7 @@ export function useBlePrinter() {
     }, { once: true });
   }, []);
 
-  const connect = useCallback(async () => {
+  const connect = useCallback(async (options?: { namePrefixes?: string[] }) => {
     if (!navigator.bluetooth) {
       throw new Error('Browser ini tidak mendukung Web Bluetooth. Pakai Chrome di Android.');
     }
@@ -75,12 +75,27 @@ export function useBlePrinter() {
     // namePrefix filter worked for the Kitchen/Barista iWare units (both
     // "RPP...") but a second iWare unit bought for kiosk receipts turned out
     // not to show up under that filter -- rather than guess at every
-    // possible BLE local name, show every nearby BLE device and let staff
-    // pick the right one by eye during pairing.
-    const device = await navigator.bluetooth.requestDevice({
-      acceptAllDevices: true,
-      optionalServices: [BARISTA_PRINTER_SERVICE_UUID],
-    });
+    // possible BLE local name, that caller (KioskPrinterProvider) still
+    // calls connect() with no options and gets the old acceptAllDevices
+    // scan. Kitchen/Barista pass namePrefixes: ['RPP'] instead -- an
+    // unfiltered scan makes Chrome's native chooser continuously discover
+    // and list EVERY nearby BLE device (phones, earbuds, etc.), which is
+    // what made pairing feel heavy/laggy on a lower-spec tablet (confirmed
+    // live 2026-09-22 on an Advan tablet); a name-filtered scan only surfaces
+    // matching devices and is dramatically lighter. Their "Cari Semua
+    // Device" fallback button re-calls connect() with no options for the
+    // day a differently-named printer replaces theirs.
+    const device = await navigator.bluetooth.requestDevice(
+      options?.namePrefixes?.length
+        ? {
+            filters: options.namePrefixes.map((namePrefix) => ({ namePrefix })),
+            optionalServices: [BARISTA_PRINTER_SERVICE_UUID],
+          }
+        : {
+            acceptAllDevices: true,
+            optionalServices: [BARISTA_PRINTER_SERVICE_UUID],
+          },
+    );
 
     await bindDevice(device);
   }, [bindDevice]);

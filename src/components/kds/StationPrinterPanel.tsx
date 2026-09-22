@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { printStationLabel, printTestLabel } from '@/lib/print/station-print';
+import { STATION_PRINTER_NAME_PREFIXES } from '@/lib/print/ble-config';
 
 interface StationPrinterPanelProps {
   /** e.g. "/api/kds/sticker" (Barista, drinks) or "/api/kds/food-label" (Kitchen, food) -- jobId is appended. */
@@ -18,7 +19,7 @@ interface StationPrinterPanelProps {
       connection instead of each holding (and fighting over) their own. */
   connected: boolean;
   deviceName: string | null;
-  connect: () => Promise<void>;
+  connect: (options?: { namePrefixes?: string[] }) => Promise<void>;
   disconnect: () => void;
   writeBytes: (bytes: Uint8Array) => Promise<void>;
 }
@@ -95,6 +96,18 @@ export function StationPrinterPanel({
   const handleConnect = async () => {
     setStatus('');
     try {
+      await connect({ namePrefixes: STATION_PRINTER_NAME_PREFIXES });
+    } catch (err: any) {
+      setStatus(`Gagal connect: ${err.message}`);
+    }
+  };
+
+  // Fallback for a printer that doesn't match STATION_PRINTER_NAME_PREFIXES
+  // (e.g. a future replacement unit) -- falls back to the old unfiltered
+  // scan, which is heavier but shows every nearby BLE device.
+  const handleConnectAnyDevice = async () => {
+    setStatus('');
+    try {
       await connect();
     } catch (err: any) {
       setStatus(`Gagal connect: ${err.message}`);
@@ -136,12 +149,21 @@ export function StationPrinterPanel({
           </button>
         </>
       ) : (
-        <button
-          onClick={handleConnect}
-          className="text-white font-semibold hover:text-[#A8131E] transition-colors"
-        >
-          Connect Printer
-        </button>
+        <>
+          <button
+            onClick={handleConnect}
+            className="text-white font-semibold hover:text-[#A8131E] transition-colors"
+          >
+            Connect Printer
+          </button>
+          <button
+            onClick={handleConnectAnyDevice}
+            title="Pakai ini kalau printer-nya nggak muncul di list Connect Printer (ganti unit baru, misalnya)"
+            className="text-zinc-500 hover:text-white text-xs transition-colors"
+          >
+            Cari Semua Device
+          </button>
+        </>
       )}
       {lastJobId && (
         <button
