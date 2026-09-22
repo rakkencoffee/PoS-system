@@ -14,6 +14,14 @@ interface CartStore extends CartState {
   clearCart: () => void;
   itemCount: number;
   bagQuantities: Record<BagKey, number>;
+  // Tracks which cart item (if any) is the customer's pick from the "buy 1
+  // drink, get a Refreshment free" picker on the cart page -- lets that
+  // picker show/let them swap their current choice instead of just adding
+  // duplicates, and lets the cart card badge it as free. Purely a client-side
+  // UI hint: the actual discount is still computed server-side by category,
+  // not by this id (see order-pricing.ts's computeAutoPromoDiscount).
+  freeRefreshmentCartItemId: string | null;
+  setFreeRefreshmentCartItemId: (id: string | null) => void;
 }
 
 const emptyBagQuantities: Record<BagKey, number> = {
@@ -42,6 +50,7 @@ export const useCartStore = create<CartStore>()(
       customerPhone: '',
       itemCount: 0,
       bagQuantities: emptyBagQuantities,
+      freeRefreshmentCartItemId: null,
 
       addItem: (newItem: CartItem) => {
         const { items } = get();
@@ -77,9 +86,13 @@ export const useCartStore = create<CartStore>()(
       },
 
       removeItem: (id: string) => {
-        const { items } = get();
+        const { items, freeRefreshmentCartItemId } = get();
         const newItems = items.filter((item) => item.id !== id);
-        set({ items: newItems, ...deriveCartMeta(newItems) });
+        set({
+          items: newItems,
+          ...deriveCartMeta(newItems),
+          freeRefreshmentCartItemId: freeRefreshmentCartItemId === id ? null : freeRefreshmentCartItemId,
+        });
       },
 
       updateItem: (id: string, updatedItem: CartItem) => {
@@ -91,10 +104,14 @@ export const useCartStore = create<CartStore>()(
       },
 
       updateQuantity: (id: string, quantity: number) => {
-        const { items } = get();
+        const { items, freeRefreshmentCartItemId } = get();
         if (quantity <= 0) {
           const newItems = items.filter((item) => item.id !== id);
-          set({ items: newItems, ...deriveCartMeta(newItems) });
+          set({
+            items: newItems,
+            ...deriveCartMeta(newItems),
+            freeRefreshmentCartItemId: freeRefreshmentCartItemId === id ? null : freeRefreshmentCartItemId,
+          });
           return;
         }
 
@@ -122,8 +139,20 @@ export const useCartStore = create<CartStore>()(
         set({ bagQuantities: { ...bagQuantities, [key]: Math.max(0, quantity) } });
       },
 
+      setFreeRefreshmentCartItemId: (id: string | null) => {
+        set({ freeRefreshmentCartItemId: id });
+      },
+
       clearCart: () => {
-        set({ items: [], totalAmount: 0, itemCount: 0, customerName: '', customerPhone: '', bagQuantities: emptyBagQuantities });
+        set({
+          items: [],
+          totalAmount: 0,
+          itemCount: 0,
+          customerName: '',
+          customerPhone: '',
+          bagQuantities: emptyBagQuantities,
+          freeRefreshmentCartItemId: null,
+        });
       },
     }),
     {

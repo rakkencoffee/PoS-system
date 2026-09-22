@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCartStore } from '@/stores/useCartStore';
-import { useCreateOrder, useValidateVoucher } from '@/hooks/useOrders';
+import { useCreateOrder, useValidateVoucher, useAutoPromoStatus } from '@/hooks/useOrders';
+import { AUTO_PROMO_TRIGGER_CATEGORY_SLUGS } from '@/lib/promo-categories';
 import { db, encryptPendingOrder } from '@/lib/dexie';
 import { CartItem } from '@/lib/types';
 import { KioskHeader } from '@/components/kiosk/KioskHeader';
@@ -92,7 +93,8 @@ function formatCurrency(amount: number): string {
 
 export default function CheckoutNewPage() {
   const router = useRouter();
-  const { items, totalAmount, clearCart, itemCount, customerName, customerPhone, updateQuantity, removeItem, bagQuantities } = useCartStore();
+  const { items, totalAmount, clearCart, itemCount, customerName, customerPhone, updateQuantity, removeItem, bagQuantities, freeRefreshmentCartItemId } = useCartStore();
+  const { data: autoPromoStatus } = useAutoPromoStatus();
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<string>('');
@@ -259,8 +261,31 @@ export default function CheckoutNewPage() {
     }
   };
 
+  // Preview-only mirror of order-pricing.ts's computeAutoPromoDiscount, so
+  // the total shown here BEFORE payment already matches what
+  // /api/payment/create will actually charge -- without this, a customer
+  // could see e.g. "Total: Rp50.000" on screen but the EDC terminal only
+  // asks for Rp30.000 once the free item is applied server-side, a
+  // confusing mismatch (caught before ever shipping, 2026-09-22). This does
+  // NOT decide the real discount -- the server always recomputes it from
+  // scratch and is the only source of truth for what gets charged.
+  const qualifyingDrinkUnits = items.reduce(
+    (sum, item) =>
+      AUTO_PROMO_TRIGGER_CATEGORY_SLUGS.includes(String(item.categorySlug || '').toLowerCase())
+        ? sum + item.quantity
+        : sum,
+    0,
+  );
+  const freeRefreshmentItem = freeRefreshmentCartItemId
+    ? items.find((i) => i.id === freeRefreshmentCartItemId)
+    : undefined;
+  const autoPromoDiscount =
+    autoPromoStatus?.active && qualifyingDrinkUnits >= 2 && freeRefreshmentItem
+      ? freeRefreshmentItem.subtotal / freeRefreshmentItem.quantity
+      : 0;
+
   const subtotal = totalAmount;
-  const discount = appliedDiscount;
+  const discount = appliedDiscount + autoPromoDiscount;
   const bagTotal = calculateBagTotal(bagQuantities);
   const total = Math.max(0, subtotal - discount) + bagTotal;
 
@@ -442,10 +467,16 @@ export default function CheckoutNewPage() {
                       <span>{formatCurrency(bagTotal)}</span>
                     </div>
                   )}
-                  {discount > 0 && (
+                  {appliedDiscount > 0 && (
                     <div className="flex justify-between text-body-lg text-green-600 font-body-lg">
                       <span>Voucher Discount</span>
-                      <span>-{formatCurrency(discount)}</span>
+                      <span>-{formatCurrency(appliedDiscount)}</span>
+                    </div>
+                  )}
+                  {autoPromoDiscount > 0 && (
+                    <div className="flex justify-between text-body-lg text-green-600 font-body-lg">
+                      <span>Promo Buy 1 Get 1</span>
+                      <span>-{formatCurrency(autoPromoDiscount)}</span>
                     </div>
                   )}
                   <div className="pt-standard border-t border-surface-variant flex justify-between items-center">
@@ -674,10 +705,16 @@ export default function CheckoutNewPage() {
                 <span className="font-body-md text-on-surface">{formatCurrency(bagTotal)}</span>
               </div>
             )}
-            {discount > 0 && (
+            {appliedDiscount > 0 && (
               <div className="flex justify-between text-green-600">
                 <span>Voucher Discount</span>
-                <span>-{formatCurrency(discount)}</span>
+                <span>-{formatCurrency(appliedDiscount)}</span>
+              </div>
+            )}
+            {autoPromoDiscount > 0 && (
+              <div className="flex justify-between text-green-600">
+                <span>Promo Buy 1 Get 1</span>
+                <span>-{formatCurrency(autoPromoDiscount)}</span>
               </div>
             )}
             <div className="h-[1px] bg-surface-variant opacity-50"></div>

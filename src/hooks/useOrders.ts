@@ -167,6 +167,21 @@ export function useCreateOrder() {
   });
 }
 
+/** Whether the automatic "buy 1 drink, get a Refreshment free" promo is
+    currently in its active window -- see /api/promo/status. */
+export function useAutoPromoStatus() {
+  return useQuery({
+    queryKey: ['promo', 'auto-promo-status'],
+    queryFn: async (): Promise<{ active: boolean }> => {
+      const res = await fetch('/api/promo/status');
+      if (!res.ok) return { active: false };
+      return res.json();
+    },
+    staleTime: 60_000,
+    refetchInterval: 60_000, // window can start/end mid-session while a kiosk sits idle
+  });
+}
+
 export function useValidateVoucher() {
   return useMutation({
     mutationFn: async ({ code, totalAmount, items }: { code: string; totalAmount: number; items?: any[] }) => {

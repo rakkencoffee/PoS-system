@@ -1,6 +1,7 @@
 import { getMenuItems, type NormalizedMenuItem } from "@/lib/integrations/pos.adapter";
 import { BAG_OPTIONS } from "@/lib/bag-options";
 import { olseraApi } from "@/lib/integrations/olsera.service";
+import { AUTO_PROMO_TRIGGER_CATEGORY_SLUGS, AUTO_PROMO_REWARD_CATEGORY_SLUG } from "@/lib/promo-categories";
 
 /**
  * Server-side pricing verification for checkout.
@@ -266,13 +267,10 @@ export async function computeVoucherDiscount(
 // system has a "buy category A, get category B free" concept.
 // ──────────────────────────────
 
-// All beverage categories count as the "buy" side, including Refreshment
-// itself (confirmed 2026-09-22: 2x the same Refreshment alone should also
-// qualify, not just coffee+Refreshment combos).
-const AUTO_PROMO_TRIGGER_CATEGORY_SLUGS = ["rakken-signature", "rakken-style", "non-coffee", "refreshment"];
-const AUTO_PROMO_REWARD_CATEGORY_SLUG = "refreshment";
 
-function isAutoPromoActiveNow(): boolean {
+// Exported so /api/promo/status can tell the cart page whether to show the
+// "pick your free Refreshment" picker, without duplicating the env-var check.
+export function isAutoPromoActiveNow(): boolean {
   const start = process.env.AUTO_PROMO_START;
   const end = process.env.AUTO_PROMO_END;
   if (!start || !end) return false; // not scheduled -- no-op
