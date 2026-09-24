@@ -83,7 +83,17 @@ export async function GET(request: NextRequest) {
             },
             include: { items: true },
             orderBy: { createdAt: 'asc' },
-            take: 50,
+            // No `take` cap -- there was a `take: 50` here before, and on a
+            // busy day (queue past 100+) plus any order stuck unable to ever
+            // reach COMPLETED (e.g. Olsera rejecting a status update because
+            // a line item is out of stock), "active" orders exceeded 50.
+            // Since this is ordered oldest-first, that silently dropped the
+            // NEWEST orders -- today's most recent tickets -- off the end
+            // before they ever reached the KDS board (confirmed live
+            // 2026-09-24: fresh Barista orders missing while older stuck
+            // orders kept occupying slots). The WHERE clause above already
+            // bounds this query to today's genuinely unfinished orders, so
+            // there's no unbounded-growth risk from removing the cap.
           });
 
           // Category still needs the master menu catalog (name -> slug) --
