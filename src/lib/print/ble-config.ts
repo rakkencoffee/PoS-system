@@ -35,10 +35,13 @@ export const BLE_WRITE_CHUNK_SIZE = 20;
 
 /**
  * Delay between chunked writes so the printer's BLE stack isn't overrun.
- * Lowered from 20ms 2026-09-01 to cut total transmission time on
- * multi-cup orders (proportional to chunk count) -- writeValueWithoutResponse
- * gives no flow-control feedback, so this still needs a physical print test
- * on both QPOS and iWare to confirm no dropped/corrupted bytes before
- * trusting it in production. Revert to 20 if either shows garbled output.
+ * Reverted to 20ms 2026-09-24: the 8ms value (lowered 2026-09-01 to cut
+ * transmission time on multi-cup orders) was never confirmed safe against
+ * real hardware, and a large Kitchen order (queue #308, 11 labels sent as
+ * one combined buffer) showed exactly the dropped/duplicated-label symptom
+ * this comment warned about -- writeValueWithoutResponse gives no
+ * flow-control feedback, so a long burst of unacknowledged chunks at the
+ * faster rate is the likely cause. Back to the proven-safe value; revisit
+ * only after a physical multi-item print test confirms a faster delay is safe.
  */
-export const BLE_WRITE_DELAY_MS = 8;
+export const BLE_WRITE_DELAY_MS = 20;
