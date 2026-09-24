@@ -37,6 +37,26 @@ export async function getKdsLastSyncedAt(): Promise<string | null> {
   return status?.lastSynced ?? null;
 }
 
+// Purely cosmetic: which queue numbers today were cancelled (customer backed
+// out of payment, etc.) -- shown as a small "Dibatalkan" note on the KDS
+// board so a skipped number reads as "this one was cancelled", not "this
+// order got lost". Deliberately its own query against its own endpoint, so
+// a failure here never affects the main order feed above.
+export function useCancelledOrdersToday() {
+  return useQuery({
+    queryKey: ['orders', 'cancelled-today'],
+    queryFn: async (): Promise<number[]> => {
+      const res = await fetch('/api/orders/cancelled-today');
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data.queueNumbers) ? data.queueNumbers : [];
+    },
+    refetchInterval: 60000,
+    refetchOnWindowFocus: false,
+    staleTime: 30000,
+  });
+}
+
 export function useUpdateOrderStatus() {
   const queryClient = useQueryClient();
   

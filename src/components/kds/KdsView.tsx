@@ -1,7 +1,7 @@
 'use client';
 
-import { ReactNode, useEffect, useState, useMemo } from 'react';
-import { useKitchenOrders, useUpdateOrderStatus, getKdsLastSyncedAt } from '@/hooks/useOrders';
+import { ReactNode, useEffect, useState, useMemo, useRef } from 'react';
+import { useKitchenOrders, useUpdateOrderStatus, getKdsLastSyncedAt, useCancelledOrdersToday } from '@/hooks/useOrders';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useQueryClient } from '@tanstack/react-query';
 import { OrderData } from '@/lib/types';
@@ -31,6 +31,7 @@ interface KdsViewProps {
 export function KdsView({ type, title, headerExtra, printerConnected, onPrintLabel }: KdsViewProps) {
   const queryClient = useQueryClient();
   const { data: orders = [], isLoading: loading, refetch: fetchOrders, isFetching: refreshing } = useKitchenOrders();
+  const { data: cancelledQueueNumbers = [] } = useCancelledOrdersToday();
   const [printStatusByOrderId, setPrintStatusByOrderId] = useState<Record<string, string>>({});
   const [printingOrderId, setPrintingOrderId] = useState<string | null>(null);
 
@@ -67,13 +68,18 @@ export function KdsView({ type, title, headerExtra, printerConnected, onPrintLab
       channel = pusher.subscribe('kitchen');
 
       channel.bind('ORDER_CREATED', (data: { order: any }) => {
+        // Barista and Kitchen both listen on this same shared 'kitchen'
+        // channel -- ORDER_CREATED fires for every new order regardless of
+        // what's in it, and its payload doesn't even carry categorySlug per
+        // item (see pos.adapter.ts's broadcast). So the notification sound
+        // is NOT played here -- it's decided below, from the actual
+        // category-filtered order data this station already has, once the
+        // invalidation below pulls it in. Confirmed live 2026-09-24: both
+        // stations were dinging for every order, including ones with
+        // nothing relevant to them (e.g. Kitchen ringing for a drinks-only
+        // order after Refreshment correctly moved to Barista).
         console.log('[Pusher] New order received:', data.order);
         queryClient.invalidateQueries({ queryKey: ['orders', 'kitchen'] });
-
-        try {
-          const audio = new Audio('/sounds/new-order.wav');
-          audio.play().catch(() => { /* user interaction required */ });
-        } catch { /* ignore */ }
       });
 
       channel.bind('ORDER_UPDATED', (data: { order: any }) => {
@@ -180,6 +186,44 @@ export function KdsView({ type, title, headerExtra, printerConnected, onPrintLab
     console.log(`[KdsView - ${type}] Computed ordersPreparing count: ${res.length}`, res.map(o => ({ id: o.id, baristaStatus: o.baristaStatus, kitchenStatus: o.kitchenStatus, status: o.status })));
     return res;
   }, [filteredOrders, type]);
+
+  // IDs of PENDING orders that actually have at least one item for THIS
+  // station -- built straight from `orders` (not `filteredOrders`) so an
+  // active search query never hides a genuinely new order from this check.
+  const pendingOrderIdsForStation = useMemo(() => {
+    const ids = new Set<string>();
+    for (const order of orders as any[]) {
+      const currentStatus = type === 'barista' ? order.baristaStatus : order.kitchenStatus;
+      if ((currentStatus || order.status) !== 'PENDING') continue;
+      const hasRelevantItem = order.items.some((item: any) => {
+        const isCoffee = !isKitchenCategory(item.categorySlug);
+        return type === 'barista' ? isCoffee : !isCoffee;
+      });
+      if (hasRelevantItem) ids.add(String(order.id));
+    }
+    return ids;
+  }, [orders, type]);
+
+  // Plays the notification sound only when a PENDING order relevant to THIS
+  // station appears that wasn't there a moment ago -- decoupled from the
+  // Pusher ORDER_CREATED event on purpose (see that handler's comment).
+  // `prevIdsRef` starting at null means the very first render just records
+  // today's already-existing orders as the baseline instead of ringing for
+  // all of them at once.
+  const prevPendingIdsForStationRef = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    const prevIds = prevPendingIdsForStationRef.current;
+    if (prevIds) {
+      const hasNewOrder = [...pendingOrderIdsForStation].some((id) => !prevIds.has(id));
+      if (hasNewOrder) {
+        try {
+          const audio = new Audio('/sounds/new-order.wav');
+          audio.play().catch(() => { /* user interaction required */ });
+        } catch { /* ignore */ }
+      }
+    }
+    prevPendingIdsForStationRef.current = pendingOrderIdsForStation;
+  }, [pendingOrderIdsForStation]);
 
   const updateOrderStatus = (orderId: number | string, newStatus: string) => {
     if (!isOnline) {
@@ -340,6 +384,11 @@ export function KdsView({ type, title, headerExtra, printerConnected, onPrintLab
               )}
             </div>
             <p className="text-zinc-500 text-sm mt-1 font-medium">{filteredOrders.length} active orders filtered</p>
+            {cancelledQueueNumbers.length > 0 && (
+              <p className="text-zinc-600 text-xs mt-1">
+                Dibatalkan hari ini: {cancelledQueueNumbers.map((q) => `#${String(q).padStart(3, '0')}`).join(', ')}
+              </p>
+            )}
             {!isOnline && (
               <div className="mt-3 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-300 max-w-md">
                 Koneksi terputus. Menampilkan data terakhir
