@@ -16,26 +16,21 @@ model User {
   role             Role       @default(CASHIER)
   defaultStationId String?
   createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
   orders           Order[]
-  shiftLogs        ShiftLog[]
 }
 
 model Order {
   id                  String           @id
   stationId           String
   cashierId           String
-  tableNumber         String?
   queueNumber         Int? // Daily queue number (001, 002, ...) resets at 00:00 WIB
   status              OrderStatus      @default(PENDING)
   baristaStatus       OrderStatus      @default(PENDING)
   kitchenStatus       OrderStatus      @default(PENDING)
   total               Int
   paymentMethod       String?
-  cashReceived        Int?
-  changeAmount        Int?
-  edcTransactionId    String?
   olseraSynced        Boolean          @default(false)
-  olseraSyncedAt      DateTime?
   olseraTransactionId String?
   // Kode voucher/kupon yang dipakai di order ini (uppercase, mis. "RKARCADE") --
   // Olsera's Open API punya field `usage` di /discountvoucher, tapi itu cuma
@@ -105,9 +100,10 @@ model OrderItem {
   name     String
   price    Int
   quantity Int
-  subtotal Int
-  notes    String?
-  order    Order   @relation(fields: [orderId], references: [id])
+  subtotal  Int
+  notes     String?
+  createdAt DateTime @default(now())
+  order     Order    @relation(fields: [orderId], references: [id])
 
   @@index([orderId])
 }
@@ -125,51 +121,7 @@ model VoucherCap {
   code        String   @unique
   maxDiscount Int
   createdAt   DateTime @default(now())
-}
-
-model ShiftLog {
-  id          String    @id @default(cuid())
-  stationId   String
-  cashierId   String
-  startTime   DateTime  @default(now())
-  endTime     DateTime?
-  openingCash Int       @default(0)
-  closingCash Int?
-  totalSales  Int?
-  cashier     User      @relation(fields: [cashierId], references: [id])
-
-  @@index([stationId, startTime])
-}
-
-model ProductCache {
-  olseraId    String   @id
-  name        String
-  description String?
-  price       Int
-  stock       Int
-  category    String
-  imageUrl    String?
-  isActive    Boolean  @default(true)
-  cachedAt    DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
-  @@index([category])
-  @@index([isActive])
-  @@index([cachedAt])
-}
-
-model OlseraSyncLog {
-  id          String   @id @default(cuid())
-  type        String
-  status      String
-  orderId     String?
-  productId   String?
-  itemsSynced Int?
-  errorMsg    String?
-  createdAt   DateTime @default(now())
-
-  @@index([type, createdAt])
-  @@index([status])
 }
 
 enum Role {
@@ -237,8 +189,11 @@ model EdcJob {
 
 // Daily queue counter — resets at 00:00 WIB each day
 model QueueCounter {
-  date    String @id // Format: "2026-05-19" (WIB date)
-  counter Int    @default(0)
+  id        String   @id @default(cuid())
+  date      String   @unique // Format: "2026-05-19" (WIB date)
+  counter   Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // ============================================================
@@ -333,9 +288,11 @@ model TierRule {
   // minimal 1 minuman"; beverage-nya yang termurah dari yang dibeli (bukan
   // termahal), snack/merch masing-masing 1 item TETAP yang admin tentukan
   // (lihat RewardsCatalog.isBirthdayReward), bukan pilihan member.
-  birthdayFreeBeverage  Boolean @default(false)
-  birthdayFreeSnack     Boolean @default(false)
-  birthdayFreeMerch     Boolean @default(false)
+  birthdayFreeBeverage  Boolean  @default(false)
+  birthdayFreeSnack     Boolean  @default(false)
+  birthdayFreeMerch     Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 }
 
 // Singleton (selalu 1 baris, id tetap "singleton") — semua angka yang bisa
@@ -346,7 +303,9 @@ model LoyaltyConfig {
   pointExpiryMonths          Int    @default(12)
   tierPeriodDays             Int    @default(365)
   tierUpgradeClaimWindowDays Int    @default(90)
-  weeklyMemberDayOfWeek      Int    @default(3) // 0=Minggu .. 6=Sabtu
+  weeklyMemberDayOfWeek      Int      @default(3) // 0=Minggu .. 6=Sabtu
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
 }
 
 model RewardsCatalog {
@@ -395,6 +354,8 @@ model RedeemedReward {
   redeemedAt       DateTime             @default(now())
   expiresAt        DateTime // redeemedAt + 30 hari
   usedInOrderId    String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
 
   member         Member         @relation(fields: [memberId], references: [id])
   rewardsCatalog RewardsCatalog @relation(fields: [rewardsCatalogId], references: [id])
