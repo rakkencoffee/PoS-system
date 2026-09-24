@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
+import { isKitchenCategory } from '@/lib/promo-categories';
 
 const USE_OLSERA = process.env.USE_OLSERA === 'true';
 
@@ -253,8 +254,8 @@ export async function GET(request: NextRequest) {
           let kitchenStatus = localData?.kitchenStatus || kdsStatus;
 
           // AUTO-COMPLETE station if it has no relevant items
-          const hasCoffee = normalizedItems.some((i: any) => ['rakken-signature', 'rakken-style'].includes(i.categorySlug));
-          const hasKitchen = normalizedItems.some((i: any) => !['rakken-signature', 'rakken-style'].includes(i.categorySlug));
+          const hasCoffee = normalizedItems.some((i: any) => !isKitchenCategory(i.categorySlug));
+          const hasKitchen = normalizedItems.some((i: any) => isKitchenCategory(i.categorySlug));
 
           if (!hasCoffee) baristaStatus = 'COMPLETED';
           if (!hasKitchen) kitchenStatus = 'COMPLETED';

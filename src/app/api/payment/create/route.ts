@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyOrderItems, computeVoucherDiscount, computeAutoPromoDiscount } from "@/lib/order-pricing";
 
+// The after() settlement callback below waits on createOrder()'s
+// itemSyncPromise (its own retry loop: up to 4 Olsera round-trips, ~1-2s
+// each) BEFORE starting its own sequential Olsera calls (payment methods,
+// order detail, mark-paid, status update) plus an 8-attempt Prisma retry --
+// easily 10-20s+ total when Olsera is slow, which silently exceeds the
+// platform's default function timeout and gets the whole callback killed
+// mid-flight with no error logged (confirmed live 2026-09-24: a batch of
+// paid orders never got marked PAID -- invisible on KDS -- and Olsera never
+// received the payment amount at all, a POS/EDC nominal mismatch). Same
+// fix already applied to api/orders/[id]/route.ts for the same reason.
+export const maxDuration = 60;
+
 /**
  * POST /api/payment/create
  *

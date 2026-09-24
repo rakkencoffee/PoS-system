@@ -5,6 +5,7 @@ import { useKitchenOrders, useUpdateOrderStatus, getKdsLastSyncedAt } from '@/ho
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useQueryClient } from '@tanstack/react-query';
 import { OrderData } from '@/lib/types';
+import { isKitchenCategory } from '@/lib/promo-categories';
 
 interface KdsViewProps {
   type: 'kitchen' | 'barista';
@@ -143,7 +144,7 @@ export function KdsView({ type, title, headerExtra, printerConnected, onPrintLab
     return orders.map((order: any) => {
       // Filter items based on KDS type
       const items = order.items.filter((item: any) => {
-        const isCoffee = ['rakken-signature', 'rakken-style'].includes(item.categorySlug);
+        const isCoffee = !isKitchenCategory(item.categorySlug);
         return type === 'barista' ? isCoffee : !isCoffee;
       });
 

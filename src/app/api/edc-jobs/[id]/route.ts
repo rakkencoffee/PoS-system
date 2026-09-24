@@ -4,6 +4,13 @@ import { safeEqual } from '@/lib/safe-equal';
 
 const EDC_BRIDGE_API_KEY = process.env.EDC_BRIDGE_API_KEY || '';
 
+// Same reasoning as api/payment/create/route.ts's maxDuration: the after()
+// settlement callback below runs several sequential Olsera calls, which
+// can silently exceed the platform's default function timeout and get
+// killed mid-flight -- the order never gets marked PAID (invisible on KDS)
+// and Olsera never gets told the paid amount (POS/EDC nominal mismatch).
+export const maxDuration = 60;
+
 /**
  * PATCH /api/edc-jobs/[id]
  *

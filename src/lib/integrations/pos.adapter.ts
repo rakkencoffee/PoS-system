@@ -15,6 +15,7 @@ import { logOrderStatusChange, type StatusLogSource } from "@/lib/order-status-l
 import { BAG_OPTIONS } from "@/lib/bag-options";
 import { Prisma } from "@prisma/client";
 import { redis } from "@/lib/redis";
+import { isKitchenCategory } from "@/lib/promo-categories";
 
 const BAG_PRODUCT_IDS = new Set(BAG_OPTIONS.map((b) => String(b.olseraProductId)));
 
@@ -205,11 +206,20 @@ function mapOlseraProduct(
     description: product.description || "",
     price,
     image: product.photo_md || product.photo || product.image || "",
-    // "pos_hidden": 0 means it's available in POS
+    // "pos_hidden": 0 means it's available in POS. "is_out_stock" is
+    // Olsera's own already-computed out-of-stock flag (accounts for
+    // stock_qty/hold_qty/track_inventory internally, so we don't have to
+    // re-derive stock math ourselves) -- confirmed live 2026-09-24 via the
+    // product list endpoint that it's present on every product, 1/0.
+    // Without this check the kiosk kept selling items Olsera had already
+    // run out of (confirmed live: "Blueberry Crumble Cheesecake only left 0
+    // hold"), which then 406'd when checkout tried to add it to the Olsera
+    // order -- silently, after the customer had already paid.
     isAvailable:
-      Number(product.pos_hidden) === 0 ||
-      Number(product.is_active) === 1 ||
-      product.is_active === true,
+      (Number(product.pos_hidden) === 0 ||
+        Number(product.is_active) === 1 ||
+        product.is_active === true) &&
+      Number(product.is_out_stock) !== 1,
     isBestSeller: false,
     isRecommended: false,
     type: "both",
@@ -835,11 +845,11 @@ export async function createOrder(
 
         const hasCoffee = items.some((item) => {
           const categorySlug = catMap.get(item.name || "");
-          return ["rakken-signature", "rakken-style"].includes(categorySlug);
+          return !isKitchenCategory(categorySlug);
         });
         const hasFood = items.some((item) => {
           const categorySlug = catMap.get(item.name || "");
-          return !["rakken-signature", "rakken-style"].includes(categorySlug);
+          return isKitchenCategory(categorySlug);
         });
 
         const baseTotal = items.reduce(

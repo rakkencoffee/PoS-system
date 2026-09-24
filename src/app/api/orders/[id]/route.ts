@@ -6,6 +6,7 @@ import { logOrderStatusChange } from '@/lib/order-status-log';
 import { sendPushToMember } from '@/lib/push';
 import { auth } from '@/lib/auth';
 import { BAG_OPTIONS } from '@/lib/bag-options';
+import { isKitchenCategory } from '@/lib/promo-categories';
 
 const USE_OLSERA = process.env.USE_OLSERA === 'true';
 const BAG_NAMES = new Set(BAG_OPTIONS.map((b) => b.label));
@@ -476,12 +477,12 @@ export async function PATCH(
           const hasCoffee = rawItems.some((i: any) => {
             const name = i.product_name || i.name || '';
             const categorySlug = catMap.get(name);
-            return ['rakken-signature', 'rakken-style'].includes(categorySlug);
+            return !isKitchenCategory(categorySlug);
           });
           const hasFood = rawItems.some((i: any) => {
             const name = i.product_name || i.name || '';
             const categorySlug = catMap.get(name);
-            return !['rakken-signature', 'rakken-style'].includes(categorySlug);
+            return isKitchenCategory(categorySlug);
           });
 
           // Fetch a valid user for cashierId to prevent Prisma foreign key constraints

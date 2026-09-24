@@ -7,6 +7,7 @@
  */
 
 import { RAKKEN_LOGO_288, type LogoRaster } from './rakken-logo';
+import { isKitchenCategory } from '@/lib/promo-categories';
 
 const ESC = 0x1b;
 const GS = 0x1d;
@@ -338,14 +339,12 @@ export function formatReceipt(data: ReceiptData, lineWidth = 48, cut = false): B
   return Buffer.concat(parts);
 }
 
-const DRINK_CATEGORIES = ['bites', 'dessert', 'main-course', 'snack', 'pastry', 'makanan', 'cemilan', 'packaging', 'other'];
-
 /** Exported so alternate label formatters (e.g. format-label-tspl.ts) classify items identically. */
 export function isDrinkItem(item: ReceiptItem): boolean {
   const category = (item.categorySlug || item.category || '').toLowerCase();
-  if (category) return !DRINK_CATEGORIES.some((excluded) => category.includes(excluded));
+  if (category) return !isKitchenCategory(category);
   const name = (item.menuItem?.name || item.name || '').toLowerCase();
-  return !DRINK_CATEGORIES.some((excluded) => name.includes(excluded));
+  return !isKitchenCategory(name);
 }
 
 /**
