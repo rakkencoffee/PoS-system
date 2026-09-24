@@ -2,6 +2,12 @@
 
 import { useState } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
+import { Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+
+const darkInput = 'h-12 rounded-xl border-white/10 bg-zinc-950 text-base text-white placeholder:text-zinc-500 focus-visible:border-primary focus-visible:ring-primary/30';
 
 const ALLOWED_ROLES = ['KITCHEN', 'ADMIN'];
 
@@ -14,8 +20,8 @@ export function KdsAuthGate({ children, station }: { children: React.ReactNode; 
 
   if (status === 'loading') {
     return (
-      <div className="min-h-dvh flex items-center justify-center bg-[#0F0F0F]">
-        <div className="w-10 h-10 border-4 border-[#A8131E] border-t-transparent rounded-full animate-spin" />
+      <div className="flex min-h-dvh items-center justify-center bg-zinc-950">
+        <Loader2 className="size-8 animate-spin text-primary" aria-label="Memuat" />
       </div>
     );
   }
@@ -42,70 +48,62 @@ export function KdsAuthGate({ children, station }: { children: React.ReactNode; 
   const isWrongRole = status === 'authenticated' && !ALLOWED_ROLES.includes(role);
 
   return (
-    <div className="min-h-dvh flex items-center justify-center p-6 bg-[#0F0F0F]">
+    <div className="flex min-h-dvh items-center justify-center bg-zinc-950 px-4 py-10">
       <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <img src="/rakken-icon.svg" alt="Rakken Coffee" className="h-14 w-14 object-contain mx-auto drop-shadow-2xl" />
-          <h1 className="text-2xl font-black tracking-tight text-white mt-4">
-            <span className="text-[#A8131E]">RAKKEN</span> {station}
+        <div className="mb-8 text-center">
+          <img src="/rakken-icon.svg" alt="Rakken Coffee" className="mx-auto size-14 object-contain" />
+          <h1 className="mt-4 text-2xl font-bold text-white">
+            <span className="text-primary-fixed-dim">RAKKEN</span> {station}
           </h1>
         </div>
 
-        <div className="bg-zinc-900 border border-zinc-800 rounded-[2rem] p-8">
+        <div className="rounded-2xl border border-white/10 bg-zinc-900 p-6">
           {isWrongRole ? (
             <div className="space-y-4 text-center">
-              <p className="text-sm text-zinc-400">
-                Akun <span className="font-bold text-white">{session?.user?.name}</span> tidak punya akses ke halaman ini.
+              <p className="text-sm text-zinc-300">
+                Akun <span className="font-semibold text-white">{session?.user?.name}</span> tidak punya akses ke halaman ini.
               </p>
-              <button
-                onClick={() => signOut({ redirect: false })}
-                className="w-full py-3 rounded-xl bg-zinc-800 text-white font-bold text-sm hover:bg-zinc-700 transition-all"
-              >
+              <Button variant="surface" size="lg" className="w-full" onClick={() => signOut({ redirect: false })}>
                 Login sebagai user lain
-              </button>
+              </Button>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
-                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
+                <p role="alert" className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">
                   {error}
-                </div>
+                </p>
               )}
-              <div>
-                <label className="block text-xs font-bold text-zinc-400 mb-2 uppercase tracking-wider">Username</label>
-                <input
-                  type="text"
+              <div className="space-y-2">
+                <Label htmlFor="kds-username" className="text-zinc-300">Username</Label>
+                <Input
+                  id="kds-username"
+                  autoComplete="username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   required
                   disabled={isLoading}
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#A8131E] transition-all"
+                  className={darkInput}
                   placeholder="Masukkan username"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-bold text-zinc-400 mb-2 uppercase tracking-wider">Password</label>
-                <input
+              <div className="space-y-2">
+                <Label htmlFor="kds-password" className="text-zinc-300">Password</Label>
+                <Input
+                  id="kds-password"
                   type="password"
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   disabled={isLoading}
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#A8131E] transition-all"
-                  placeholder="••••••••"
+                  className={darkInput}
                 />
               </div>
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-3.5 rounded-xl bg-[#A8131E] text-white font-bold text-sm hover:bg-red-700 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center"
-              >
-                {isLoading ? (
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  'Sign In'
-                )}
-              </button>
+              <Button type="submit" variant="brand" size="lg" className="w-full" disabled={isLoading}>
+                {isLoading && <Loader2 className="animate-spin" aria-hidden />}
+                {isLoading ? 'Masuk...' : 'Masuk'}
+              </Button>
             </form>
           )}
         </div>

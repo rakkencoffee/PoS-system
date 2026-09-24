@@ -594,7 +594,15 @@ export async function PATCH(
           console.warn(`[Sync] "${id}" has no real Olsera order behind it -- skipping Olsera status sync, local status update stands alone.`);
         } else {
           try {
-            // Only sync if Olsera status needs to change
+            // Without Start Making an order can jump P -> Z; step through A so
+            // Olsera always sees the P -> A -> Z sequence it has accepted before.
+            if (olseraStatus === 'Z') {
+              try {
+                await olsera.updateOrderStatus(olseraOrderId, 'A');
+              } catch (stepErr) {
+                console.warn(`[Sync] Pre-complete "A" step for ${olseraOrderId} failed (continuing to Z):`, stepErr instanceof Error ? stepErr.message : stepErr);
+              }
+            }
             await olsera.updateOrderStatus(olseraOrderId, olseraStatus);
             console.log(`Successfully synced Olsera order ${olseraOrderId} to combined status ${olseraStatus}`);
           } catch (err: any) {

@@ -1,11 +1,19 @@
 'use client';
 
 import { ReactNode, useEffect, useState, useMemo, useRef } from 'react';
-import { useKitchenOrders, useUpdateOrderStatus, getKdsLastSyncedAt, useCancelledOrdersToday } from '@/hooks/useOrders';
+import { Check, Inbox, Loader2, Printer, RefreshCw, Search, WifiOff, X } from 'lucide-react';
+import { useKitchenOrders, useUpdateOrderStatus, getKdsLastSyncedAt } from '@/hooks/useOrders';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useQueryClient } from '@tanstack/react-query';
-import { OrderData } from '@/lib/types';
 import { isKitchenCategory } from '@/lib/promo-categories';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
+
+function formatClock(date: Date) {
+  return date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' });
+}
 
 interface KdsViewProps {
   type: 'kitchen' | 'barista';
@@ -31,7 +39,6 @@ interface KdsViewProps {
 export function KdsView({ type, title, headerExtra, printerConnected, onPrintLabel }: KdsViewProps) {
   const queryClient = useQueryClient();
   const { data: orders = [], isLoading: loading, refetch: fetchOrders, isFetching: refreshing } = useKitchenOrders();
-  const { data: cancelledQueueNumbers = [] } = useCancelledOrdersToday();
   const [printStatusByOrderId, setPrintStatusByOrderId] = useState<Record<string, string>>({});
   const [printingOrderId, setPrintingOrderId] = useState<string | null>(null);
 
@@ -50,7 +57,14 @@ export function KdsView({ type, title, headerExtra, printerConnected, onPrintLab
   const isOnline = useOnlineStatus();
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 15_000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Pull the last-known-good sync timestamp so the offline banner can say "as of HH:mm"
   useEffect(() => {
@@ -169,22 +183,14 @@ export function KdsView({ type, title, headerExtra, printerConnected, onPrintLab
     }).filter(Boolean);
   }, [orders, type, searchQuery]);
 
-  const ordersPending = useMemo(() => {
-    const res = filteredOrders.filter((o: any) => {
+  // PREPARING still happens without a Start Making button (Olsera webhook
+  // moving an order to "A"), so it stays on the board alongside PENDING.
+  const activeOrders = useMemo(() => {
+    return filteredOrders.filter((o: any) => {
       const currentStatus = type === 'barista' ? o.baristaStatus : o.kitchenStatus;
-      return (currentStatus || o.status) === 'PENDING';
+      const displayStatus = currentStatus || o.status;
+      return displayStatus === 'PENDING' || displayStatus === 'PREPARING';
     });
-    console.log(`[KdsView - ${type}] Computed ordersPending count: ${res.length}`, res.map(o => ({ id: o.id, baristaStatus: o.baristaStatus, kitchenStatus: o.kitchenStatus, status: o.status })));
-    return res;
-  }, [filteredOrders, type]);
-  
-  const ordersPreparing = useMemo(() => {
-    const res = filteredOrders.filter((o: any) => {
-      const currentStatus = type === 'barista' ? o.baristaStatus : o.kitchenStatus;
-      return (currentStatus || o.status) === 'PREPARING';
-    });
-    console.log(`[KdsView - ${type}] Computed ordersPreparing count: ${res.length}`, res.map(o => ({ id: o.id, baristaStatus: o.baristaStatus, kitchenStatus: o.kitchenStatus, status: o.status })));
-    return res;
   }, [filteredOrders, type]);
 
   // IDs of PENDING orders that actually have at least one item for THIS
@@ -244,236 +250,202 @@ export function KdsView({ type, title, headerExtra, printerConnected, onPrintLab
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0F0F0F]">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-[#A8131E] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-zinc-500">Loading orders...</p>
-        </div>
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-zinc-950 text-zinc-400">
+        <Loader2 className="size-8 animate-spin text-primary" aria-hidden />
+        <p className="text-sm">Memuat pesanan...</p>
       </div>
     );
   }
 
+  const stationItemLabel = type === 'barista' ? 'minuman' : 'makanan';
+
   const renderOrderCard = (order: any) => {
-    const currentStatus = type === 'barista' ? order.baristaStatus : order.kitchenStatus;
-    const displayStatus = currentStatus || order.status;
+    const orderKey = String(order.id);
+    const isCompleting = updateStatusMutation.isPending && String(updateStatusMutation.variables?.orderId) === orderKey;
+    const isPrinting = printingOrderId === orderKey;
+    const printMessage = printStatusByOrderId[orderKey];
 
     return (
-      <div key={order.id} className={`rounded-2xl border-2 p-5 transition-all bg-zinc-900/50 ${displayStatus === 'PENDING' ? 'border-yellow-500/20' : 'border-blue-500/20'}`}>
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-3">
-            <div>
-              <span className={`text-3xl font-black ${displayStatus === 'PENDING' ? 'text-yellow-500' : 'text-blue-500'}`}>
-                #{String(order.queueNumber).padStart(3, '0')}
-              </span>
-              <div className="text-xs font-mono text-zinc-500 mt-1">
-                {order.orderNo || order.id}
-              </div>
-            </div>
-            <div>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${displayStatus === 'PENDING' ? 'bg-yellow-500/20 text-yellow-500' : 'bg-blue-500/20 text-blue-500'}`}>
-                {displayStatus}
-              </span>
-              <p className="text-[10px] text-zinc-500 mt-0.5">{new Date(order.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</p>
-            </div>
+      <article key={order.id} className="flex flex-col rounded-2xl border border-white/10 bg-zinc-900 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-[family-name:var(--font-jetbrains-mono)] font-extrabold text-3xl leading-none text-white tabular-nums">
+              #{String(order.queueNumber).padStart(3, '0')}
+            </p>
+            {order.customerName && (
+              <p className="mt-2 truncate text-base font-semibold text-zinc-200">{order.customerName}</p>
+            )}
+          </div>
+          <div className="shrink-0 text-right">
+            <p className="text-sm font-medium text-zinc-300 tabular-nums">
+              {formatClock(new Date(order.createdAt))}
+            </p>
+            {order.orderNo && (
+              <p className="mt-1 max-w-[9rem] truncate font-mono text-xs text-zinc-500">{order.orderNo}</p>
+            )}
           </div>
         </div>
-        {/* Customer Name */}
-        {order.customerName && (
-          <div className="mb-3 px-3 py-2 bg-amber-500/10 border border-amber-500/20 rounded-xl">
-            <p className="text-xs text-amber-400 font-bold">{order.customerName}</p>
-          </div>
-        )}
 
-        <div className="space-y-2 mb-4">
+        <ul className="mt-4 flex-1 divide-y divide-white/5 border-y border-white/5">
           {order.items.map((item: any) => {
-            // Parse notes into structured display
             const notesParts = (item.notes || '').split(',').map((n: string) => n.trim()).filter(Boolean);
-            const hasNotes = notesParts.length > 0;
-            
             return (
-              <div key={item.id} className="bg-black/20 rounded-xl p-3 border border-white/5">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-white text-sm">
-                    {item.quantity}x {item.menuItem?.name}
-                  </span>
-                  {item.size && item.size !== '-' && (
-                    <span className="text-[10px] text-zinc-400 bg-white/5 px-2 py-0.5 rounded-full font-medium">
-                      {item.size}
-                    </span>
-                  )}
+              <li key={item.id} className="py-3">
+                <div className="flex items-baseline gap-2.5">
+                  <span className="font-[family-name:var(--font-jetbrains-mono)] font-extrabold text-base text-white tabular-nums">{item.quantity}x</span>
+                  <span className="flex-1 text-base font-semibold leading-snug text-white">{item.menuItem?.name}</span>
+                  {item.size && item.size !== '-' && <Badge variant="surface">{item.size}</Badge>}
                 </div>
-                {hasNotes && (
-                  <div className="mt-1.5 flex flex-wrap gap-1">
-                    {notesParts.map((note: string, i: number) => {
-                      // Determine badge color based on note type
-                      let badgeColor = 'bg-zinc-700/50 text-zinc-300';
-                      const lower = note.toLowerCase();
-                      if (lower.includes('size') || lower.includes('hot') || lower.includes('ice') || lower.includes('cold')) {
-                        badgeColor = 'bg-cyan-500/15 text-cyan-400';
-                      } else if (lower.includes('sugar')) {
-                        badgeColor = 'bg-amber-500/15 text-amber-400';
-                      } else if (lower.includes('icelevel') || lower.includes('ice level')) {
-                        badgeColor = 'bg-blue-500/15 text-blue-400';
-                      }
-                      return (
-                        <span key={i} className={`text-[10px] px-2 py-0.5 rounded-md font-medium ${badgeColor}`}>
-                          {note.replace(/^(size|sugarLevel|iceLevel|sugar|ice):\s*/i, (_, key) => `${key}: `)}
-                        </span>
-                      );
-                    })}
+                {notesParts.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {notesParts.map((note: string, i: number) => (
+                      <Badge key={i} variant="surface" className="text-[13px]">
+                        {note.replace(/^(size|sugarLevel|iceLevel|sugar|ice):\s*/i, (_, key) => `${key}: `)}
+                      </Badge>
+                    ))}
                   </div>
                 )}
-              </div>
+              </li>
             );
           })}
-        </div>
+        </ul>
 
-        <div className="flex gap-2">
-          {displayStatus === 'PENDING' ? (
-            <button
-              onClick={() => updateOrderStatus(order.id, 'PREPARING')}
-              disabled={!isOnline}
-              className="flex-1 py-3 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-500 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
-            >
-              Start Making
-            </button>
-          ) : (
-            <button
-              onClick={() => updateOrderStatus(order.id, 'COMPLETED')}
-              disabled={!isOnline}
-              className="flex-1 py-3 rounded-xl bg-green-600 text-white font-bold text-sm hover:bg-green-500 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
-            >
-              Complete
-            </button>
-          )}
+        <div className="mt-4 flex gap-2">
+          <Button
+            variant="brand"
+            size="lg"
+            className="flex-1"
+            onClick={() => updateOrderStatus(order.id, 'COMPLETED')}
+            disabled={!isOnline || isCompleting}
+          >
+            {isCompleting ? <Loader2 className="animate-spin" aria-hidden /> : <Check aria-hidden />}
+            {isCompleting ? 'Menyimpan...' : 'Complete'}
+          </Button>
           {onPrintLabel && (
-            <button
-              onClick={() => handlePrintLabel(String(order.id))}
-              disabled={!printerConnected || printingOrderId === String(order.id)}
-              title={printerConnected ? 'Cetak ulang label order ini' : 'Connect printer dulu'}
-              className="px-4 py-3 rounded-xl bg-zinc-800 border border-zinc-700 text-zinc-200 font-bold text-sm hover:bg-zinc-700 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
+            <Button
+              variant="surface"
+              size="lg"
+              onClick={() => handlePrintLabel(orderKey)}
+              disabled={!printerConnected || isPrinting}
+              title={printerConnected ? 'Cetak ulang label order ini' : 'Hubungkan printer dulu'}
             >
-              {printingOrderId === String(order.id) ? 'Mencetak...' : 'Print Label'}
-            </button>
+              {isPrinting ? <Loader2 className="animate-spin" aria-hidden /> : <Printer aria-hidden />}
+              {isPrinting ? 'Mencetak' : 'Label'}
+            </Button>
           )}
         </div>
-        {onPrintLabel && printStatusByOrderId[String(order.id)] && (
-          <p className="text-[11px] text-zinc-500 mt-2 text-right">{printStatusByOrderId[String(order.id)]}</p>
+        {onPrintLabel && printMessage && (
+          <p className={cn('mt-2 text-right text-xs', printMessage.startsWith('Gagal') ? 'text-red-300' : 'text-zinc-400')}>
+            {printMessage}
+          </p>
         )}
-      </div>
+      </article>
     );
   };
 
+  const closeSearch = () => {
+    setSearchQuery('');
+    setShowSearch(false);
+  };
+
   return (
-    <div className="min-h-screen bg-[#0F0F0F] text-white p-6">
-        {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-black tracking-tight text-white uppercase">{title}</h1>
-              {isOnline ? (
-                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/20">
-                  <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                  <span className="text-[10px] font-black text-green-500 uppercase tracking-widest">Live</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20">
-                  <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                  <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">Offline</span>
-                </div>
-              )}
-            </div>
-            <p className="text-zinc-500 text-sm mt-1 font-medium">{filteredOrders.length} active orders filtered</p>
-            {cancelledQueueNumbers.length > 0 && (
-              <p className="text-zinc-600 text-xs mt-1">
-                Dibatalkan hari ini: {cancelledQueueNumbers.map((q) => `#${String(q).padStart(3, '0')}`).join(', ')}
-              </p>
-            )}
-            {!isOnline && (
-              <div className="mt-3 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-300 max-w-md">
-                Koneksi terputus. Menampilkan data terakhir
-                {lastSyncedAt ? ` jam ${new Date(lastSyncedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}` : ''}
-                — aksi status dinonaktifkan sampai koneksi kembali.
+    <div className="min-h-dvh bg-zinc-950 text-zinc-100 selection:bg-primary/40">
+      <header className="sticky top-0 z-20 border-b border-white/10 bg-zinc-950 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+        <div className="mx-auto max-w-6xl">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h1 className="truncate text-lg font-bold text-white">{title}</h1>
+                <span
+                  className={cn(
+                    'inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold',
+                    isOnline ? 'bg-emerald-500/10 text-emerald-300' : 'bg-red-500/10 text-red-300'
+                  )}
+                >
+                  <span className={cn('size-1.5 rounded-full', isOnline ? 'bg-emerald-400' : 'bg-red-400')} aria-hidden />
+                  {isOnline ? 'Live' : 'Offline'}
+                </span>
               </div>
-            )}
+              <p className="mt-0.5 text-sm text-zinc-400">
+                {activeOrders.length} pesanan aktif
+              </p>
+            </div>
+            <time className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] font-extrabold text-2xl text-white tabular-nums">{formatClock(now)}</time>
           </div>
 
-          {/* Search Bar */}
-          <div className="relative flex-1 max-w-md">
-            <input
-              type="text"
-              placeholder="Cari Pesanan atau Menu..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-5 py-3.5 pl-12 text-sm focus:outline-none focus:border-[#A8131E] transition-all placeholder:text-zinc-600"
-            />
-            <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            {searchQuery && (
-              <button onClick={() => setSearchQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            )}
-          </div>
-
-          <div className="flex items-center gap-3">
-            {headerExtra}
-            <button
+          <div className="mt-3 flex items-center gap-2">
+            <div className="min-w-0 flex-1">{headerExtra}</div>
+            <Button
+              variant={showSearch ? 'brand' : 'surface'}
+              size="icon"
+              aria-label={showSearch ? 'Tutup pencarian' : 'Cari pesanan'}
+              aria-pressed={showSearch}
+              onClick={() => (showSearch ? closeSearch() : setShowSearch(true))}
+            >
+              {showSearch ? <X aria-hidden /> : <Search aria-hidden />}
+            </Button>
+            <Button
+              variant="surface"
+              size="icon"
+              aria-label="Muat ulang pesanan"
               onClick={() => fetchOrders()}
               disabled={refreshing}
-              className="px-5 py-3 rounded-2xl bg-zinc-900 border border-zinc-800 text-sm font-bold flex items-center gap-2 hover:bg-zinc-800 transition-all disabled:opacity-50"
             >
-              <svg className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              {refreshing ? 'Syncing' : 'Sync Data'}
-            </button>
-            <div className="bg-zinc-900 border border-zinc-800 px-5 py-3 rounded-2xl">
-              <p className="text-lg font-black tabular-nums">{new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</p>
-            </div>
+              <RefreshCw className={cn(refreshing && 'animate-spin')} aria-hidden />
+            </Button>
           </div>
-        </div>
 
-        {/* Content Section */}
-        {filteredOrders.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-32 bg-zinc-900/20 border border-dashed border-zinc-800 rounded-[3rem]">
-            <h2 className="text-2xl font-bold text-zinc-500 mb-2">No Active Orders</h2>
-            <p className="text-zinc-600">Waiting for {type === 'barista' ? 'coffee' : 'kitchen'} items...</p>
+          {showSearch && (
+            <div className="relative mt-3">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" aria-hidden />
+              <Input
+                autoFocus
+                type="search"
+                inputMode="search"
+                placeholder="No. antrian, nama, atau menu"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-11 rounded-xl border-white/10 bg-zinc-900 pl-9 text-base text-white placeholder:text-zinc-500 focus-visible:border-primary focus-visible:ring-primary/30"
+              />
+            </div>
+          )}
+        </div>
+      </header>
+
+      {!isOnline && (
+        <div role="status" className="border-b border-red-500/20 bg-red-500/10 px-4 py-2.5">
+          <p className="mx-auto flex max-w-6xl items-start gap-2 text-sm text-red-200">
+            <WifiOff className="mt-0.5 size-4 shrink-0" aria-hidden />
+            <span>
+              Koneksi terputus. Menampilkan data terakhir
+              {lastSyncedAt ? ` jam ${formatClock(new Date(lastSyncedAt))}` : ''}. Tombol Complete nonaktif sampai online lagi.
+            </span>
+          </p>
+        </div>
+      )}
+
+      <main className="mx-auto max-w-6xl px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-4">
+        {activeOrders.length === 0 ? (
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 px-6 py-20 text-center">
+            <Inbox className="size-10 text-zinc-600" aria-hidden />
+            {searchQuery ? (
+              <>
+                <p className="mt-4 text-base font-semibold text-zinc-300">Nggak ada pesanan yang cocok</p>
+                <p className="mt-1 text-sm text-zinc-500">Coba kata kunci lain, atau tutup pencarian.</p>
+              </>
+            ) : (
+              <>
+                <p className="mt-4 text-base font-semibold text-zinc-300">Belum ada pesanan</p>
+                <p className="mt-1 text-sm text-zinc-500">Pesanan {stationItemLabel} baru muncul otomatis di sini.</p>
+              </>
+            )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Pending Column */}
-            <div>
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-black uppercase tracking-widest text-yellow-500 flex items-center gap-3">
-                  <div className="w-2 h-8 bg-yellow-500 rounded-full" />
-                  Pending
-                  <span className="bg-yellow-500/10 px-3 py-1 rounded-full text-xs">{ordersPending.length}</span>
-                </h3>
-              </div>
-              <div className="space-y-6">
-                {ordersPending.map(renderOrderCard)}
-              </div>
-            </div>
-
-            {/* Preparing Column */}
-            <div>
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-black uppercase tracking-widest text-blue-500 flex items-center gap-3">
-                  <div className="w-2 h-8 bg-blue-500 rounded-full" />
-                  Preparing
-                  <span className="bg-blue-500/10 px-3 py-1 rounded-full text-xs">{ordersPreparing.length}</span>
-                </h3>
-              </div>
-              <div className="space-y-6">
-                {ordersPreparing.map(renderOrderCard)}
-              </div>
-            </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {activeOrders.map(renderOrderCard)}
           </div>
         )}
-      </div>
+      </main>
+    </div>
   );
 }

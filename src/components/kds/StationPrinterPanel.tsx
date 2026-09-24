@@ -1,8 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { ChevronDown, Printer } from 'lucide-react';
 import { printStationLabel } from '@/lib/print/station-print';
 import { STATION_PRINTER_NAME_PREFIXES } from '@/lib/print/ble-config';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 interface StationPrinterPanelProps {
   /** e.g. "/api/kds/sticker" (Barista, drinks) or "/api/kds/food-label" (Kitchen, food) -- jobId is appended. */
@@ -107,44 +110,81 @@ export function StationPrinterPanel({
     }
   };
 
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (e: PointerEvent) => {
+      if (!containerRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [open]);
+
+  const isError = status.startsWith('Gagal');
+  const summary = status || (connected ? deviceName || 'Terhubung' : 'Belum terhubung');
+
   return (
-    <div className="flex items-center gap-3 px-5 py-3 bg-zinc-900 border border-zinc-800 rounded-2xl text-sm font-bold">
-      <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-zinc-600'}`} />
-      {connected ? (
-        <>
-          <span className="text-zinc-300">Printer: {deviceName}</span>
-          <button onClick={disconnect} className="text-zinc-500 hover:text-white transition-colors">
-            Putuskan
-          </button>
-        </>
-      ) : (
-        <>
-          <button
-            onClick={handleConnect}
-            className="text-white font-semibold hover:text-[#A8131E] transition-colors"
-          >
-            Connect Printer
-          </button>
-          <button
-            onClick={handleConnectAnyDevice}
-            title="Pakai ini kalau printer-nya nggak muncul di list Connect Printer (ganti unit baru, misalnya)"
-            className="text-zinc-500 hover:text-white text-xs transition-colors"
-          >
-            Cari Semua Device
-          </button>
-        </>
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex h-11 w-full items-center gap-2.5 rounded-xl border border-white/10 bg-white/5 px-3 text-left transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400"
+      >
+        <Printer className="size-5 shrink-0 text-zinc-300" aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-1.5 text-xs text-zinc-400">
+            <span className={cn('size-1.5 rounded-full', connected ? 'bg-emerald-400' : 'bg-red-400')} aria-hidden />
+            Printer
+          </span>
+          <span className={cn('block truncate text-sm font-medium', isError ? 'text-red-300' : 'text-zinc-100')}>
+            {summary}
+          </span>
+        </span>
+        <ChevronDown className={cn('size-4 shrink-0 text-zinc-500 transition-transform', open && 'rotate-180')} aria-hidden />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full z-30 mt-2 w-[min(20rem,calc(100vw-2rem))] rounded-2xl border border-white/10 bg-zinc-900 p-3 shadow-[0_12px_32px_rgba(0,0,0,0.5)]">
+          {connected ? (
+            <p className="px-1 pb-3 text-sm text-zinc-300">
+              Terhubung ke <span className="font-semibold text-white">{deviceName}</span>. Label kecetak otomatis tiap ada pesanan baru.
+            </p>
+          ) : (
+            <p className="px-1 pb-3 text-sm text-zinc-300">
+              Hubungkan printer supaya label kecetak otomatis tiap ada pesanan baru.
+            </p>
+          )}
+          <div className="flex flex-col gap-2">
+            {connected ? (
+              <Button variant="surface" size="lg" onClick={disconnect}>
+                Putuskan printer
+              </Button>
+            ) : (
+              <>
+                <Button variant="brand" size="lg" onClick={handleConnect}>
+                  Hubungkan printer
+                </Button>
+                <Button
+                  variant="ghost-dark"
+                  size="lg"
+                  onClick={handleConnectAnyDevice}
+                  title="Pakai ini kalau printer-nya nggak muncul di daftar (misal ganti unit baru)"
+                >
+                  Cari semua device
+                </Button>
+              </>
+            )}
+            {lastJobId && (
+              <Button variant="surface" size="lg" onClick={() => printLabel(lastJobId)} disabled={!connected}>
+                Cetak ulang label terakhir
+              </Button>
+            )}
+          </div>
+        </div>
       )}
-      {lastJobId && (
-        <button
-          onClick={() => printLabel(lastJobId)}
-          disabled={!connected}
-          className="ml-2 text-zinc-400 hover:text-white disabled:opacity-40 disabled:hover:text-zinc-400 transition-colors"
-          title="Cetak ulang label order terakhir"
-        >
-          Print Ulang
-        </button>
-      )}
-      {status && <span className="text-zinc-500 ml-2">{status}</span>}
     </div>
   );
 }
