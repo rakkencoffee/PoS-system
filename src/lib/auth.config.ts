@@ -32,6 +32,18 @@ export const authConfig = {
         return true;
       }
 
+      if (pathname.startsWith('/admin/login')) {
+        return true;
+      }
+
+      // Admin pages have their own login screen -- send them there instead of
+      // the default signIn page (/kitchen, the KDS login).
+      if (pathname.startsWith('/admin') && !isLoggedIn) {
+        const loginUrl = new URL('/admin/login', nextUrl);
+        loginUrl.searchParams.set('callbackUrl', pathname);
+        return Response.redirect(loginUrl);
+      }
+
       // Protect all other routes
       if (!isLoggedIn) {
         // Allow public assets and auth APIs
@@ -43,7 +55,6 @@ export const authConfig = {
           pathname.startsWith('/api/jobs') ||
           pathname.startsWith('/api/categories') ||
           pathname.startsWith('/api/menu') ||
-          pathname.startsWith('/api/products') ||
           pathname.startsWith('/api/payment') ||
           pathname.startsWith('/menu') ||
           pathname.startsWith('/cart') ||
