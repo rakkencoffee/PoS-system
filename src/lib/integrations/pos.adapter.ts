@@ -424,10 +424,10 @@ async function createAndDispatchPrintJob(params: {
       // a genuine Barista drink whose name didn't exactly match the menu
       // catalog (a transient getMenuItems() fetch failure, or any naming
       // drift) silently printed on Kitchen's printer instead -- confirmed
-      // live 2026-09-18. Only bag/packaging items get that explicit "other"
-      // treatment now (correct on purpose, they're not on the visible menu
-      // catalog at all); everything else left unmatched falls through to
-      // isDrinkItem()'s own name-keyword fallback instead of being
+      // live 2026-09-18. Bag items are identified by product id and always
+      // tagged "packaging" (Barista board, no printed label), even when the
+      // catalog lookup fails; everything else left unmatched falls through
+      // to isDrinkItem()'s own name-keyword fallback instead of being
       // pre-empted by a fake category.
       const isBagItem = BAG_PRODUCT_IDS.has(String(item.productId || ""));
       const matchedCategory = catMap.get(item.name || "");
@@ -438,7 +438,7 @@ async function createAndDispatchPrintJob(params: {
         price: item.price || 0,
         notes: displayNotes,
         size: displaySize,
-        categorySlug: matchedCategory || (isBagItem ? "other" : undefined),
+        categorySlug: isBagItem ? "packaging" : matchedCategory,
       };
     });
 

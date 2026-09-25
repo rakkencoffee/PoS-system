@@ -21,7 +21,9 @@ export const AUTO_PROMO_REWARD_CATEGORY_SLUG = "refreshment";
 // (lib/print/format-receipt.ts's isDrinkItem) -- confirmed live 2026-09-24
 // that the on-screen split had drifted to a narrower (wrong) list than the
 // print side, routing Refreshment/Non-Coffee orders to Kitchen's board
-// instead of Barista's.
+// instead of Barista's. Packaging (bags, cup carriers) is deliberately NOT
+// here: it goes to Barista's board, but never gets a printed label (see
+// isPackagingItem in lib/print/format-receipt.ts).
 export const KITCHEN_CATEGORY_KEYWORDS = [
   "bites",
   "dessert",
@@ -30,7 +32,6 @@ export const KITCHEN_CATEGORY_KEYWORDS = [
   "pastry",
   "makanan",
   "cemilan",
-  "packaging",
   "other",
 ];
 
