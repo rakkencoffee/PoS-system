@@ -9,7 +9,9 @@ export type StatusLogSource =
   | 'system_recovery'
   | 'edc_bridge'
   | 'kiosk_cancelled'
-  | 'tripay_webhook';
+  | 'tripay_webhook'
+  | 'admin_manual_paid'
+  | 'admin_manual_cancel';
 
 export type StatusField = 'order' | 'barista' | 'kitchen';
 

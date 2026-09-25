@@ -1,9 +1,10 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { edcStatusBadge, formatDateTime, formatRupiah } from "./format";
 
 const ALLOWED_ROLES = ["ADMIN", "MANAGER"];
 
@@ -18,35 +19,6 @@ function startOfTodayWIB(): Date {
   const wibNow = new Date(Date.now() + wibOffsetMs);
   const wibMidnightAsUTC = Date.UTC(wibNow.getUTCFullYear(), wibNow.getUTCMonth(), wibNow.getUTCDate());
   return new Date(wibMidnightAsUTC - wibOffsetMs);
-}
-
-function formatRupiah(amount: number) {
-  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(
-    amount
-  );
-}
-
-function formatDateTime(date: Date) {
-  return new Intl.DateTimeFormat("id-ID", {
-    dateStyle: "medium",
-    timeStyle: "medium",
-    timeZone: "Asia/Jakarta",
-  }).format(date);
-}
-
-function edcStatusBadge(status: string) {
-  switch (status) {
-    case "APPROVED":
-      return <Badge variant="destructive">APPROVED (tapi order batal!)</Badge>;
-    case "FAILED":
-      return <Badge variant="warning">FAILED</Badge>;
-    case "PROCESSING":
-      return <Badge variant="warning">PROCESSING (macet)</Badge>;
-    case "PENDING":
-      return <Badge variant="secondary">PENDING (belum diambil daemon)</Badge>;
-    default:
-      return <Badge variant="outline">{status}</Badge>;
-  }
 }
 
 async function getStuckOrders() {
@@ -98,6 +70,14 @@ function OrderRow({ order }: { order: StuckOrder }) {
       </TableCell>
       <TableCell className="text-xs text-zinc-500">{formatDateTime(order.createdAt)}</TableCell>
       <TableCell className="font-mono text-xs text-zinc-400">{order.id}</TableCell>
+      <TableCell>
+        <Link
+          href={`/admin/edc-monitor/${encodeURIComponent(order.id)}`}
+          className="inline-flex h-8 items-center rounded-md border border-zinc-300 bg-white px-3 text-xs font-medium hover:bg-zinc-50"
+        >
+          Detail
+        </Link>
+      </TableCell>
     </TableRow>
   );
 }
@@ -118,6 +98,9 @@ function StuckOrdersTable({ orders, emptyLabel }: { orders: StuckOrder[]; emptyL
           <TableHead>Error</TableHead>
           <TableHead>Dibuat</TableHead>
           <TableHead>Order ID</TableHead>
+          <TableHead>
+            <span className="sr-only">Aksi</span>
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
