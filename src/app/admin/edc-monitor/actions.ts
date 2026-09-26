@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { logOrderStatusChange } from '@/lib/order-status-log';
+import { isKitchenCategory } from '@/lib/promo-categories';
 
 const ALLOWED_ROLES = ['ADMIN', 'MANAGER'];
 // Only orders that really exist in Olsera can be settled here -- local-only
@@ -77,6 +79,75 @@ export async function markOrderPaid(_prev: ActionState, formData: FormData): Pro
 
   refresh(orderId);
   return { ok: true, message: 'Order ditandai lunas. Pesanan dikirim ke KDS dan label dicetak otomatis.' };
+}
+
+// For an order the kiosk cancelled (and voided in Olsera) although the EDC
+// receipt shows it was paid. Olsera can't take it back, so this only brings
+// it back locally: PAID, onto the KDS boards, labels printed. The sale has to
+// be entered in Olsera by hand.
+export async function recoverCancelledOrder(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const user = await requireStaff();
+  if (!user) return { ok: false, message: 'Sesi habis atau akun nggak punya akses. Login ulang dulu.' };
+
+  const orderId = String(formData.get('orderId') ?? '');
+  const reffNo = String(formData.get('reffNo') ?? '').trim();
+
+  if (formData.get('confirmed') !== 'on') {
+    return { ok: false, message: 'Centang konfirmasi bahwa struk EDC-nya udah kamu cek.' };
+  }
+  if (reffNo.length < 4 || reffNo.length > 40) {
+    return { ok: false, message: 'Isi Reff No atau approval code dari struk EDC (4 sampai 40 karakter).' };
+  }
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { status: true, baristaStatus: true, kitchenStatus: true, items: { select: { name: true } } },
+  });
+  if (order?.status !== 'CANCELLED') {
+    return { ok: false, message: 'Order ini udah nggak berstatus CANCELLED. Muat ulang halaman.' };
+  }
+
+  // The void in Olsera echoes back through its webhook as CANCELLED on both
+  // stations, so recompute which stations actually have work to do.
+  const { getMenuItems, triggerPrintJobBroadcast } = await import('@/lib/integrations/pos.adapter');
+  let categoryByName = new Map<string, string>();
+  try {
+    categoryByName = new Map((await getMenuItems({ includeUnavailable: true })).map((m) => [m.name, m.categorySlug]));
+  } catch (err) {
+    console.warn('[Recover] Menu lookup failed, routing every item by name:', err);
+  }
+  const kitchenItem = (name: string) => isKitchenCategory(categoryByName.get(name) ?? name);
+  const baristaStatus = order.items.some((i) => !kitchenItem(i.name)) ? 'PENDING' : 'COMPLETED';
+  const kitchenStatus = order.items.some((i) => kitchenItem(i.name)) ? 'PENDING' : 'COMPLETED';
+
+  // Claim in one conditional write so a double submit can't recover (and
+  // print) twice.
+  const claimed = await prisma.order.updateMany({
+    where: { id: orderId, status: 'CANCELLED' },
+    data: { status: 'PAID', baristaStatus, kitchenStatus },
+  });
+  if (claimed.count !== 1) {
+    return { ok: false, message: 'Order ini udah dipulihkan orang lain. Muat ulang halaman.' };
+  }
+
+  const metadata = { reffNo, actorId: user.id ?? null, actorName: user.name ?? null, olseraSynced: false };
+  await logOrderStatusChange({ orderId, statusField: 'order', fromStatus: 'CANCELLED', toStatus: 'PAID', source: 'admin_manual_recover', actorId: user.id, metadata });
+  await logOrderStatusChange({ orderId, statusField: 'barista', fromStatus: order.baristaStatus, toStatus: baristaStatus, source: 'admin_manual_recover', actorId: user.id });
+  await logOrderStatusChange({ orderId, statusField: 'kitchen', fromStatus: order.kitchenStatus, toStatus: kitchenStatus, source: 'admin_manual_recover', actorId: user.id });
+
+  try {
+    const { pusherServer } = await import('@/lib/pusher');
+    await pusherServer.trigger('kitchen', 'ORDER_CREATED', { order: { id: orderId } });
+  } catch (err) {
+    console.warn('[Recover] KDS broadcast failed (boards still pick it up on their next refresh):', err);
+  }
+  await triggerPrintJobBroadcast(orderId);
+
+  refresh(orderId);
+  return {
+    ok: true,
+    message: 'Order dipulihkan: masuk KDS dan label dicetak. Jangan lupa input penjualannya manual di Olsera.',
+  };
 }
 
 export async function cancelStuckOrder(_prev: ActionState, formData: FormData): Promise<ActionState> {

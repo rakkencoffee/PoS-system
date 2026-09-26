@@ -590,8 +590,15 @@ export async function PATCH(
           }
         }
 
-        if (!hasValidOlseraId) {
-          console.warn(`[Sync] "${id}" has no real Olsera order behind it -- skipping Olsera status sync, local status update stands alone.`);
+        // An admin-recovered order's Olsera counterpart was already voided, so
+        // syncing it would only fail and alert the station staff.
+        const isRecoveredOrder = hasValidOlseraId && !!(await prisma.orderStatusLog.findFirst({
+          where: { orderId: id, source: 'admin_manual_recover' },
+          select: { id: true },
+        }));
+
+        if (!hasValidOlseraId || isRecoveredOrder) {
+          console.warn(`[Sync] "${id}" has no live Olsera order behind it -- skipping Olsera status sync, local status update stands alone.`);
         } else {
           try {
             // Without Start Making an order can jump P -> Z; step through A so

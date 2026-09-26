@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDateTime, formatRupiah, formatTime, orderStatusBadge } from "../format";
-import { OrderActions } from "./order-actions";
+import { OrderActions, RecoverAction } from "./order-actions";
 
 const ALLOWED_ROLES = ["ADMIN", "MANAGER"];
 const PAID_STATUSES = ["PAID", "PREPARING", "READY", "COMPLETED"] as const;
@@ -64,6 +64,10 @@ export default async function EdcOrderDetailPage({ params }: { params: Promise<{
   const latestJob = order.edcJobs[0];
   const canAct = order.status === "PENDING" && /^OLSERA-\d+$/.test(order.id);
   const chargedAmount = latestJob?.amount ?? order.total;
+  const adminLog = [...order.statusLogs]
+    .reverse()
+    .find((l) => l.statusField === "order" && l.source.startsWith("admin_manual_"));
+  const adminMeta = (adminLog?.metadata ?? {}) as { reffNo?: string; actorName?: string };
 
   return (
     <div className="min-h-screen bg-zinc-50 px-4 py-8 text-zinc-900 sm:px-8">
@@ -118,7 +122,29 @@ export default async function EdcOrderDetailPage({ params }: { params: Promise<{
               Cocokkan dulu dengan struk fisik di mesin EDC sebelum memilih.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            {adminLog && (
+              <div
+                className={
+                  adminLog.source === "admin_manual_cancel"
+                    ? "rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700"
+                    : "rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900"
+                }
+              >
+                <p className="font-medium">
+                  {adminLog.source === "admin_manual_paid"
+                    ? "Ditandai lunas"
+                    : adminLog.source === "admin_manual_recover"
+                      ? "Dipulihkan ke KDS"
+                      : "Dibatalkan admin"}
+                  {adminMeta.actorName ? ` oleh ${adminMeta.actorName}` : ""} pada {formatDateTime(adminLog.createdAt)}
+                  {adminMeta.reffNo ? ` · Reff ${adminMeta.reffNo}` : ""}
+                </p>
+                {adminLog.source === "admin_manual_recover" && (
+                  <p className="mt-1">Penjualan order ini nggak tercatat otomatis di Olsera. Pastikan sudah diinput manual.</p>
+                )}
+              </div>
+            )}
             {canAct ? (
               <OrderActions
                 orderId={order.id}
@@ -126,10 +152,11 @@ export default async function EdcOrderDetailPage({ params }: { params: Promise<{
                 timeLabel={formatTime(latestJob?.createdAt ?? order.createdAt)}
               />
             ) : order.status === "CANCELLED" ? (
-              <p className="text-sm text-zinc-600">
-                Order ini udah dibatalkan dan di-void di Olsera, jadi belum bisa ditandai lunas dari sini. Kalau struk EDC-nya
-                ternyata sukses, catat nomor antrian dan Reff No-nya, lalu buatkan pesanannya manual di kasir.
-              </p>
+              <RecoverAction
+                orderId={order.id}
+                amountLabel={formatRupiah(chargedAmount)}
+                timeLabel={formatTime(latestJob?.createdAt ?? order.createdAt)}
+              />
             ) : order.status === "PENDING" ? (
               <p className="text-sm text-zinc-600">
                 Order ini nggak punya pasangan di Olsera, jadi belum bisa diproses dari sini.

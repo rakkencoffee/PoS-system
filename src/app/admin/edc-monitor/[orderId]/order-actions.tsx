@@ -4,7 +4,7 @@ import { useActionState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { cancelStuckOrder, markOrderPaid, type ActionState } from '../actions';
+import { cancelStuckOrder, markOrderPaid, recoverCancelledOrder, type ActionState } from '../actions';
 
 function Result({ state }: { state: ActionState }) {
   if (!state) return null;
@@ -19,6 +19,41 @@ function Result({ state }: { state: ActionState }) {
     >
       {state.message}
     </p>
+  );
+}
+
+export function RecoverAction({ orderId, amountLabel, timeLabel }: { orderId: string; amountLabel: string; timeLabel: string }) {
+  const [state, action, pending] = useActionState(recoverCancelledOrder, null);
+
+  if (state?.ok) return <Result state={state} />;
+
+  return (
+    <form action={action} className="max-w-xl space-y-4 rounded-xl border border-zinc-200 p-4">
+      <input type="hidden" name="orderId" value={orderId} />
+      <div>
+        <h3 className="font-semibold">Pulihkan ke KDS</h3>
+        <p className="mt-1 text-sm text-zinc-500">
+          Pakai kalau ternyata ada struk EDC berstatus SUKSES sebesar <span className="font-medium text-zinc-800">{amountLabel}</span>{' '}
+          sekitar jam <span className="font-medium text-zinc-800">{timeLabel}</span>. Order jadi lunas, masuk KDS, dan label dicetak.
+        </p>
+        <p className="mt-2 rounded-lg bg-amber-50 p-2.5 text-sm text-amber-900">
+          Order ini udah di-void di Olsera, jadi penjualannya nggak tercatat otomatis. Setelah dipulihkan, input manual
+          penjualannya di Olsera.
+        </p>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="recoverReffNo">Reff No / approval code di struk EDC</Label>
+        <Input id="recoverReffNo" name="reffNo" required minLength={4} maxLength={40} autoComplete="off" disabled={pending} />
+      </div>
+      <label className="flex items-start gap-2 text-sm text-zinc-700">
+        <input type="checkbox" name="confirmed" required disabled={pending} className="mt-0.5 size-4 accent-zinc-900" />
+        Saya sudah cek struk EDC-nya, nominal dan jamnya cocok.
+      </label>
+      <Result state={state} />
+      <Button type="submit" disabled={pending} className="w-full">
+        {pending ? 'Memulihkan...' : 'Pulihkan ke KDS'}
+      </Button>
+    </form>
   );
 }
 

@@ -14,7 +14,7 @@ const ALLOWED_ROLES = ["ADMIN", "MANAGER"];
 const MAX_ROWS = 200;
 const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
-const ADMIN_SOURCES = ["admin_manual_paid", "admin_manual_cancel"];
+const ADMIN_SOURCES = ["admin_manual_paid", "admin_manual_cancel", "admin_manual_recover"];
 
 // An order counts as "stuck" once the daemon has had time to finish
 // (approved, rejected, or timed out) -- younger ones are probably still
@@ -91,7 +91,12 @@ function resolvedNote(logs: { source: string; metadata: Prisma.JsonValue; create
   const log = logs[0];
   if (!log) return null;
   const meta = (log.metadata ?? {}) as { reffNo?: string; actorName?: string };
-  const action = log.source === "admin_manual_paid" ? "Ditandai lunas" : "Dibatalkan admin";
+  const action =
+    log.source === "admin_manual_paid"
+      ? "Ditandai lunas"
+      : log.source === "admin_manual_recover"
+        ? "Dipulihkan (input manual di Olsera)"
+        : "Dibatalkan admin";
   const who = meta.actorName ? ` oleh ${meta.actorName}` : "";
   const reff = meta.reffNo ? ` · Reff ${meta.reffNo}` : "";
   return `${action}${who}${reff}`;
@@ -136,7 +141,7 @@ export default async function EdcMonitorPage({ searchParams }: { searchParams: P
       include: {
         edcJobs: { orderBy: { createdAt: "desc" } },
         statusLogs: {
-          where: { source: { in: ADMIN_SOURCES } },
+          where: { source: { in: ADMIN_SOURCES }, statusField: "order" },
           orderBy: { createdAt: "desc" },
           take: 1,
           select: { source: true, metadata: true, createdAt: true },

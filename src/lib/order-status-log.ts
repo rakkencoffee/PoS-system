@@ -11,7 +11,8 @@ export type StatusLogSource =
   | 'kiosk_cancelled'
   | 'tripay_webhook'
   | 'admin_manual_paid'
-  | 'admin_manual_cancel';
+  | 'admin_manual_cancel'
+  | 'admin_manual_recover';
 
 export type StatusField = 'order' | 'barista' | 'kitchen';
 
