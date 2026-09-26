@@ -18,10 +18,20 @@ export function formatTime(date: Date) {
   return new Intl.DateTimeFormat("id-ID", { timeStyle: "short", timeZone: "Asia/Jakarta" }).format(date);
 }
 
-export function edcStatusBadge(status: string) {
+export function orderStatusBadge(status: string) {
+  if (status === "PENDING") return <Badge variant="warning">PENDING</Badge>;
+  if (status === "CANCELLED") return <Badge variant="destructive">CANCELLED</Badge>;
+  return <Badge variant="success">{status}</Badge>;
+}
+
+export function edcStatusBadge(status: string, orderStatus?: string) {
   switch (status) {
     case "APPROVED":
-      return <Badge variant="destructive">APPROVED (tapi order batal!)</Badge>;
+      return orderStatus === "CANCELLED" ? (
+        <Badge variant="destructive">APPROVED (tapi order batal!)</Badge>
+      ) : (
+        <Badge variant="success">APPROVED</Badge>
+      );
     case "FAILED":
       return <Badge variant="warning">FAILED</Badge>;
     case "PROCESSING":

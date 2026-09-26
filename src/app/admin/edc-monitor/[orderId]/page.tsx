@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatDateTime, formatRupiah, formatTime } from "../format";
+import { formatDateTime, formatRupiah, formatTime, orderStatusBadge } from "../format";
 import { OrderActions } from "./order-actions";
 
 const ALLOWED_ROLES = ["ADMIN", "MANAGER"];
@@ -16,12 +16,6 @@ function jobStatusBadge(status: string) {
   if (status === "APPROVED") return <Badge variant="success">APPROVED</Badge>;
   if (status === "FAILED" || status === "REJECTED") return <Badge variant="warning">{status}</Badge>;
   return <Badge variant="secondary">{status}</Badge>;
-}
-
-function orderStatusBadge(status: string) {
-  if (status === "PENDING") return <Badge variant="warning">PENDING</Badge>;
-  if (status === "CANCELLED") return <Badge variant="destructive">CANCELLED</Badge>;
-  return <Badge variant="success">{status}</Badge>;
 }
 
 // Possible re-orders by the same customer that DID go through -- marking this
