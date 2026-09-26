@@ -406,7 +406,9 @@ export default function CartNewPage() {
   const bagTotal = bagLines.reduce((sum, l) => sum + l.subtotal, 0);
 
   const { data: allMenuItems = [] } = useMenuItems('all');
-  const { data: refreshmentOptions = [] } = useMenuItems(AUTO_PROMO_REWARD_CATEGORY_SLUG);
+  const { data: refreshmentMenu = [] } = useMenuItems(AUTO_PROMO_REWARD_CATEGORY_SLUG);
+  // Sold-out refreshments can't be picked as the free promo item either.
+  const refreshmentOptions = useMemo(() => refreshmentMenu.filter((m) => !m.isOutOfStock), [refreshmentMenu]);
   const { data: promoStatus } = useAutoPromoStatus();
 
   // Eligible once the cart has at least 1 qualifying drink -- the picker's

@@ -29,13 +29,32 @@ const JKT = { fontFamily: 'var(--font-plus-jakarta-sans), sans-serif' } as const
    Sub-components
 ───────────────────────────────────────────── */
 
+function SoldOutBadge({ compact = false }: { compact?: boolean }) {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center bg-white/50">
+      <span
+        className={`bg-[#323131] text-white font-bold rounded-full ${compact ? 'text-[11px] px-2.5 py-0.5' : 'text-[13px] px-3.5 py-1'}`}
+        style={JKT}
+      >
+        Habis
+      </span>
+    </div>
+  );
+}
+
 function KioskProductCard({ item, onSelect, priority }: { item: MenuItem; onSelect: () => void; priority?: boolean }) {
+  const soldOut = !!item.isOutOfStock;
   return (
     <button
       onClick={onSelect}
-      className="bg-white rounded-xl border border-[#f3e0be] shadow-sm overflow-hidden flex flex-col group product-card-hover text-left w-full"
+      disabled={soldOut}
+      aria-disabled={soldOut}
+      className={`bg-white rounded-xl border border-[#f3e0be] shadow-sm overflow-hidden flex flex-col group text-left w-full ${
+        soldOut ? 'cursor-not-allowed' : 'product-card-hover'
+      }`}
     >
-      <div className="relative aspect-[4/3] overflow-hidden bg-white m-1.5 rounded-lg">
+      <div className={`relative aspect-[4/3] overflow-hidden bg-white m-1.5 rounded-lg ${soldOut ? 'grayscale opacity-60' : ''}`}>
+        {soldOut && <SoldOutBadge />}
         {item.image ? (
           <img
             className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
@@ -73,15 +92,24 @@ function KioskProductCard({ item, onSelect, priority }: { item: MenuItem; onSele
           </p>
         </div>
         <div className="flex items-center justify-between gap-2 mt-auto">
-          <span className="text-[17px] font-bold text-[#A8131E] whitespace-nowrap" style={JKT}>
+          <span className={`text-[17px] font-bold whitespace-nowrap ${soldOut ? 'text-[#998075]' : 'text-[#A8131E]'}`} style={JKT}>
             {formatCurrency(item.price)}
           </span>
-          <div
-            className="bg-[#A8131E] text-white text-[13px] font-[600] px-3.5 py-1.5 rounded-lg hover:bg-[#7D0F18] transition-colors flex items-center justify-center active:scale-95"
-            style={JKT}
-          >
-            Pilih
-          </div>
+          {soldOut ? (
+            <div
+              className="bg-[#F5F5F5] text-[#998075] text-[13px] font-[600] px-3.5 py-1.5 rounded-lg flex items-center justify-center"
+              style={JKT}
+            >
+              Habis
+            </div>
+          ) : (
+            <div
+              className="bg-[#A8131E] text-white text-[13px] font-[600] px-3.5 py-1.5 rounded-lg hover:bg-[#7D0F18] transition-colors flex items-center justify-center active:scale-95"
+              style={JKT}
+            >
+              Pilih
+            </div>
+          )}
         </div>
       </div>
     </button>
@@ -89,12 +117,18 @@ function KioskProductCard({ item, onSelect, priority }: { item: MenuItem; onSele
 }
 
 function MobileProductCard({ item, onSelect, priority }: { item: MenuItem; onSelect: () => void; priority?: boolean }) {
+  const soldOut = !!item.isOutOfStock;
   return (
     <button
       onClick={onSelect}
-      className="bg-white rounded-xl p-2 shadow-sm border border-[#f3e0be] flex flex-col group active:scale-95 transition-all duration-200 text-left w-full"
+      disabled={soldOut}
+      aria-disabled={soldOut}
+      className={`bg-white rounded-xl p-2 shadow-sm border border-[#f3e0be] flex flex-col group transition-all duration-200 text-left w-full ${
+        soldOut ? 'cursor-not-allowed' : 'active:scale-95'
+      }`}
     >
-      <div className="aspect-square w-full rounded-lg overflow-hidden mb-2 relative bg-white">
+      <div className={`aspect-square w-full rounded-lg overflow-hidden mb-2 relative bg-white ${soldOut ? 'grayscale opacity-60' : ''}`}>
+        {soldOut && <SoldOutBadge compact />}
         {item.image ? (
           <img
             className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
@@ -122,12 +156,18 @@ function MobileProductCard({ item, onSelect, priority }: { item: MenuItem; onSel
           {item.name}
         </h3>
         <div className="mt-auto flex justify-between items-center">
-          <span className="text-[14px] font-bold text-[#A8131E]" style={JKT}>
+          <span className={`text-[14px] font-bold ${soldOut ? 'text-[#998075]' : 'text-[#A8131E]'}`} style={JKT}>
             {formatCurrency(item.price)}
           </span>
-          <div className="w-7 h-7 rounded-full bg-[#F5F5F5] flex items-center justify-center text-[#A8131E] group-hover:bg-[#A8131E] group-hover:text-white transition-colors shrink-0">
-            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>add</span>
-          </div>
+          {soldOut ? (
+            <span className="text-[12px] font-[600] text-[#998075] shrink-0" style={JKT}>
+              Habis
+            </span>
+          ) : (
+            <div className="w-7 h-7 rounded-full bg-[#F5F5F5] flex items-center justify-center text-[#A8131E] group-hover:bg-[#A8131E] group-hover:text-white transition-colors shrink-0">
+              <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>add</span>
+            </div>
+          )}
         </div>
       </div>
     </button>

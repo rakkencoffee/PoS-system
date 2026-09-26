@@ -35,7 +35,11 @@ const USE_OLSERA = process.env.USE_OLSERA === "true";
 // mapped/filtered output) so getMenuItems() and getCategories() each still
 // do their own independent mapping/filtering from one shared fetch.
 const OLSERA_CACHE_KEY = "olsera:raw-catalog";
-const CACHE_TTL_SECONDS = 60; // same effective window as the old 1-minute in-memory cache
+// 20s so an item Olsera marks out of stock greys out on the kiosk within
+// ~20-40s (this cache + the kiosk's own 20s menu refetch). Each refresh costs
+// ~6 Olsera calls no matter how many kiosks there are -- if Olsera starts
+// answering 429, raise this back towards 30-60s.
+const CACHE_TTL_SECONDS = 20;
 
 interface OlseraRawCatalog {
   products: OlseraProduct[];
@@ -78,6 +82,9 @@ export interface NormalizedMenuItem {
   price: number;
   image: string;
   isAvailable: boolean;
+  // Listed on the kiosk but Olsera says it's out of stock right now -- shown
+  // greyed out as "Habis" instead of disappearing, and refused at checkout.
+  isOutOfStock: boolean;
   isBestSeller: boolean;
   isRecommended: boolean;
   type: string; // 'hot' | 'iced' | 'both'
@@ -200,26 +207,33 @@ function mapOlseraProduct(
     sizes = [{ size: "Regular", priceAdjustment: 0 }];
   }
 
+  const listedInPos =
+    Number(product.pos_hidden) === 0 ||
+    Number(product.is_active) === 1 ||
+    product.is_active === true;
+  // Olsera's own is_out_stock flag can't be trusted: confirmed live
+  // 2026-09-26 it was 0 on every product, including tracked ones sitting at
+  // stock_qty 0 that Olsera itself refuses to add to an order (406, "only
+  // left 0 hold"). So derive it from the raw numbers instead: only products
+  // with track_inventory on can run out, and hold_qty is the (negative)
+  // quantity already reserved by open orders -- e.g. stock 937 / hold -55
+  // leaves 882 sellable.
+  const tracksStock = Number(product.track_inventory) === 1;
+  const sellableQty = (Number(product.stock_qty) || 0) + (Number(product.hold_qty) || 0);
+  const outOfStock = Number(product.is_out_stock) === 1 || (tracksStock && sellableQty <= 0);
+
   return {
     id: String(product.id || product.product_id),
     name: product.name,
     description: product.description || "",
     price,
     image: product.photo_md || product.photo || product.image || "",
-    // "pos_hidden": 0 means it's available in POS. "is_out_stock" is
-    // Olsera's own already-computed out-of-stock flag (accounts for
-    // stock_qty/hold_qty/track_inventory internally, so we don't have to
-    // re-derive stock math ourselves) -- confirmed live 2026-09-24 via the
-    // product list endpoint that it's present on every product, 1/0.
-    // Without this check the kiosk kept selling items Olsera had already
-    // run out of (confirmed live: "Blueberry Crumble Cheesecake only left 0
-    // hold"), which then 406'd when checkout tried to add it to the Olsera
-    // order -- silently, after the customer had already paid.
-    isAvailable:
-      (Number(product.pos_hidden) === 0 ||
-        Number(product.is_active) === 1 ||
-        product.is_active === true) &&
-      Number(product.is_out_stock) !== 1,
+    // "pos_hidden": 0 means it's available in POS. Without the stock check
+    // the kiosk kept selling items Olsera had already run out of, which then
+    // 406'd when checkout tried to add them to the Olsera order -- silently,
+    // after the customer had already paid.
+    isAvailable: listedInPos && !outOfStock,
+    isOutOfStock: listedInPos && outOfStock,
     isBestSeller: false,
     isRecommended: false,
     type: "both",
@@ -273,6 +287,9 @@ export async function getMenuItems(filters?: {
   type?: string;
   filter?: string;
   includeUnavailable?: boolean;
+  // Keep listed-but-out-of-stock items (isOutOfStock) so the kiosk can show
+  // them as "Habis"; items hidden in Olsera stay hidden either way.
+  includeOutOfStock?: boolean;
 }): Promise<NormalizedMenuItem[]> {
   if (USE_OLSERA) {
     const { products, groups, addOns } = await getOlseraCatalog();
@@ -284,7 +301,7 @@ export async function getMenuItems(filters?: {
 
     // Apply filters
     if (!filters?.includeUnavailable) {
-      items = items.filter((i) => i.isAvailable);
+      items = items.filter((i) => i.isAvailable || (filters?.includeOutOfStock && i.isOutOfStock));
     }
     if (filters?.category) {
       items = items.filter((i) => i.categorySlug === filters.category);

@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type') || undefined;
     const filter = searchParams.get('filter') || undefined;
 
-    const items = await getMenuItems({ category, search, type, filter });
+    const items = await getMenuItems({ category, search, type, filter, includeOutOfStock: true });
 
     return NextResponse.json(items);
   } catch (error) {

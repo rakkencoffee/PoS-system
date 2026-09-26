@@ -18,6 +18,7 @@ export interface MenuItem {
   category?: { name: string; slug: string };
   categorySlug?: string;
   available: boolean;
+  isOutOfStock?: boolean;
   isBestSeller: boolean;
   isRecommended: boolean;
   type: string;
@@ -39,6 +40,11 @@ export interface MenuItem {
 // QueryProvider's global staleTime (5min), so this only affects how long
 // data stays visible while that happens, not correctness.
 const KIOSK_GC_TIME_MS = 60 * 60 * 1000; // 1 hour
+
+// Menu (and so stock) is re-pulled every 20s even while the kiosk sits idle,
+// so an item that runs out in Olsera greys out as "Habis" within ~20-40s
+// (this + the server's 20s catalog cache in pos.adapter).
+const MENU_REFRESH_MS = 20_000;
 
 export function useCategories() {
   return useQuery({
@@ -71,6 +77,8 @@ export function useMenuItems(categorySlug?: string) {
   return useQuery({
     queryKey: ['menu', categorySlug || 'all'],
     gcTime: KIOSK_GC_TIME_MS,
+    staleTime: MENU_REFRESH_MS,
+    refetchInterval: MENU_REFRESH_MS,
     queryFn: async (): Promise<MenuItem[]> => {
       const params = new URLSearchParams();
       if (categorySlug && categorySlug !== 'all') {

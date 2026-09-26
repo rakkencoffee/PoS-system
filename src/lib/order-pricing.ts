@@ -66,6 +66,12 @@ function computeExpectedUnitPrice(
   if (!menuItem) {
     return { ok: false, error: `Produk tidak dikenali (${item.productId}). Silakan refresh menu dan coba lagi.` };
   }
+  // Refuse before the EDC ever runs: Olsera rejects an out-of-stock item
+  // when it's added to the order, which used to happen after the customer
+  // had already paid.
+  if (menuItem.isOutOfStock) {
+    return { ok: false, error: `Maaf, "${menuItem.name}" baru saja habis. Hapus dari keranjang lalu coba lagi.` };
+  }
 
   let basePrice = menuItem.price;
   if (item.variantId) {
