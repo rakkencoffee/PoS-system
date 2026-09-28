@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useCartStore } from '@/stores/useCartStore';
 import { CartItem } from '@/lib/types';
+import { BEAN_FLAVORS, matchBeanFlavor } from '@/lib/menu-default-price';
 
 interface Topping {
   id: number;
@@ -43,15 +44,6 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-// Coffee bean flavor -- a real Olsera variant dimension, baked into the
-// variant name as its trailing comma segment (e.g. "Hot,Small,Bold & Nutty").
-// Order here also drives display order and the default ("Roar", no add-on).
-const BEAN_FLAVORS = ['Roar', 'Bold & Nutty', 'Rich & Fruity'];
-
-function matchBeanFlavor(segment: string): string | null {
-  const trimmed = segment.trim();
-  return BEAN_FLAVORS.find((b) => b.toLowerCase() === trimmed.toLowerCase()) || null;
-}
 
 // Which Sugar/Ice levels apply per item -- these stay kiosk-only (free, not
 // Olsera data), but unlike Milk/Beans/Shot the exact set of levels genuinely
@@ -399,9 +391,17 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
                           auto-selected on open -- rather than whichever one's
                           price happens to match the base item price, so the
                           two never disagree even with off/testing prices. */}
+                      {/* Difference is shown against the default variant (the
+                          price on the menu card), not Olsera's base price --
+                          that base is the CHEAPEST variant, so once Ice sits
+                          first the old "+Rp" labels no longer added up to the
+                          card price. Display only; unitPrice is unchanged. */}
                       {index === 0
                         ? 'Default'
-                        : `${size.priceAdjustment > 0 ? '+' : ''}${formatCurrency(size.priceAdjustment)}`}
+                        : (() => {
+                            const diff = size.priceAdjustment - displaySizes[0].priceAdjustment;
+                            return `${diff > 0 ? '+' : ''}${formatCurrency(diff)}`;
+                          })()}
                     </span>
                   </button>
                 ))}

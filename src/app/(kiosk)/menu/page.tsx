@@ -6,6 +6,7 @@ import { useCartStore } from '@/stores/useCartStore';
 import { useDebouncedCallback } from 'use-debounce';
 import { useCategories, useMenuItems, Category, MenuItem } from '@/hooks/useMenu';
 import { KioskHeader } from '@/components/kiosk/KioskHeader';
+import { defaultVariantPrice } from '@/lib/menu-default-price';
 import dynamic from 'next/dynamic';
 const CustomizeModal = dynamic(() => import('@/components/kiosk/CustomizeModal'), {
   ssr: false,
@@ -93,7 +94,7 @@ function KioskProductCard({ item, onSelect, priority }: { item: MenuItem; onSele
         </div>
         <div className="flex items-center justify-between gap-2 mt-auto">
           <span className={`text-[17px] font-bold whitespace-nowrap ${soldOut ? 'text-[#998075]' : 'text-[#A8131E]'}`} style={JKT}>
-            {formatCurrency(item.price)}
+            {formatCurrency(defaultVariantPrice(item))}
           </span>
           {soldOut ? (
             <div
@@ -157,7 +158,7 @@ function MobileProductCard({ item, onSelect, priority }: { item: MenuItem; onSel
         </h3>
         <div className="mt-auto flex justify-between items-center">
           <span className={`text-[14px] font-bold ${soldOut ? 'text-[#998075]' : 'text-[#A8131E]'}`} style={JKT}>
-            {formatCurrency(item.price)}
+            {formatCurrency(defaultVariantPrice(item))}
           </span>
           {soldOut ? (
             <span className="text-[12px] font-[600] text-[#998075] shrink-0" style={JKT}>
