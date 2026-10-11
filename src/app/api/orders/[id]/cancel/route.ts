@@ -32,7 +32,14 @@ export async function POST(
 ) {
   try {
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'unknown';
-    const { success } = await ratelimit.limit(`cancel-order:${ip}`);
+    // Fail open: the limiter lives in Redis, and a throttled/unreachable
+    // Redis must not stop a kiosk from cancelling an unpaid order.
+    let success = true;
+    try {
+      ({ success } = await ratelimit.limit(`cancel-order:${ip}`));
+    } catch (rlErr) {
+      console.warn('[Cancel] Rate limiter unavailable, allowing request:', rlErr);
+    }
     if (!success) {
       return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
     }

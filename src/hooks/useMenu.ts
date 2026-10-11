@@ -41,10 +41,11 @@ export interface MenuItem {
 // data stays visible while that happens, not correctness.
 const KIOSK_GC_TIME_MS = 60 * 60 * 1000; // 1 hour
 
-// Menu (and so stock) is re-pulled every 20s even while the kiosk sits idle,
-// so an item that runs out in Olsera greys out as "Habis" within ~20-40s
-// (this + the server's 20s catalog cache in pos.adapter).
-const MENU_REFRESH_MS = 20_000;
+// Menu (and so stock) is re-pulled every 60s even while the kiosk sits idle,
+// so an item that runs out in Olsera greys out as "Habis" within ~1-2 min
+// (this + the server's 60s catalog cache in pos.adapter). Was 20s, which
+// helped exhaust the Upstash bandwidth quota (2026-10-11).
+const MENU_REFRESH_MS = 60_000;
 
 export function useCategories() {
   return useQuery({

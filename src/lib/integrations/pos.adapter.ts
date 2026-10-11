@@ -14,7 +14,6 @@ import type { OlseraProduct, OlseraProductGroup, OlseraProductAddOn } from "./ol
 import { logOrderStatusChange, type StatusLogSource } from "@/lib/order-status-log";
 import { BAG_OPTIONS } from "@/lib/bag-options";
 import { Prisma } from "@prisma/client";
-import { redis } from "@/lib/redis";
 import { isKitchenCategory } from "@/lib/promo-categories";
 
 const BAG_PRODUCT_IDS = new Set(BAG_OPTIONS.map((b) => String(b.olseraProductId)));
@@ -22,24 +21,16 @@ const BAG_PRODUCT_IDS = new Set(BAG_OPTIONS.map((b) => String(b.olseraProductId)
 const USE_OLSERA = process.env.USE_OLSERA === "true";
 
 // ──────────────────────────────
-// Shared Olsera catalog cache (Redis, not in-memory)
+// Olsera catalog cache (per-instance memory, not Redis)
 // ──────────────────────────────
-// Previously an in-memory module-level object: worked within one warm
-// serverless instance, but Vercel routes concurrent requests across
-// multiple instances and a cold start gets a blank cache every time --
-// confirmed 2026-09-16 as a real contributor to slow menu loads (most
-// requests were re-fetching Olsera live instead of hitting a 1-minute-old
-// cache). Redis is shared across every instance, so a cache populated by
-// one request's cold start actually helps the next request too, regardless
-// of which instance handles it. Stores the raw Olsera API results (not the
-// mapped/filtered output) so getMenuItems() and getCategories() each still
-// do their own independent mapping/filtering from one shared fetch.
-const OLSERA_CACHE_KEY = "olsera:raw-catalog";
-// 20s so an item Olsera marks out of stock greys out on the kiosk within
-// ~20-40s (this cache + the kiosk's own 20s menu refetch). Each refresh costs
-// ~6 Olsera calls no matter how many kiosks there are -- if Olsera starts
-// answering 429, raise this back towards 30-60s.
-const CACHE_TTL_SECONDS = 20;
+// Was a Redis cache until 2026-10-11: the raw catalog is ~145KB and every
+// kiosk/KDS/cart read pulled the whole blob, which burned through Upstash's
+// 10GB/month free bandwidth -- once throttled, every request hit Olsera live,
+// Olsera started failing, and orders were created with no category map
+// (food routed to Barista, Kitchen auto-"completed"). Fluid Compute reuses
+// warm instances, so a module-level copy is hit far more often than it
+// misses; each instance refetches at most once per TTL.
+const CATALOG_TTL_MS = 60_000;
 
 interface OlseraRawCatalog {
   products: OlseraProduct[];
@@ -47,28 +38,43 @@ interface OlseraRawCatalog {
   addOns: OlseraProductAddOn[];
 }
 
+let catalogCache: { data: OlseraRawCatalog; fetchedAt: number } | null = null;
+// Concurrent misses on one instance share a single Olsera fetch.
+let catalogInFlight: Promise<OlseraRawCatalog> | null = null;
+
 async function getOlseraCatalog(): Promise<OlseraRawCatalog> {
-  try {
-    const cached = await redis.get<OlseraRawCatalog>(OLSERA_CACHE_KEY);
-    if (cached) return cached;
-  } catch (err) {
-    console.warn("[Olsera cache] Redis read failed, fetching live:", err);
+  if (catalogCache && Date.now() - catalogCache.fetchedAt < CATALOG_TTL_MS) {
+    return catalogCache.data;
   }
 
-  const [products, groups, addOns] = await Promise.all([
-    olsera.getProducts(),
-    olsera.getProductGroups(),
-    olsera.getProductAddOnsGlobal(),
-  ]);
-  const fresh: OlseraRawCatalog = { products, groups, addOns };
-
-  try {
-    await redis.set(OLSERA_CACHE_KEY, fresh, { ex: CACHE_TTL_SECONDS });
-  } catch (err) {
-    console.warn("[Olsera cache] Redis write failed (non-blocking):", err);
+  if (!catalogInFlight) {
+    catalogInFlight = (async () => {
+      const [products, groups, addOns] = await Promise.all([
+        olsera.getProducts(),
+        olsera.getProductGroups(),
+        olsera.getProductAddOnsGlobal(),
+      ]);
+      const fresh: OlseraRawCatalog = { products, groups, addOns };
+      catalogCache = { data: fresh, fetchedAt: Date.now() };
+      return fresh;
+    })().finally(() => {
+      catalogInFlight = null;
+    });
   }
 
-  return fresh;
+  try {
+    return await catalogInFlight;
+  } catch (err) {
+    // A stale catalog beats none: callers use it for prices and for the
+    // Barista/Kitchen split, and an empty catalog misroutes whole orders.
+    if (catalogCache) {
+      const ageSec = Math.round((Date.now() - catalogCache.fetchedAt) / 1000);
+      console.warn(`[Olsera catalog] Live fetch failed, serving last good copy (${ageSec}s old):`, err);
+      return catalogCache.data;
+    }
+    console.error("[Olsera catalog] Live fetch failed and no cached copy on this instance:", err);
+    throw err;
+  }
 }
 
 // ──────────────────────────────
@@ -422,7 +428,7 @@ async function createAndDispatchPrintJob(params: {
 
     let menuItems: any[] = [];
     try {
-      menuItems = await getMenuItems();
+      menuItems = await getMenuItems({ includeUnavailable: true });
     } catch (mErr) {}
     const catMap = new Map();
     menuItems.forEach((m) => catMap.set(m.name, m.categorySlug));
@@ -706,7 +712,7 @@ export async function createOrder(
         // Load menu items to map category slugs for discount logic
         let menuItems: any[] = [];
         try {
-          menuItems = await getMenuItems();
+          menuItems = await getMenuItems({ includeUnavailable: true });
         } catch (mErr) {}
         const catMap = new Map();
         menuItems.forEach((m) => catMap.set(m.name, m.categorySlug));
@@ -850,24 +856,32 @@ export async function createOrder(
       try {
         const { prisma } = await import("@/lib/db");
 
-        // Load menu items to accurately map categories
+        // Load menu items to accurately map categories. Retried because an
+        // empty map here used to mark Kitchen COMPLETED on food orders --
+        // they never showed on Kitchen's board (confirmed 2026-10-11 while
+        // Redis was throttled and Olsera kept failing).
         let menuItems: any[] = [];
-        try {
-          menuItems = await getMenuItems();
-        } catch (mErr) {
-          console.warn(`[Sync] Failed to fetch menu items for category mapping:`, mErr);
+        for (let attempt = 1; attempt <= 3 && menuItems.length === 0; attempt++) {
+          try {
+            menuItems = await getMenuItems({ includeUnavailable: true });
+          } catch (mErr) {
+            console.warn(`[Sync] Category lookup attempt ${attempt}/3 failed for order ${orderId}:`, mErr);
+            if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
+          }
+        }
+        const catalogMissing = menuItems.length === 0;
+        if (catalogMissing) {
+          console.error(`[Sync] No menu catalog for order ${orderId} -- leaving BOTH stations PENDING so no board silently drops its items.`);
         }
         const catMap = new Map();
         menuItems.forEach((m) => catMap.set(m.name, m.categorySlug));
 
-        const hasCoffee = items.some((item) => {
-          const categorySlug = catMap.get(item.name || "");
-          return !isKitchenCategory(categorySlug);
-        });
-        const hasFood = items.some((item) => {
-          const categorySlug = catMap.get(item.name || "");
-          return isKitchenCategory(categorySlug);
-        });
+        // Unknown names count as Kitchen ("other"), the same rule the KDS
+        // board uses when it splits items -- the two must agree or an order
+        // lands on a board whose station is already COMPLETED.
+        const categoryOf = (item: { name?: string }) => catMap.get(item.name || "") ?? "other";
+        const hasCoffee = catalogMissing || items.some((item) => !isKitchenCategory(categoryOf(item)));
+        const hasFood = catalogMissing || items.some((item) => isKitchenCategory(categoryOf(item)));
 
         const baseTotal = items.reduce(
           (acc, item) => acc + (item.price || 0) * item.quantity,

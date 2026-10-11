@@ -102,7 +102,7 @@ export async function GET(
       let menuItems: any[] = [];
       try {
         const { getMenuItems } = await import('@/lib/integrations/pos.adapter');
-        menuItems = await getMenuItems();
+        menuItems = await getMenuItems({ includeUnavailable: true });
       } catch (mErr) {}
       const catMap = new Map();
       menuItems.forEach(m => catMap.set(m.name, m.categorySlug));
@@ -468,22 +468,20 @@ export async function PATCH(
           // Build category lookup
           let menuItems: any[] = [];
           try {
-            menuItems = await getMenuItems();
-          } catch (mErr) {}
+            menuItems = await getMenuItems({ includeUnavailable: true });
+          } catch (mErr) {
+            console.warn(`[Sync] Category lookup failed while self-healing ${id}:`, mErr);
+          }
           const catMap = new Map();
           menuItems.forEach(m => catMap.set(m.name, m.categorySlug));
 
-          // Basic category detection matching client-side KDS logic
-          const hasCoffee = rawItems.some((i: any) => {
-            const name = i.product_name || i.name || '';
-            const categorySlug = catMap.get(name);
-            return !isKitchenCategory(categorySlug);
-          });
-          const hasFood = rawItems.some((i: any) => {
-            const name = i.product_name || i.name || '';
-            const categorySlug = catMap.get(name);
-            return isKitchenCategory(categorySlug);
-          });
+          // Same rules as pos.adapter's order mirror: unknown names count as
+          // Kitchen ("other", what the KDS board does), and with no catalog
+          // at all neither station is marked COMPLETED up front.
+          const catalogMissing = menuItems.length === 0 && rawItems.length > 0;
+          const categoryOf = (i: any) => catMap.get(i.product_name || i.name || '') ?? 'other';
+          const hasCoffee = catalogMissing || rawItems.some((i: any) => !isKitchenCategory(categoryOf(i)));
+          const hasFood = catalogMissing || rawItems.some((i: any) => isKitchenCategory(categoryOf(i)));
 
           // Fetch a valid user for cashierId to prevent Prisma foreign key constraints
           let firstUser = await prisma.user.findFirst();
@@ -653,7 +651,7 @@ export async function PATCH(
       // Build category lookup for final response
       let menuItems: any[] = [];
       try {
-        menuItems = await getMenuItems();
+        menuItems = await getMenuItems({ includeUnavailable: true });
       } catch (mErr) {}
       const catMap = new Map();
       menuItems.forEach(m => catMap.set(m.name, m.categorySlug));

@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
           // is Redis-cached for 60s (see pos.adapter.ts), so it's a shared,
           // cheap read, not a per-order Olsera round-trip.
           const { getMenuItems } = await import('@/lib/integrations/pos.adapter');
-          const menuItemsMaster = await getMenuItems();
+          const menuItemsMaster = await getMenuItems({ includeUnavailable: true });
           const masterCategoryMap = new Map<string, string>();
           menuItemsMaster.forEach((m) => masterCategoryMap.set(m.name.toLowerCase(), m.categorySlug));
 
@@ -193,7 +193,7 @@ export async function GET(request: NextRequest) {
         // 4. Fetch master menu to map categories accurately based on product names
         // This is the most reliable fallback if order details lack category info.
         const { getMenuItems } = await import('@/lib/integrations/pos.adapter');
-        const menuItemsMaster = await getMenuItems();
+        const menuItemsMaster = await getMenuItems({ includeUnavailable: true });
         const masterCategoryMap = new Map();
         menuItemsMaster.forEach(m => masterCategoryMap.set(m.name.toLowerCase(), m.categorySlug));
 
