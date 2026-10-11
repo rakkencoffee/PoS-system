@@ -24,7 +24,7 @@
  * below is scaled up ~1.5x from the manual's numbers to match.
  */
 
-import { type ReceiptData, type ReceiptItem, isDrinkItem, isPackagingItem } from './format-receipt';
+import { type ReceiptData, type ReceiptItem, isDrinkItem } from './format-receipt';
 
 const CRLF = '\r\n';
 const DOTS_PER_MM = 8; // 200 DPI
@@ -325,9 +325,10 @@ export function formatRulerTestTspl(widthMm = 48, gapMm = 2): Buffer {
   return Buffer.from(commandLines.join(CRLF) + CRLF, 'utf8');
 }
 
-/** Individual per-cup drink labels (Barista station), TSPL variant. */
+/** Individual per-cup drink labels (Barista station), TSPL variant. Packaging
+ *  (bags, cup carriers) is a Barista item too and gets its own label per unit. */
 export function formatDrinkLabelsTspl(data: ReceiptData, opts?: TsplLabelOptions): Buffer {
-  const drinkItems = (data.items || []).filter((item) => isDrinkItem(item) && !isPackagingItem(item));
+  const drinkItems = (data.items || []).filter(isDrinkItem);
   return formatItemLabelsTspl(data, drinkItems, 'Drink', opts);
 }
 

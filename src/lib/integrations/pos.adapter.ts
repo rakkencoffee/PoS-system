@@ -448,7 +448,7 @@ async function createAndDispatchPrintJob(params: {
       // catalog (a transient getMenuItems() fetch failure, or any naming
       // drift) silently printed on Kitchen's printer instead -- confirmed
       // live 2026-09-18. Bag items are identified by product id and always
-      // tagged "packaging" (Barista board, no printed label), even when the
+      // tagged "packaging" (Barista board and label printer), even when the
       // catalog lookup fails; everything else left unmatched falls through
       // to isDrinkItem()'s own name-keyword fallback instead of being
       // pre-empted by a fake category.

@@ -347,11 +347,6 @@ export function isDrinkItem(item: ReceiptItem): boolean {
   return !isKitchenCategory(name);
 }
 
-/** Bags/cup carriers: shown on Barista's board, but never printed as a label. */
-export function isPackagingItem(item: ReceiptItem): boolean {
-  return (item.categorySlug || item.category || '').toLowerCase().includes('packaging');
-}
-
 /**
  * Shared per-item label renderer for Barista (drinks) and Kitchen (food) --
  * condensed font (font B), notes joined on one "|"-separated line, customer
@@ -466,9 +461,10 @@ function formatItemLabels(data: ReceiptData, items: ReceiptItem[], defaultName: 
   return Buffer.concat(parts);
 }
 
-/** Individual per-cup drink labels (Barista station). See formatItemLabels for layout notes. */
+/** Individual per-cup drink labels (Barista station), packaging included -- one
+ *  label per unit. See formatItemLabels for layout notes. */
 export function formatDrinkLabels(data: ReceiptData, lineWidth = 32): Buffer {
-  const drinkItems = (data.items || []).filter((item) => isDrinkItem(item) && !isPackagingItem(item));
+  const drinkItems = (data.items || []).filter(isDrinkItem);
   return formatItemLabels(data, drinkItems, 'Drink', lineWidth);
 }
 
