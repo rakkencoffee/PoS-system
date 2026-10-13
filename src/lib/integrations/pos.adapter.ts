@@ -342,6 +342,7 @@ export async function getCategories(): Promise<NormalizedCategory[]> {
     dessert: 5,
     bites: 6,
     "main-course": 7,
+    merchandise: 8,
   };
 
   if (USE_OLSERA) {

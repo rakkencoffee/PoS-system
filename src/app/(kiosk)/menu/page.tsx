@@ -273,8 +273,15 @@ function MenuPageContent() {
   const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get('search') || '');
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
 
-  const { data: categories = [] } = useCategories();
+  const { data: allCategories = [] } = useCategories();
   const { data: allItems = [], isLoading: loading } = useMenuItems('all');
+  // Olsera lists a category even when all its products are hidden (e.g. a new
+  // group still being set up), which showed as an empty tab. Wait for the
+  // menu to load first so the tabs don't flicker away.
+  const categories = useMemo(
+    () => (allItems.length === 0 ? allCategories : allCategories.filter((c: Category) => allItems.some((i: MenuItem) => i.categorySlug === c.slug))),
+    [allCategories, allItems],
+  );
 
   const handleSearch = useDebouncedCallback((term: string) => {
     setDebouncedSearch(term);

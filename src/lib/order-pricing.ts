@@ -175,12 +175,28 @@ export type VoucherDiscountResult =
   | { ok: true; message: string; discountAmount: number; itemDiscounts: Record<string, number> }
   | { ok: false; error: string };
 
+// Merchandise (t-shirts) never takes a voucher. The kiosk preview sends the
+// category NAME ("Merchandise"), checkout sends the slug ("merchandise").
+const isMerchandise = (category: string) => /merch/i.test(String(category || ""));
+
 export async function computeVoucherDiscount(
   code: string,
   totalAmount: number,
   items?: DiscountableItem[],
 ): Promise<VoucherDiscountResult> {
   const uppercaseCode = code.toUpperCase().trim();
+
+  if (Array.isArray(items) && items.some((i) => isMerchandise(i.category))) {
+    const rest = items.filter((i) => !isMerchandise(i.category));
+    // Must stop here: with no items left the discount code below falls back
+    // to a whole-cart discount.
+    if (rest.length === 0) {
+      return { ok: false, error: "Voucher tidak berlaku untuk merchandise." };
+    }
+    items = rest;
+    // Minimum-spend checks look at what the voucher can actually apply to.
+    totalAmount = rest.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  }
   const result = await olseraApi.validateVoucherRemote(uppercaseCode, totalAmount);
   if (!result.valid) {
     return { ok: false, error: result.message };

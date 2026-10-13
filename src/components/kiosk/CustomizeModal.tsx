@@ -85,7 +85,9 @@ const SUGAR_ICE_CONFIG: Record<string, { sugar: string[]; ice: string[] }> = {
   'sunset in kyoto': { sugar: ['less', 'normal'], ice: ['less', 'normal'] },
 };
 
-const FOOD_CATEGORIES = ['dessert', 'snack', 'main-course', 'bites'];
+// Non-drink categories: no Sugar/Ice Level. 'merchandise' (t-shirts) only
+// gets the size picker.
+const FOOD_CATEGORIES = ['dessert', 'snack', 'main-course', 'bites', 'merchandise'];
 
 // Unmapped items (new drinks not yet in the table above) fall back to the
 // full set rather than silently hiding Sugar/Ice -- food items get neither.
