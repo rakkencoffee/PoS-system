@@ -148,20 +148,10 @@ export async function verifyOrderItems(items: PriceableItem[]): Promise<VerifyIt
 // has to trust the discountAmount a client says that preview returned.
 // ──────────────────────────────
 
-function isNonCoffeeItem(category: string, name: string): boolean {
-  const cat = String(category || "").toLowerCase().trim();
-  const itemName = String(name || "").toLowerCase().trim();
-  return (
-    cat === "non-coffee" ||
-    cat === "non coffee" ||
-    cat === "milk-based" ||
-    cat === "refreshment" ||
-    itemName.includes("tea") ||
-    itemName.includes("milk") ||
-    itemName.includes("matcha") ||
-    (itemName.includes("latte") && !itemName.includes("coffee") && !itemName.includes("espresso"))
-  );
-}
+// The kiosk preview sends the category NAME ("Non-Coffee"), checkout sends the
+// slug ("non-coffee"); slugifying both lets them match VoucherScope.categorySlugs.
+const toSlug = (s: string) =>
+  String(s || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 export interface DiscountableItem {
   id: string | number;
@@ -239,14 +229,12 @@ export async function computeVoucherDiscount(
   const itemDiscounts: Record<string, number> = {};
 
   if (Array.isArray(items) && items.length > 0) {
-    const isRestrictedToNonCoffee =
-      uppercaseCode === "RAKKEN002" ||
-      String(voucher.title || "").toLowerCase().includes("non-coffee") ||
-      String(voucher.title || "").toLowerCase().includes("non coffee");
+    // Category scope mirrored from Olsera (see VoucherScope in schema.prisma):
+    // no row = every item is eligible, a row = only those categories.
+    const scope = await prisma.voucherScope.findUnique({ where: { code: uppercaseCode } });
+    const allowed = scope ? new Set(scope.categorySlugs) : null;
 
-    const eligibleItems = items.filter((item) =>
-      isRestrictedToNonCoffee ? isNonCoffeeItem(item.category, item.name) : true,
-    );
+    const eligibleItems = items.filter((item) => !allowed || allowed.has(toSlug(item.category)));
 
     const eligibleTotal = eligibleItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
@@ -286,8 +274,8 @@ export async function computeVoucherDiscount(
         finalDiscountAmount = Object.values(itemDiscounts).reduce((sum, d) => sum + d, 0);
       }
     } else {
-      if (isRestrictedToNonCoffee) {
-        return { ok: false, error: "Voucher ini hanya berlaku untuk kategori Non-Coffee saja." };
+      if (allowed) {
+        return { ok: false, error: "Voucher ini tidak berlaku untuk produk di keranjang." };
       }
       finalDiscountAmount = 0;
     }

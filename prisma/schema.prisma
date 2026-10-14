@@ -124,6 +124,18 @@ model VoucherCap {
   updatedAt   DateTime @updatedAt
 }
 
+// Which product categories (category slugs) a voucher applies to. Olsera
+// stores this scope (Kupon Diskon > "Berlaku untuk grup produk") but its Open
+// API never returns it, so it's mirrored here. A voucher with NO row applies
+// to every non-merchandise item. Manage with scripts/set-voucher-scope.mjs.
+model VoucherScope {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  categorySlugs String[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
 enum Role {
   CASHIER
   MANAGER
