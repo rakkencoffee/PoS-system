@@ -240,7 +240,10 @@ export async function computeVoucherDiscount(
 
     if (eligibleItems.length > 0) {
       const isFreeItemVoucher = isPercentage && discountRate >= 0.999;
-      if (isFreeItemVoucher) {
+      // VoucherScope.cheapestOnly (staff vouchers): same "one unit of the
+      // cheapest eligible item" rule as the free-item voucher below, but the
+      // discount is only the voucher's own rate/nominal of that one unit.
+      if (isFreeItemVoucher || scope?.cheapestOnly) {
         // 100%-off voucher: read as "one free item" (the single cheapest
         // eligible item), not a whole-cart discount -- this is how RAKKEN
         // ARCADE prizes get redeemed (crew hands the winner a 100%-off code
@@ -249,8 +252,13 @@ export async function computeVoucherDiscount(
         // 100% to every eligible item instead would give away the whole
         // eligible portion of the cart, not just the one intended prize.
         const cheapestItem = eligibleItems.reduce((min, item) => (item.price < min.price ? item : min));
-        itemDiscounts[cheapestItem.id] = cheapestItem.price;
-        finalDiscountAmount = cheapestItem.price;
+        const unitDiscount = isFreeItemVoucher
+          ? cheapestItem.price
+          : isPercentage
+            ? Math.floor(cheapestItem.price * discountRate)
+            : Math.min(discountNominal, cheapestItem.price);
+        itemDiscounts[cheapestItem.id] = unitDiscount;
+        finalDiscountAmount = unitDiscount;
       } else if (isPercentage) {
         eligibleItems.forEach((item) => {
           const itemSubtotal = item.price * item.quantity;
