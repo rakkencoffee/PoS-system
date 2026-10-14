@@ -165,9 +165,11 @@ export type VoucherDiscountResult =
   | { ok: true; message: string; discountAmount: number; itemDiscounts: Record<string, number> }
   | { ok: false; error: string };
 
-// Merchandise (t-shirts) never takes a voucher. The kiosk preview sends the
-// category NAME ("Merchandise"), checkout sends the slug ("merchandise").
-const isMerchandise = (category: string) => /merch/i.test(String(category || ""));
+// Merchandise (t-shirts) and packaging (bags) never take a voucher. The kiosk
+// preview sends the category NAME ("Merchandise"), checkout sends the slug
+// ("merchandise"). Bags are already kept out of both callers' item lists;
+// matching them here too means a stray one can't be discounted.
+const isVoucherExcluded = (category: string) => /merch|packag/i.test(String(category || ""));
 
 export async function computeVoucherDiscount(
   code: string,
@@ -176,17 +178,35 @@ export async function computeVoucherDiscount(
 ): Promise<VoucherDiscountResult> {
   const uppercaseCode = code.toUpperCase().trim();
 
-  if (Array.isArray(items) && items.some((i) => isMerchandise(i.category))) {
-    const rest = items.filter((i) => !isMerchandise(i.category));
+  if (Array.isArray(items) && items.some((i) => isVoucherExcluded(i.category))) {
+    const rest = items.filter((i) => !isVoucherExcluded(i.category));
     // Must stop here: with no items left the discount code below falls back
     // to a whole-cart discount.
     if (rest.length === 0) {
-      return { ok: false, error: "Voucher tidak berlaku untuk merchandise." };
+      return { ok: false, error: "Voucher tidak berlaku untuk merchandise dan packaging." };
     }
     items = rest;
     // Minimum-spend checks look at what the voucher can actually apply to.
     totalAmount = rest.reduce((sum, i) => sum + i.price * i.quantity, 0);
   }
+
+  // Category scope mirrored from Olsera (see VoucherScope in schema.prisma):
+  // no row = every item is eligible, a row = only those categories. Applied
+  // before the remote check so the minimum-spend rule also only counts the
+  // items the voucher can actually discount.
+  const scope =
+    Array.isArray(items) && items.length > 0
+      ? await prisma.voucherScope.findUnique({ where: { code: uppercaseCode } })
+      : null;
+  if (scope && Array.isArray(items)) {
+    const allowed = new Set(scope.categorySlugs);
+    items = items.filter((i) => allowed.has(toSlug(i.category)));
+    if (items.length === 0) {
+      return { ok: false, error: "Voucher ini tidak berlaku untuk produk di keranjang." };
+    }
+    totalAmount = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  }
+
   const result = await olseraApi.validateVoucherRemote(uppercaseCode, totalAmount);
   if (!result.valid) {
     return { ok: false, error: result.message };
@@ -229,12 +249,8 @@ export async function computeVoucherDiscount(
   const itemDiscounts: Record<string, number> = {};
 
   if (Array.isArray(items) && items.length > 0) {
-    // Category scope mirrored from Olsera (see VoucherScope in schema.prisma):
-    // no row = every item is eligible, a row = only those categories.
-    const scope = await prisma.voucherScope.findUnique({ where: { code: uppercaseCode } });
-    const allowed = scope ? new Set(scope.categorySlugs) : null;
-
-    const eligibleItems = items.filter((item) => !allowed || allowed.has(toSlug(item.category)));
+    // `items` is already limited to merch-free, in-scope items (see above).
+    const eligibleItems = items;
 
     const eligibleTotal = eligibleItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
@@ -282,9 +298,6 @@ export async function computeVoucherDiscount(
         finalDiscountAmount = Object.values(itemDiscounts).reduce((sum, d) => sum + d, 0);
       }
     } else {
-      if (allowed) {
-        return { ok: false, error: "Voucher ini tidak berlaku untuk produk di keranjang." };
-      }
       finalDiscountAmount = 0;
     }
   }
