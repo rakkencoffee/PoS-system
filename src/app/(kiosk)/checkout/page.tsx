@@ -430,7 +430,8 @@ export default function CheckoutNewPage() {
                     <input
                       className="flex-1 bg-off-white border-1.5 border-surface-variant rounded-xl px-standard py-compact focus:ring-primary focus:border-primary placeholder-taupe focus:outline-none"
                       placeholder="Enter code (e.g. COFFEE20)"
-                      type="text"
+                      type="password"
+                      autoComplete="off"
                       readOnly={appliedDiscount > 0 || isProcessing}
                       value={voucherCode}
                       onChange={(e) => { setVoucherCode(e.target.value.toUpperCase()); setVoucherMessage(null); }}
@@ -667,7 +668,8 @@ export default function CheckoutNewPage() {
                 <input
                   className="flex-1 bg-surface border border-surface-variant rounded-xl px-4 py-2 text-sm focus:ring-primary focus:border-primary placeholder-taupe focus:outline-none font-mono"
                   placeholder="Kode Voucher"
-                  type="text"
+                  type="password"
+                  autoComplete="off"
                   readOnly={appliedDiscount > 0 || isProcessing}
                   value={voucherCode}
                   onChange={(e) => { setVoucherCode(e.target.value.toUpperCase()); setVoucherMessage(null); }}
