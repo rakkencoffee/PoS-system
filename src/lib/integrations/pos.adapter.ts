@@ -564,19 +564,129 @@ const runInBackground = (fn: () => Promise<any> | any) => {
     });
 };
 
+type OrderInputItem = {
+  productId: string;
+  variantId?: string;
+  quantity: number;
+  price?: number;
+  note?: string;
+  name?: string;
+  options?: any;
+};
+
+// Mirrors an order (items + per-station status) into the local Order table,
+// which is what KDS and the kiosk nota read from. Shared by createOrder()'s
+// normal Olsera path and its local-only fallback.
+async function mirrorOrderToLocalDb(
+  localId: string,
+  items: OrderInputItem[],
+  opts: {
+    olseraOrderId?: number;
+    orderNo?: string;
+    queueNum?: number;
+    customerName?: string;
+    voucherCode?: string;
+    discountAmount: number;
+  },
+): Promise<void> {
+  const { olseraOrderId, orderNo, queueNum, customerName, voucherCode, discountAmount } = opts;
+  try {
+    const { prisma } = await import("@/lib/db");
+
+    // Load menu items to accurately map categories. Retried because an
+    // empty map here used to mark Kitchen COMPLETED on food orders --
+    // they never showed on Kitchen's board (confirmed 2026-10-11 while
+    // Redis was throttled and Olsera kept failing).
+    let menuItems: any[] = [];
+    for (let attempt = 1; attempt <= 3 && menuItems.length === 0; attempt++) {
+      try {
+        menuItems = await getMenuItems({ includeUnavailable: true });
+      } catch (mErr) {
+        console.warn(`[Sync] Category lookup attempt ${attempt}/3 failed for order ${localId}:`, mErr);
+        if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
+      }
+    }
+    const catalogMissing = menuItems.length === 0;
+    if (catalogMissing) {
+      console.error(`[Sync] No menu catalog for order ${localId} -- leaving BOTH stations PENDING so no board silently drops its items.`);
+    }
+    const catMap = new Map();
+    menuItems.forEach((m) => catMap.set(m.name, m.categorySlug));
+
+    // Unknown names count as Kitchen ("other"), the same rule the KDS
+    // board uses when it splits items -- the two must agree or an order
+    // lands on a board whose station is already COMPLETED.
+    const categoryOf = (item: { name?: string }) => catMap.get(item.name || "") ?? "other";
+    const hasCoffee = catalogMissing || items.some((item) => !isKitchenCategory(categoryOf(item)));
+    const hasFood = catalogMissing || items.some((item) => isKitchenCategory(categoryOf(item)));
+
+    const baseTotal = items.reduce(
+      (acc, item) => acc + (item.price || 0) * item.quantity,
+      0,
+    );
+    const finalTotal = Math.max(0, baseTotal - discountAmount);
+
+    const itemsCreate = items.map((item) => {
+      // Format customization details for local receipt fallback
+      let displayNotes = item.note || "";
+      const optStr = formatOptionsWithToppings(item.options);
+      if (optStr) displayNotes = displayNotes ? `${displayNotes} (${optStr})` : optStr;
+
+      return {
+        olseraId: item.productId,
+        name: item.name || "Item",
+        quantity: item.quantity,
+        price: item.price || 0,
+        subtotal: (item.price || 0) * item.quantity,
+        notes: displayNotes,
+      };
+    });
+
+    // Upsert, not create — the early minimal row from step 2.5 usually
+    // already exists at this point; this fills in items/total/status.
+    await prisma.order.upsert({
+      where: { id: localId },
+      update: {
+        total: finalTotal,
+        baristaStatus: hasCoffee ? "PENDING" : "COMPLETED",
+        kitchenStatus: hasFood ? "PENDING" : "COMPLETED",
+        items: { create: itemsCreate },
+      },
+      create: {
+        id: localId,
+        stationId: "KIOSK", // Kiosk self-service
+        cashierId: "cmo83g6140000vq5g10u03858", // Valid system user for Kiosk sync
+        queueNumber: queueNum || null,
+        total: finalTotal,
+        status: "PENDING",
+        baristaStatus: hasCoffee ? "PENDING" : "COMPLETED",
+        kitchenStatus: hasFood ? "PENDING" : "COMPLETED",
+        voucherCode: voucherCode?.toUpperCase().trim() || null,
+        orderNo: orderNo || null,
+        customerName: customerName || null,
+        items: { create: itemsCreate },
+      },
+    });
+    console.log(`[Sync] Order ${localId} (${orderNo || "-"}) Queue=#${String(queueNum).padStart(3, '0')} mirrored.`);
+
+    await logOrderStatusChange({
+      orderId: localId,
+      statusField: "order",
+      fromStatus: null,
+      toStatus: "PENDING",
+      source: "order_created",
+      metadata: { olseraOrderId, orderNo, queueNumber: queueNum },
+    });
+  } catch (dbErr) {
+    console.warn(`[Sync] Failed to mirror order to local database:`, dbErr);
+  }
+}
+
 /**
  * Create order in POS system
  */
 export async function createOrder(
-  items: {
-    productId: string;
-    variantId?: string;
-    quantity: number;
-    price?: number;
-    note?: string;
-    name?: string;
-    options?: any;
-  }[],
+  items: OrderInputItem[],
   customerName?: string,
   discountAmount: number = 0,
   voucherCode?: string,
@@ -610,11 +720,38 @@ export async function createOrder(
     // to LINK order history (customer_id), never to override what the
     // customer actually entered. Its name is a fallback purely for the case
     // where no name was typed at all.
-    const order = await olsera.createOrder([], {
-      customer_name: customerName || matchedCustomer?.name,
-      customer_phone: customerPhone,
-      customer_id: matchedCustomer?.id,
-    });
+    let order: Awaited<ReturnType<typeof olsera.createOrder>>;
+    try {
+      order = await olsera.createOrder([], {
+        customer_name: customerName || matchedCustomer?.name,
+        customer_phone: customerPhone,
+        customer_id: matchedCustomer?.id,
+      });
+    } catch (olseraErr) {
+      // Olsera being down must not lose the order: the customer still pays
+      // at the EDC. This used to throw straight back to /api/payment/create,
+      // whose own catch only swapped in a bare "SF-" id -- no queue number,
+      // no OrderItem rows, no PrintJob -- so the kiosk nota never printed,
+      // KDS showed nothing, and the items were gone for good (confirmed live
+      // 2026-10-30: two paid QRIS orders, nota rebuilt by hand). Keep
+      // everything local instead; settlement's SF- recovery path pushes the
+      // payment to Olsera later.
+      console.error(`[Fallback] Olsera createOrder failed, keeping order local-only:`, olseraErr);
+      const localId = `SF-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+      let queueNum: number | undefined;
+      try {
+        const { getNextQueueNumber } = await import("@/lib/queue-number");
+        queueNum = await getNextQueueNumber();
+      } catch (qErr) {
+        console.warn(`[Queue] Failed to generate queue number:`, qErr);
+      }
+      // Awaited, not backgrounded: the EdcJob insert right after this returns
+      // needs the Order row, and its own placeholder upsert would otherwise
+      // win and leave queueNumber/customerName empty.
+      await mirrorOrderToLocalDb(localId, items, { queueNum, customerName, voucherCode, discountAmount });
+      await createAndDispatchPrintJob({ orderId: localId, queueNumber: queueNum, customerName, items, discountAmount });
+      return { orderId: localId, queueNumber: queueNum };
+    }
     const orderId = (order.id || order.order_id) as number;
     const orderNo = (order.order_no as string) || '';
 
@@ -853,98 +990,16 @@ export async function createOrder(
     // 3c. Mirror to local Prisma for Dashboard/Reporting (Sprint 4) — kept as
     // its own background task since it never touches Olsera's paid-lock and
     // doesn't need to block payment settlement.
-    runInBackground(async () => {
-      try {
-        const { prisma } = await import("@/lib/db");
-
-        // Load menu items to accurately map categories. Retried because an
-        // empty map here used to mark Kitchen COMPLETED on food orders --
-        // they never showed on Kitchen's board (confirmed 2026-10-11 while
-        // Redis was throttled and Olsera kept failing).
-        let menuItems: any[] = [];
-        for (let attempt = 1; attempt <= 3 && menuItems.length === 0; attempt++) {
-          try {
-            menuItems = await getMenuItems({ includeUnavailable: true });
-          } catch (mErr) {
-            console.warn(`[Sync] Category lookup attempt ${attempt}/3 failed for order ${orderId}:`, mErr);
-            if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
-          }
-        }
-        const catalogMissing = menuItems.length === 0;
-        if (catalogMissing) {
-          console.error(`[Sync] No menu catalog for order ${orderId} -- leaving BOTH stations PENDING so no board silently drops its items.`);
-        }
-        const catMap = new Map();
-        menuItems.forEach((m) => catMap.set(m.name, m.categorySlug));
-
-        // Unknown names count as Kitchen ("other"), the same rule the KDS
-        // board uses when it splits items -- the two must agree or an order
-        // lands on a board whose station is already COMPLETED.
-        const categoryOf = (item: { name?: string }) => catMap.get(item.name || "") ?? "other";
-        const hasCoffee = catalogMissing || items.some((item) => !isKitchenCategory(categoryOf(item)));
-        const hasFood = catalogMissing || items.some((item) => isKitchenCategory(categoryOf(item)));
-
-        const baseTotal = items.reduce(
-          (acc, item) => acc + (item.price || 0) * item.quantity,
-          0,
-        );
-        const finalTotal = Math.max(0, baseTotal - discountAmount);
-
-        const itemsCreate = items.map((item) => {
-          // Format customization details for local receipt fallback
-          let displayNotes = item.note || "";
-          const optStr = formatOptionsWithToppings(item.options);
-          if (optStr) displayNotes = displayNotes ? `${displayNotes} (${optStr})` : optStr;
-
-          return {
-            olseraId: item.productId,
-            name: item.name || "Item",
-            quantity: item.quantity,
-            price: item.price || 0,
-            subtotal: (item.price || 0) * item.quantity,
-            notes: displayNotes,
-          };
-        });
-
-        // Upsert, not create — the early minimal row from step 2.5 usually
-        // already exists at this point; this fills in items/total/status.
-        await prisma.order.upsert({
-          where: { id: `OLSERA-${orderId}` },
-          update: {
-            total: finalTotal,
-            baristaStatus: hasCoffee ? "PENDING" : "COMPLETED",
-            kitchenStatus: hasFood ? "PENDING" : "COMPLETED",
-            items: { create: itemsCreate },
-          },
-          create: {
-            id: `OLSERA-${orderId}`,
-            stationId: "KIOSK", // Kiosk self-service
-            cashierId: "cmo83g6140000vq5g10u03858", // Valid system user for Kiosk sync
-            queueNumber: queueNum || null,
-            total: finalTotal,
-            status: "PENDING",
-            baristaStatus: hasCoffee ? "PENDING" : "COMPLETED",
-            kitchenStatus: hasFood ? "PENDING" : "COMPLETED",
-            voucherCode: voucherCode?.toUpperCase().trim() || null,
-            orderNo: orderNo || null,
-            customerName: customerName || null,
-            items: { create: itemsCreate },
-          },
-        });
-        console.log(`[Sync] Order OLSERA-${orderId} (${orderNo}) Queue=#${String(queueNum).padStart(3, '0')} mirrored.`);
-
-        await logOrderStatusChange({
-          orderId: `OLSERA-${orderId}`,
-          statusField: "order",
-          fromStatus: null,
-          toStatus: "PENDING",
-          source: "order_created",
-          metadata: { olseraOrderId: orderId, orderNo, queueNumber: queueNum },
-        });
-      } catch (dbErr) {
-        console.warn(`[Sync] Failed to mirror order to local database:`, dbErr);
-      }
-    });
+    runInBackground(() =>
+      mirrorOrderToLocalDb(`OLSERA-${orderId}`, items, {
+        olseraOrderId: orderId,
+        orderNo,
+        queueNum,
+        customerName,
+        voucherCode,
+        discountAmount,
+      })
+    );
 
     return {
       orderId: `OLSERA-${orderId}`,
@@ -1358,10 +1413,12 @@ export async function updateOrderPaymentStatus(
     // Step 3: Broadcast ke KDS via Pusher — pelanggan sudah bayar, barista HARUS tahu
     try {
       const { pusherServer } = await import("@/lib/pusher");
+      const { prisma } = await import("@/lib/db");
+      const local = await prisma.order.findUnique({ where: { id: orderId }, select: { queueNumber: true } });
       await pusherServer.trigger("kitchen", "ORDER_CREATED", {
         order: {
           id: recoveredOlseraId || orderId,
-          queueNumber: Math.floor(Math.random() * 900) + 100,
+          queueNumber: local?.queueNumber ?? 0,
           status: "PENDING",
           totalAmount: paymentAmount || 0,
           paymentMethod: "SIMULATED",
@@ -1405,6 +1462,10 @@ export async function updateOrderPaymentStatus(
           source: "system_recovery",
           metadata: { recoveredOlseraId, originalOrderId: orderId },
         });
+        // createOrder()'s local-only fallback already wrote this order's
+        // PrintJob; the Barista label goes out once payment is confirmed,
+        // same as the normal path.
+        await triggerPrintJobBroadcast(orderId);
       } else {
         // Buat record baru jika belum ada (checkout awal gagal total)
         await prisma.order.create({

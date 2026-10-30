@@ -382,8 +382,10 @@ export async function PATCH(
     const session = await auth();
     const actorId = session?.user ? (session.user as any).id : undefined;
 
-    // Olsera orders: update state locally and emit SSE event
-    if (id.startsWith('OLSERA-')) {
+    // Olsera orders: update state locally and emit SSE event. Local-only
+    // "SF-" orders (Olsera was down at checkout) take the same path --
+    // hasValidOlseraId below is false for them, so every Olsera sync is skipped.
+    if (id.startsWith('OLSERA-') || id.startsWith('SF-')) {
       const olsera = await import('@/lib/integrations/olsera.service');
       
       // Normalize the ID for processing
