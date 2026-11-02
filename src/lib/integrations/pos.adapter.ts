@@ -677,6 +677,16 @@ async function mirrorOrderToLocalDb(
       source: "order_created",
       metadata: { olseraOrderId, orderNo, queueNumber: queueNum },
     });
+
+    // Last, so a failure here can't skip the status log above.
+    const code = voucherCode?.toUpperCase().trim();
+    if (code) {
+      await prisma.voucherUsage.upsert({
+        where: { orderId: localId },
+        update: {},
+        create: { orderId: localId, code, discountAmount },
+      });
+    }
   } catch (dbErr) {
     console.warn(`[Sync] Failed to mirror order to local database:`, dbErr);
   }

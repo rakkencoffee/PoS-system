@@ -62,6 +62,7 @@ model Order {
   statusLogs          OrderStatusLog[]
   pointLedgerEntries  PointLedger[]
   edcJobs             EdcJob[]
+  voucherUsage        VoucherUsage?
 
   @@index([stationId, createdAt])
   @@index([status])
@@ -137,6 +138,22 @@ model VoucherScope {
   cheapestOnly  Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+}
+
+// Satu baris per order yang pakai voucher, buat laporan pemakaian voucher
+// (Olsera gak pernah nambah `usage`, lihat Order.voucherCode). Status bayar
+// gak diduplikasi di sini -- join ke Order.status (PENDING/CANCELLED = gak
+// kepakai). discountAmount = total diskon order, termasuk auto promo kalau
+// lagi aktif.
+model VoucherUsage {
+  id             String   @id @default(cuid())
+  orderId        String   @unique
+  code           String
+  discountAmount Int
+  createdAt      DateTime @default(now())
+  order          Order    @relation(fields: [orderId], references: [id])
+
+  @@index([code, createdAt])
 }
 
 enum Role {
