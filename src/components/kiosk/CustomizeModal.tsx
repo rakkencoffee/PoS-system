@@ -262,6 +262,21 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
     };
   }, []);
 
+  // Photo slider: the menu's main photo shows instantly, then the full
+  // Olsera gallery (see /api/menu/[id]/photos) replaces it once loaded.
+  const [photos, setPhotos] = useState<string[]>(item.image ? [item.image] : []);
+  const [photoIndex, setPhotoIndex] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/menu/${item.id}/photos`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((urls: string[]) => {
+        if (!cancelled && Array.isArray(urls) && urls.length > 0) setPhotos(urls);
+      })
+      .catch(() => { /* keep the main photo */ });
+    return () => { cancelled = true; };
+  }, [item.id]);
+
   const selectedMilkPrice = milkChoices.find(m => m.key === milkChoice)?.price || 0;
   const selectedBeansPrice = beansChoices.find(b => b.key === beansChoice)?.price || 0;
   const selectedShotPrice = shotChoices.find(s => s.key === shotChoice)?.price || 0;
@@ -370,6 +385,41 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-5 space-y-6">
+          {/* Photo slider -- swipe sideways; CSS scroll-snap does the paging. */}
+          {photos.length > 0 && (
+            <div>
+              <div
+                className="flex overflow-x-auto snap-x snap-mandatory rounded-2xl bg-(--bg-card)"
+                style={{ scrollbarWidth: 'none' }}
+                onScroll={(e) => {
+                  const el = e.currentTarget;
+                  setPhotoIndex(Math.round(el.scrollLeft / el.clientWidth));
+                }}
+              >
+                {photos.map((src, i) => (
+                  <img
+                    key={src}
+                    src={src}
+                    alt={`${item.name} ${i + 1}`}
+                    className="w-full h-56 shrink-0 snap-center object-contain"
+                  />
+                ))}
+              </div>
+              {photos.length > 1 && (
+                // Below the photo, not over it -- overlaid dots vanished on
+                // red product shots.
+                <div className="mt-2 flex justify-center gap-1.5">
+                  {photos.map((src, i) => (
+                    <span
+                      key={src}
+                      className={`h-1.5 rounded-full transition-all ${i === photoIndex ? 'w-4 bg-[var(--brand-500)]' : 'w-1.5 bg-(--border-default)'}`}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Size Selection (Hot / Ice / Upsize for drinks) */}
           {hasSizes && (
             <div>
