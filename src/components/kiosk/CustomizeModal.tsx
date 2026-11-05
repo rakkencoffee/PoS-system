@@ -4,6 +4,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { useCartStore } from '@/stores/useCartStore';
 import { CartItem } from '@/lib/types';
 import { BEAN_FLAVORS, matchBeanFlavor } from '@/lib/menu-default-price';
+import { computeBreakfastDiscounts } from '@/lib/promo-categories';
+import { useBreakfastPromoStatus } from '@/hooks/useOrders';
 
 interface Topping {
   id: number;
@@ -105,7 +107,7 @@ const BEAN_ADDON_NAMES = ['Roar 50', 'Arabica Blend', 'Exotic Blend'];
 const SHOT_ADDON_NAMES = ['Extra Shot'];
 
 export default function CustomizeModal({ item, onClose, editingCartItem }: CustomizeModalProps) {
-  const { addItem, updateItem } = useCartStore();
+  const { addItem, updateItem, items: cartItems } = useCartStore();
   const isEditMode = !!editingCartItem;
 
   // Parse existing toppings from editingCartItem to recover milk/beans/shot state
@@ -294,6 +296,25 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
 
   const unitPrice = item.price + sizeAdjustment + selectedMilkPrice + selectedBeansPrice + selectedShotPrice;
   const totalPrice = unitPrice * quantity;
+
+  // Harga Promo Brunch di tombol: hitung ulang keranjang + item ini pakai
+  // rumus yang sama dengan cart/checkout, lalu ambil diskon baris item ini
+  // (baris terakhir). Yang lagi diedit dikeluarkan dulu biar nggak dobel.
+  const { data: promoStatus } = useBreakfastPromoStatus();
+  const promoLines = promoStatus?.active
+    ? computeBreakfastDiscounts([
+        ...cartItems
+          .filter((c) => c.id !== editingCartItem?.id)
+          .map((c) => ({ name: c.name, variantName: c.size, basePrice: c.price, quantity: c.quantity })),
+        {
+          name: item.name,
+          variantName: (beanVariantInfo ? selectedBeanVariant?.variant.name : selectedSize) || selectedSize,
+          basePrice: item.price + sizeAdjustment,
+          quantity,
+        },
+      ])
+    : [];
+  const promoDiscount = promoLines[promoLines.length - 1] || 0;
 
   const handleSubmit = () => {
     // Look up the Olsera variant that matches what's currently selected --
@@ -643,7 +664,14 @@ export default function CustomizeModal({ item, onClose, editingCartItem }: Custo
             className="btn-primary w-full flex items-center justify-between text-lg py-4 rounded-2xl"
           >
             <span>{isEditMode ? 'Update Item' : 'Add to Cart'}</span>
-            <span className="font-bold">{formatCurrency(totalPrice)}</span>
+            {promoDiscount > 0 ? (
+              <span className="flex items-baseline gap-2">
+                <span className="text-sm line-through opacity-70">{formatCurrency(totalPrice)}</span>
+                <span className="font-bold">{formatCurrency(totalPrice - promoDiscount)}</span>
+              </span>
+            ) : (
+              <span className="font-bold">{formatCurrency(totalPrice)}</span>
+            )}
           </button>
         </div>
       </div>
