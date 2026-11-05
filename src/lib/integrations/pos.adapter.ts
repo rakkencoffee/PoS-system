@@ -10,6 +10,7 @@
  */
 
 import * as olsera from "./olsera.service";
+import { planOlseraItemUpdates } from "./olsera-item-sync";
 import type { OlseraProduct, OlseraProductGroup, OlseraProductAddOn } from "./olsera.service";
 import { logOrderStatusChange, type StatusLogSource } from "@/lib/order-status-log";
 import { BAG_OPTIONS } from "@/lib/bag-options";
@@ -887,7 +888,9 @@ export async function createOrder(
           console.error(`[Sync] Skipping item sync because no order items were returned from Olsera for order ${orderId}`);
         } else {
           const hasExplicitBreakdown = Object.keys(itemDiscounts).length > 0;
-          const calculatedDiscounts = new Map<string, number>();
+          // Diskon per baris (index = index di `items`), bukan per
+          // produk-varian -- 2 baris produk+varian sama dulu saling timpa.
+          const lineDiscounts = items.map(() => 0);
 
           if (hasExplicitBreakdown) {
             // Caller (order-pricing.ts) already decided exactly which item(s)
@@ -896,11 +899,7 @@ export async function createOrder(
             // spreading it, which the proportional fallback below can't
             // express. Keyed by index into `items` (see param doc above).
             for (let idx = 0; idx < items.length; idx++) {
-              const item = items[idx];
-              calculatedDiscounts.set(
-                `${item.productId}-${item.variantId || ''}`,
-                itemDiscounts[String(idx)] || 0,
-              );
+              lineDiscounts[idx] = itemDiscounts[String(idx)] || 0;
             }
           } else {
             // Fallback for callers with no per-item breakdown (e.g. member
@@ -948,45 +947,35 @@ export async function createOrder(
                   remainingDiscount -= itemDiscount;
                 }
               }
-              calculatedDiscounts.set(`${item.productId}-${item.variantId || ''}`, itemDiscount);
+              lineDiscounts[items.indexOf(item)] = itemDiscount;
             }
           }
 
-          for (let idx = 0; idx < items.length; idx++) {
-            const localItem = items[idx];
-            const localProductId = String(localItem.productId || '');
-            const localVariantId = localItem.variantId ? String(localItem.variantId) : '';
-
-            // Find the matching item added to Olsera using robust string comparison
-            const matchingOlseraItem = olseraItems.find((oi: any) => {
-              const oiProductId = String(oi.product_id || '');
-              const oiVariantId = (oi.product_variant_id || oi.variant_id) ? String(oi.product_variant_id || oi.variant_id) : '';
-              return oiProductId === localProductId && oiVariantId === localVariantId;
-            });
-
-            if (matchingOlseraItem && matchingOlseraItem.id) {
-              const itemPrice = localItem.price || 0;
-              const itemDiscount = calculatedDiscounts.get(`${localProductId}-${localVariantId}`) || 0;
-
+          const { updates, unmatched } = planOlseraItemUpdates(
+            items.map((localItem, idx) => {
               // Concatenate note and options for the item details
               let fullNote = localItem.note || "";
               const optStr = formatOptionsWithToppings(localItem.options);
               if (optStr) fullNote = fullNote ? `${fullNote} (${optStr})` : optStr;
+              return {
+                productId: localItem.productId,
+                variantId: localItem.variantId,
+                price: localItem.price || 0,
+                quantity: localItem.quantity,
+                discount: lineDiscounts[idx],
+                note: fullNote,
+              };
+            }),
+            olseraItems,
+          );
 
-              console.log(`[Sync] Updating Olsera orderitem #${matchingOlseraItem.id} (Product: ${localProductId}) to price: ${itemPrice}, discount: ${itemDiscount}`);
-              
-              // Push the price and discount details to Olsera
-              await olsera.updateOrderItemDetail(
-                orderId,
-                matchingOlseraItem.id,
-                itemPrice,
-                itemDiscount,
-                localItem.quantity,
-                fullNote
-              );
-            } else {
-              console.warn(`[Sync] Could not find matching Olsera item for local product ID: ${localProductId}, variant ID: ${localVariantId}`);
-            }
+          for (const u of updates) {
+            console.log(`[Sync] Updating Olsera orderitem #${u.rowId} to price: ${u.price}, qty: ${u.qty}, discount: ${u.discount}`);
+            // Push the price and discount details to Olsera
+            await olsera.updateOrderItemDetail(orderId, Number(u.rowId), u.price, u.discount, u.qty, u.note);
+          }
+          for (const line of unmatched) {
+            console.warn(`[Sync] Could not find matching Olsera item for local product ID: ${line.productId}, variant ID: ${line.variantId || ''}`);
           }
           console.log(`[Sync] Successfully synchronized custom prices and Rp ${discountAmount} discount to Olsera Open Order #${orderId}`);
         }
