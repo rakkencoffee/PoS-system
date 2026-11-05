@@ -1,7 +1,7 @@
 import { getMenuItems, type NormalizedMenuItem } from "@/lib/integrations/pos.adapter";
 import { BAG_OPTIONS } from "@/lib/bag-options";
 import { olseraApi } from "@/lib/integrations/olsera.service";
-import { AUTO_PROMO_TRIGGER_CATEGORY_SLUGS, AUTO_PROMO_REWARD_CATEGORY_SLUG } from "@/lib/promo-categories";
+import { computeBreakfastDiscounts, isBreakfastPromoActive } from "@/lib/promo-categories";
 import { prisma } from "@/lib/db";
 
 /**
@@ -41,6 +41,9 @@ export interface VerifiedItem {
   quantity: number;
   unitPrice: number;
   isBag: boolean;
+  // Buat promo Breakfast: nama varian ("Ice,Small") + harga varian tanpa add-on.
+  variantName?: string;
+  basePrice: number;
 }
 
 export type VerifyItemsResult =
@@ -54,10 +57,12 @@ function findBagOption(productId: string) {
 function computeExpectedUnitPrice(
   item: PriceableItem,
   catalog: NormalizedMenuItem[],
-): { ok: true; price: number; name: string; categorySlug: string } | { ok: false; error: string } {
+):
+  | { ok: true; price: number; name: string; categorySlug: string; variantName?: string; basePrice: number }
+  | { ok: false; error: string } {
   const bagOption = findBagOption(item.productId);
   if (bagOption) {
-    return { ok: true, price: bagOption.price, name: bagOption.label, categorySlug: "packaging" };
+    return { ok: true, price: bagOption.price, name: bagOption.label, categorySlug: "packaging", basePrice: bagOption.price };
   }
 
   const menuItem = catalog.find(
@@ -74,12 +79,14 @@ function computeExpectedUnitPrice(
   }
 
   let basePrice = menuItem.price;
+  let variantName: string | undefined;
   if (item.variantId) {
     const variant = menuItem.olseraVariants?.find((v) => String(v.id) === String(item.variantId));
     if (!variant) {
       return { ok: false, error: `Varian tidak dikenali untuk ${menuItem.name}. Silakan refresh menu dan coba lagi.` };
     }
     basePrice = variant.price;
+    variantName = variant.name;
   }
 
   let addonTotal = 0;
@@ -94,7 +101,14 @@ function computeExpectedUnitPrice(
     addonTotal += addon.price;
   }
 
-  return { ok: true, price: basePrice + addonTotal, name: menuItem.name, categorySlug: menuItem.categorySlug };
+  return {
+    ok: true,
+    price: basePrice + addonTotal,
+    name: menuItem.name,
+    categorySlug: menuItem.categorySlug,
+    variantName,
+    basePrice,
+  };
 }
 
 /**
@@ -135,6 +149,8 @@ export async function verifyOrderItems(items: PriceableItem[]): Promise<VerifyIt
       quantity: qty,
       unitPrice: result.price,
       isBag: !!findBagOption(item.productId),
+      variantName: result.variantName,
+      basePrice: result.basePrice,
     });
     subtotal += result.price * qty;
   }
@@ -333,63 +349,26 @@ export async function computeVoucherDiscount(
 }
 
 // ──────────────────────────────
-// Automatic "buy 1 drink, get a Refreshment free" promo -- unlike
-// computeVoucherDiscount above, the customer never types anything for this
-// one. Its active window is a fixed one-off date+time range (e.g. 24 Sep
-// 2026, 10:00-12:00 WIB) -- Olsera's own Kupon Diskon dates are day-
-// granularity only, with no time-of-day, so they can't express this. The
-// window lives in env vars instead (AUTO_PROMO_START/AUTO_PROMO_END, ISO
-// datetimes with an explicit UTC offset e.g. "2026-09-24T10:00:00+07:00"),
-// checked directly against server time -- reschedule or disable by
-// updating/unsetting those in Vercel, no redeploy needed. Which item
-// actually goes free is still decided here regardless, since no voucher
-// system has a "buy category A, get category B free" concept.
+// Promo Breakfast (otomatis, customer nggak ngetik kode apa pun) -- aturan &
+// jadwalnya di promo-categories.ts's BREAKFAST_PROMO. Hasilnya `itemDiscounts`
+// di-key pakai index item di `items` (= priceCheck.items), sama persis dengan
+// `id` discountableItems di /api/payment/create, jadi bisa langsung digabung
+// sama diskon voucher lalu di-clamp di sana.
 // ──────────────────────────────
-
-
-// Exported so /api/promo/status can tell the cart page whether to show the
-// "pick your free Refreshment" picker, without duplicating the env-var check.
-export function isAutoPromoActiveNow(): boolean {
-  const start = process.env.AUTO_PROMO_START;
-  const end = process.env.AUTO_PROMO_END;
-  if (!start || !end) return false; // not scheduled -- no-op
-
-  const startMs = new Date(start).getTime();
-  const endMs = new Date(end).getTime();
-  if (Number.isNaN(startMs) || Number.isNaN(endMs)) return false;
-
-  const now = Date.now();
-  return now >= startMs && now <= endMs;
-}
-
-export type AutoPromoResult =
-  | { active: false }
-  | { active: true; message: string; discountAmount: number; itemDiscounts: Record<string, number> };
-
-export async function computeAutoPromoDiscount(items: DiscountableItem[]): Promise<AutoPromoResult> {
-  if (!Array.isArray(items) || items.length === 0) return { active: false };
-  if (!isAutoPromoActiveNow()) return { active: false };
-
-  const qualifyingDrinks = items.filter((item) =>
-    AUTO_PROMO_TRIGGER_CATEGORY_SLUGS.includes(String(item.category || "").toLowerCase()),
+export function computeBreakfastPromoDiscount(items: VerifiedItem[]): Record<string, number> {
+  if (!isBreakfastPromoActive()) return {};
+  const perLine = computeBreakfastDiscounts(
+    items.map((i) => ({
+      // Bag/packaging dikosongkan namanya biar nggak mungkin kehitung bowl/kopi.
+      name: i.isBag ? "" : i.name,
+      variantName: i.variantName,
+      basePrice: i.basePrice,
+      quantity: i.quantity,
+    })),
   );
-  const totalDrinkUnits = qualifyingDrinks.reduce((sum, item) => sum + item.quantity, 0);
-  // A real "buy 1 get 1" needs at least 2 qualifying drink units in the
-  // cart -- otherwise the single unit bought would just be handing itself
-  // away for free, which isn't a BOGO. Since Refreshment itself counts as a
-  // trigger too, 2x the same Refreshment alone satisfies this.
-  if (totalDrinkUnits < 2) return { active: false };
-
-  const eligibleRewards = items.filter(
-    (item) => String(item.category || "").toLowerCase() === AUTO_PROMO_REWARD_CATEGORY_SLUG,
-  );
-  if (eligibleRewards.length === 0) return { active: false };
-
-  const cheapest = eligibleRewards.reduce((min, item) => (item.price < min.price ? item : min));
-  return {
-    active: true,
-    message: `Promo aktif: 1 ${cheapest.name} gratis`,
-    discountAmount: cheapest.price,
-    itemDiscounts: { [String(cheapest.id)]: cheapest.price },
-  };
+  const itemDiscounts: Record<string, number> = {};
+  perLine.forEach((amount, idx) => {
+    if (amount > 0) itemDiscounts[String(idx)] = amount;
+  });
+  return itemDiscounts;
 }

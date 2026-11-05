@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCartStore } from '@/stores/useCartStore';
 import { useMenuItems, MenuItem } from '@/hooks/useMenu';
-import { useAutoPromoStatus } from '@/hooks/useOrders';
+import { useBreakfastPromoStatus } from '@/hooks/useOrders';
 import dynamic from 'next/dynamic';
 const CustomizeModal = dynamic(() => import('@/components/kiosk/CustomizeModal'), {
   ssr: false,
@@ -12,7 +12,12 @@ const CustomizeModal = dynamic(() => import('@/components/kiosk/CustomizeModal')
 import { CartItem } from '@/lib/types';
 import { KioskHeader } from '@/components/kiosk/KioskHeader';
 import { BAG_OPTIONS, BagKey } from '@/lib/bag-options';
-import { AUTO_PROMO_TRIGGER_CATEGORY_SLUGS, AUTO_PROMO_REWARD_CATEGORY_SLUG } from '@/lib/promo-categories';
+import {
+  BREAKFAST_PROMO,
+  computeBreakfastDiscounts,
+  isBreakfastBowl,
+  isBreakfastPromoVariant,
+} from '@/lib/promo-categories';
 
 /* ─────────────────────────────────────────────
    Helpers
@@ -27,40 +32,6 @@ function formatCurrency(amount: number): string {
 }
 
 const JKT = { fontFamily: 'var(--font-plus-jakarta-sans), sans-serif' } as const;
-
-/**
- * Builds a CartItem for a picked "free Refreshment" using the menu item's
- * default size/variant (first option, no toppings/sugar/ice choice) -- the
- * picker skips CustomizeModal entirely per 2026-09-22 decision, so this is
- * the only place that config gets decided.
- */
-function buildDefaultCartItem(menuItem: MenuItem): CartItem {
-  const defaultSize = menuItem.sizes?.[0];
-  const price = menuItem.price + (defaultSize?.priceAdjustment || 0);
-  const matchedVariant = defaultSize
-    ? menuItem.olseraVariants?.find(
-        (v) => v.name.toLowerCase().trim() === defaultSize.size.toLowerCase().trim()
-      )
-    : undefined;
-
-  return {
-    id: `${menuItem.id}-${Date.now()}`,
-    menuItemId: menuItem.id,
-    name: menuItem.name,
-    price,
-    image: menuItem.image,
-    quantity: 1,
-    size: defaultSize?.size || '',
-    olseraVariantId: matchedVariant?.id,
-    sugarLevel: '',
-    iceLevel: '',
-    extraShot: false,
-    toppings: [],
-    subtotal: price,
-    category: menuItem.category?.name || '',
-    categorySlug: menuItem.categorySlug || menuItem.category?.slug || AUTO_PROMO_REWARD_CATEGORY_SLUG,
-  };
-}
 
 function buildCustomText(item: CartItem): string {
   const parts: string[] = [];
@@ -110,23 +81,40 @@ function QuantityStepper({
   );
 }
 
+// Harga di kartu item: kalau kena Promo Brunch, harga asli dicoret +
+// harga setelah promo. Cuma tampilan -- server tetap hitung sendiri.
+function ItemPrice({ subtotal, promo, className }: { subtotal: number; promo: number; className: string }) {
+  if (promo <= 0) {
+    return <span className={className} style={JKT}>{formatCurrency(subtotal)}</span>;
+  }
+  return (
+    <div className="flex flex-col">
+      <span className="text-[10px] font-[700] text-[#0f7d3b] uppercase tracking-wide" style={JKT}>Promo Brunch</span>
+      <div className="flex items-baseline gap-1.5">
+        <span className="text-[12px] text-[#998075] line-through" style={JKT}>{formatCurrency(subtotal)}</span>
+        <span className={className} style={JKT}>{formatCurrency(subtotal - promo)}</span>
+      </div>
+    </div>
+  );
+}
+
 function KioskCartItemCard({
   item,
-  isFree,
+  promo = 0,
   onRemove,
   onDec,
   onInc,
   onEdit,
 }: {
   item: CartItem;
-  isFree?: boolean;
+  promo?: number;
   onRemove: () => void;
   onDec: () => void;
   onInc: () => void;
   onEdit: () => void;
 }) {
   return (
-    <div className={`bg-white rounded-lg p-3 flex gap-3 items-center shadow-sm hover:shadow-md transition-shadow group border ${isFree ? 'border-[#A8131E]' : 'border-[#f3e0be]'}`}>
+    <div className="bg-white rounded-lg p-3 flex gap-3 items-center shadow-sm hover:shadow-md transition-shadow group border border-[#f3e0be]">
       {/* Image */}
       <div className="w-16 h-16 rounded-lg overflow-hidden bg-[#F5F5F5] shrink-0">
         {item.image ? (
@@ -140,14 +128,7 @@ function KioskCartItemCard({
       <div className="flex-1 min-w-0">
         <div className="flex justify-between items-start">
           <div className="flex-1 min-w-0 pr-2">
-            <div className="flex items-center gap-1.5">
-              <h3 className="text-[14px] font-[600] text-[#323131] truncate" style={JKT}>{item.name}</h3>
-              {isFree && (
-                <span className="shrink-0 text-[9px] font-[700] text-white bg-[#A8131E] px-1.5 py-0.5 rounded-full uppercase tracking-wide" style={JKT}>
-                  Gratis
-                </span>
-              )}
-            </div>
+            <h3 className="text-[14px] font-[600] text-[#323131] truncate" style={JKT}>{item.name}</h3>
             <p className="text-[11px] text-[#998075] mt-0.5 line-clamp-1" style={JKT}>{buildCustomText(item)}</p>
             {item.toppings && item.toppings.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-1">
@@ -177,11 +158,7 @@ function KioskCartItemCard({
           </div>
         </div>
         <div className="flex justify-between items-center mt-2">
-          {isFree ? (
-            <span className="text-[16px] font-bold text-[#A8131E]" style={JKT}>Gratis</span>
-          ) : (
-            <span className="text-[16px] font-bold text-[#A8131E]" style={JKT}>{formatCurrency(item.subtotal)}</span>
-          )}
+          <ItemPrice subtotal={item.subtotal} promo={promo} className="text-[16px] font-bold text-[#A8131E]" />
           <QuantityStepper qty={item.quantity} onDec={onDec} onInc={onInc} size="sm" />
         </div>
       </div>
@@ -191,21 +168,21 @@ function KioskCartItemCard({
 
 function MobileCartItemCard({
   item,
-  isFree,
+  promo = 0,
   onRemove,
   onDec,
   onInc,
   onEdit,
 }: {
   item: CartItem;
-  isFree?: boolean;
+  promo?: number;
   onRemove: () => void;
   onDec: () => void;
   onInc: () => void;
   onEdit: () => void;
 }) {
   return (
-    <div className={`bg-white rounded-[20px] p-4 shadow-sm flex items-center gap-3 border ${isFree ? 'border-[#A8131E]' : 'border-[#f3e0be]'}`}>
+    <div className="bg-white rounded-[20px] p-4 shadow-sm flex items-center gap-3 border border-[#f3e0be]">
       {/* Image */}
       <div className="w-20 h-20 rounded-xl overflow-hidden bg-[#F5F5F5] shrink-0">
         {item.image ? (
@@ -220,11 +197,6 @@ function MobileCartItemCard({
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-1.5 min-w-0 pr-1">
             <h3 className="text-[15px] font-[600] text-[#231a05] line-clamp-1" style={JKT}>{item.name}</h3>
-            {isFree && (
-              <span className="shrink-0 text-[9px] font-[700] text-white bg-[#A8131E] px-1.5 py-0.5 rounded-full uppercase tracking-wide" style={JKT}>
-                Gratis
-              </span>
-            )}
           </div>
           <div className="flex items-center gap-0.5 shrink-0">
             <button onClick={onEdit} className="text-[#998075] active:text-[#A8131E] p-1 transition-colors">
@@ -237,11 +209,7 @@ function MobileCartItemCard({
         </div>
         <p className="text-[11px] text-[#998075] mb-2 line-clamp-1" style={JKT}>{buildCustomText(item)}</p>
         <div className="flex justify-between items-center">
-          {isFree ? (
-            <span className="text-[15px] font-bold text-[#A8131E]" style={JKT}>Gratis</span>
-          ) : (
-            <span className="text-[15px] font-bold text-[#A8131E]" style={JKT}>{formatCurrency(item.subtotal)}</span>
-          )}
+          <ItemPrice subtotal={item.subtotal} promo={promo} className="text-[15px] font-bold text-[#A8131E]" />
           <QuantityStepper qty={item.quantity} onDec={onDec} onInc={onInc} size="sm" />
         </div>
       </div>
@@ -301,50 +269,60 @@ function BagOptionsSection({
   );
 }
 
-function FreeRefreshmentPicker({
+// Varian promo kopi ini (Ice Small / Cappuccino Hot Small), buat harga coret di banner.
+const promoVariant = (m: MenuItem) => m.olseraVariants?.find((v) => isBreakfastPromoVariant(m.name, v.name));
+
+/**
+ * Banner promo Breakfast, 2 arah:
+ * - kind="coffee": ada bowl tapi belum ada kopi promo -> tawarkan kopi promo
+ *   (tap -> CustomizeModal dengan varian dikunci ke varian promo).
+ * - kind="bowl": ada kopi promo tapi belum ada bowl -> minta pilih 1 bowl
+ *   (tap -> CustomizeModal bowl biasa, protein bebas).
+ * Promo maks 1 kopi per transaksi (BREAKFAST_PROMO.maxCoffeePerTransaction).
+ */
+function BreakfastPromoBanner({
+  kind,
   options,
-  selectedMenuItemId,
   onPick,
 }: {
+  kind: 'coffee' | 'bowl';
   options: MenuItem[];
-  selectedMenuItemId: string | number | null;
   onPick: (menuItem: MenuItem) => void;
 }) {
   return (
     <div className="bg-[#fff2de] border border-[#f3e0be] rounded-2xl p-4">
       <h3 className="text-[16px] font-[600] text-[#231a05]" style={JKT}>
-        Promo Buy 1 Get 1 Aktif!
+        {kind === 'bowl' ? 'Promo Brunch: pilih 1 rice bowl' : 'Promo Brunch'}
       </h3>
       <p className="text-[12px] text-[#998075] mt-0.5 mb-3" style={JKT}>
-        Pilih 1 Refreshment favoritmu, gratis!
+        {kind === 'bowl'
+          ? `Kopimu jadi ${formatCurrency(BREAKFAST_PROMO.coffeePrice)} kalau dibeli bareng rice bowl.`
+          : `Tambah 1 kopi cuma ${formatCurrency(BREAKFAST_PROMO.coffeePrice)} (1 kopi per transaksi).`}
       </p>
       <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-        {options.map((opt) => {
-          const isSelected = String(opt.id) === String(selectedMenuItemId);
-          return (
-            <button
-              key={opt.id}
-              onClick={() => onPick(opt)}
-              className={`text-left rounded-xl border p-1.5 transition-all active:scale-[0.97] ${
-                isSelected
-                  ? 'border-[#A8131E] bg-white shadow-sm'
-                  : 'border-[#f3e0be] bg-white/60 hover:bg-white'
-              }`}
-            >
-              <div className="w-full aspect-square rounded-lg overflow-hidden bg-[#F5F5F5] mb-1">
-                {opt.image && (
-                  <img src={opt.image} alt={opt.name} className="w-full h-full object-cover" />
-                )}
-              </div>
-              <p className="text-[11px] font-[600] text-[#323131] line-clamp-2" style={JKT}>{opt.name}</p>
-              {isSelected && (
-                <span className="text-[9px] font-[700] text-[#A8131E] uppercase tracking-wide" style={JKT}>
-                  Dipilih -- Gratis
-                </span>
+        {options.map((opt) => (
+          <button
+            key={opt.id}
+            onClick={() => onPick(opt)}
+            className="text-left rounded-xl border border-[#f3e0be] bg-white/60 hover:bg-white p-1.5 transition-all active:scale-[0.97]"
+          >
+            <div className="w-full aspect-square rounded-lg overflow-hidden bg-[#F5F5F5] mb-1">
+              {opt.image && (
+                <img src={opt.image} alt={opt.name} className="w-full h-full object-cover" />
               )}
-            </button>
-          );
-        })}
+            </div>
+            <p className="text-[11px] font-[600] text-[#323131] line-clamp-2" style={JKT}>{opt.name}</p>
+            {kind === 'bowl' ? (
+              <p className="text-[12px] font-[700] text-[#A8131E]" style={JKT}>{formatCurrency(opt.price)}</p>
+            ) : (
+              <>
+                <p className="text-[10px] text-[#998075]" style={JKT}>{promoVariant(opt)?.name.replace(',', ' ')}</p>
+                <p className="text-[10px] text-[#998075] line-through" style={JKT}>{formatCurrency(promoVariant(opt)?.price ?? opt.price)}</p>
+                <p className="text-[12px] font-[700] text-[#A8131E]" style={JKT}>{formatCurrency(BREAKFAST_PROMO.coffeePrice)}</p>
+              </>
+            )}
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -381,7 +359,6 @@ export default function CartNewPage() {
   const router = useRouter();
   const {
     items,
-    addItem,
     removeItem,
     updateQuantity,
     itemCount,
@@ -392,8 +369,6 @@ export default function CartNewPage() {
     customerPhone,
     bagQuantities,
     setBagQuantity,
-    freeRefreshmentCartItemId,
-    setFreeRefreshmentCartItemId,
   } = useCartStore();
 
   const bagLines: BagLine[] = useMemo(() => {
@@ -406,56 +381,51 @@ export default function CartNewPage() {
   const bagTotal = bagLines.reduce((sum, l) => sum + l.subtotal, 0);
 
   const { data: allMenuItems = [] } = useMenuItems('all');
-  const { data: refreshmentMenu = [] } = useMenuItems(AUTO_PROMO_REWARD_CATEGORY_SLUG);
-  // Sold-out refreshments can't be picked as the free promo item either.
-  const refreshmentOptions = useMemo(() => refreshmentMenu.filter((m) => !m.isOutOfStock), [refreshmentMenu]);
-  const { data: promoStatus } = useAutoPromoStatus();
+  const { data: promoStatus } = useBreakfastPromoStatus();
+  const breakfastActive = !!promoStatus?.active;
 
-  // Eligible once the cart has at least 1 qualifying drink -- the picker's
-  // own pick is what supplies the "2nd" unit the server-side discount needs
-  // (see order-pricing.ts's computeAutoPromoDiscount totalDrinkUnits check),
-  // not something the customer has to add twice themselves.
-  const hasQualifyingDrink = items.some((item) =>
-    AUTO_PROMO_TRIGGER_CATEGORY_SLUGS.includes(String(item.categorySlug || '').toLowerCase())
+  // Preview saja -- server (/api/payment/create) hitung ulang dengan rumus
+  // yang sama (computeBreakfastDiscounts) dan itu yang ditagih. item.price
+  // = harga varian tanpa add-on, item.size = nama varian ("Ice,Small").
+  // Index sama dengan `items`, dipakai buat harga coret di tiap kartu.
+  const breakfastLines = breakfastActive
+    ? computeBreakfastDiscounts(
+        items.map((i) => ({ name: i.name, variantName: i.size, basePrice: i.price, quantity: i.quantity })),
+      )
+    : [];
+  const breakfastDiscount = breakfastLines.reduce((sum, d) => sum + d, 0);
+
+  // Kopi promo yang bisa ditawarkan: punya varian promo di Olsera, stok ada.
+  const breakfastCoffeeOptions = useMemo(
+    () => allMenuItems.filter((m) => !m.isOutOfStock && !!promoVariant(m)),
+    [allMenuItems],
   );
-
-  // Preview-only mirror of order-pricing.ts's computeAutoPromoDiscount
-  // (same condition checkout's own preview uses) -- without this, the
-  // picked "free" item's full price still showed up in the cart page's own
-  // Total, even though checkout and the actual charge both already
-  // excluded it (confirmed live 2026-09-22).
-  const qualifyingDrinkUnits = items.reduce(
-    (sum, item) =>
-      AUTO_PROMO_TRIGGER_CATEGORY_SLUGS.includes(String(item.categorySlug || '').toLowerCase())
-        ? sum + item.quantity
-        : sum,
+  const bowlUnits = items.reduce((n, i) => (isBreakfastBowl(i.name) ? n + i.quantity : n), 0);
+  const promoCoffeeUnits = items.reduce(
+    (n, i) => (isBreakfastPromoVariant(i.name, i.size) ? n + i.quantity : n),
     0,
   );
-  const freeRefreshmentItem = freeRefreshmentCartItemId
-    ? items.find((i) => i.id === freeRefreshmentCartItemId)
-    : undefined;
-  const autoPromoDiscount =
-    promoStatus?.active && qualifyingDrinkUnits >= 2 && freeRefreshmentItem
-      ? freeRefreshmentItem.subtotal / freeRefreshmentItem.quantity
-      : 0;
+  const showBreakfastBanner = breakfastActive && bowlUnits > 0 && promoCoffeeUnits === 0 && breakfastCoffeeOptions.length > 0;
 
-  const grandTotal = Math.max(0, totalAmount - autoPromoDiscount) + bagTotal;
-  const showFreePicker = !!promoStatus?.active && hasQualifyingDrink && refreshmentOptions.length > 0;
-  const selectedFreeMenuItemId = freeRefreshmentCartItemId
-    ? items.find((i) => i.id === freeRefreshmentCartItemId)?.menuItemId ?? null
-    : null;
+  // Kebalikannya: kopi promo sudah ada tapi belum ada bowl -> minta pilih 1 bowl.
+  const breakfastBowlOptions = useMemo(
+    () => allMenuItems.filter((m) => !m.isOutOfStock && isBreakfastBowl(m.name)),
+    [allMenuItems],
+  );
+  const showBowlBanner = breakfastActive && promoCoffeeUnits > 0 && bowlUnits === 0 && breakfastBowlOptions.length > 0;
 
-  const handlePickFreeRefreshment = (menuItem: MenuItem) => {
-    // Swap out the previous pick (if any) rather than stacking multiple free
-    // items -- per 2026-09-22 decision, this promo hands out exactly 1 free
-    // item, and staff confirmed customers should still be able to change
-    // their mind about which Refreshment they want.
-    if (freeRefreshmentCartItemId) {
-      removeItem(freeRefreshmentCartItemId);
-    }
-    const cartItem = buildDefaultCartItem(menuItem);
-    addItem(cartItem);
-    setFreeRefreshmentCartItemId(cartItem.id);
+  const grandTotal = Math.max(0, totalAmount - breakfastDiscount) + bagTotal;
+
+  const [addingMenuItem, setAddingMenuItem] = useState<MenuItem | null>(null);
+  // Kunci varian: CustomizeModal cuma dikasih varian promo (sizes buat grid
+  // biasa, olseraVariants buat jalur item ber-bean), jadi customer dari banner
+  // nggak bisa pindah ke varian lain.
+  const handlePickBreakfastCoffee = (menuItem: MenuItem) => {
+    setAddingMenuItem({
+      ...menuItem,
+      sizes: (menuItem.sizes || []).filter((s) => isBreakfastPromoVariant(menuItem.name, s.size)),
+      olseraVariants: menuItem.olseraVariants?.filter((v) => isBreakfastPromoVariant(menuItem.name, v.name)),
+    });
   };
 
   const [editingCartItem, setEditingCartItem] = useState<CartItem | null>(null);
@@ -540,11 +510,11 @@ export default function CartNewPage() {
         />
 
         {itemCount === 0 ? (
-          <main className="h-[calc(100dvh-76px)] flex items-center justify-center px-12">
+          <main className="flex-1 min-h-0 flex items-center justify-center px-12">
             <EmptyCart onBrowse={() => router.push('/menu')} isMobile={false} />
           </main>
         ) : (
-          <main className="h-[calc(100dvh-76px)] flex w-full">
+          <main className="flex-1 min-h-0 flex w-full">
 
             {/* ── LEFT: Item List (scrolls on its own) ── */}
             <div className="cart-scroll w-[60%] h-full overflow-y-auto px-8 py-6">
@@ -556,11 +526,11 @@ export default function CartNewPage() {
               </header>
 
               <div className="space-y-2">
-                {items.map((item) => (
+                {items.map((item, idx) => (
                   <KioskCartItemCard
                     key={item.id}
                     item={item}
-                    isFree={item.id === freeRefreshmentCartItemId}
+                    promo={breakfastLines[idx] || 0}
                     onRemove={() => removeItem(item.id)}
                     onDec={() => updateQuantity(item.id, item.quantity - 1)}
                     onInc={() => updateQuantity(item.id, item.quantity + 1)}
@@ -568,12 +538,11 @@ export default function CartNewPage() {
                   />
                 ))}
 
-                {showFreePicker && (
-                  <FreeRefreshmentPicker
-                    options={refreshmentOptions}
-                    selectedMenuItemId={selectedFreeMenuItemId}
-                    onPick={handlePickFreeRefreshment}
-                  />
+                {showBreakfastBanner && (
+                  <BreakfastPromoBanner kind="coffee" options={breakfastCoffeeOptions} onPick={handlePickBreakfastCoffee} />
+                )}
+                {showBowlBanner && (
+                  <BreakfastPromoBanner kind="bowl" options={breakfastBowlOptions} onPick={setAddingMenuItem} />
                 )}
 
                 {/* Add more bento */}
@@ -657,10 +626,10 @@ export default function CartNewPage() {
                         <span className="text-[13px] font-[600] text-[#323131]" style={JKT}>{formatCurrency(bagTotal)}</span>
                       </div>
                     )}
-                    {autoPromoDiscount > 0 && (
+                    {breakfastDiscount > 0 && (
                       <div className="flex justify-between items-center">
-                        <span className="text-[12px] text-[#0f7d3b]" style={JKT}>Promo Buy 1 Get 1</span>
-                        <span className="text-[13px] font-[600] text-[#0f7d3b]" style={JKT}>-{formatCurrency(autoPromoDiscount)}</span>
+                        <span className="text-[12px] text-[#0f7d3b]" style={JKT}>Promo Brunch</span>
+                        <span className="text-[13px] font-[600] text-[#0f7d3b]" style={JKT}>-{formatCurrency(breakfastDiscount)}</span>
                       </div>
                     )}
                     <div className="flex justify-between items-center pt-1.5 border-t border-[#f3e0be] mt-1.5">
@@ -773,11 +742,11 @@ export default function CartNewPage() {
               </div>
 
               <div className="space-y-3">
-                {items.map((item) => (
+                {items.map((item, idx) => (
                   <MobileCartItemCard
                     key={item.id}
                     item={item}
-                    isFree={item.id === freeRefreshmentCartItemId}
+                    promo={breakfastLines[idx] || 0}
                     onRemove={() => removeItem(item.id)}
                     onDec={() => updateQuantity(item.id, item.quantity - 1)}
                     onInc={() => updateQuantity(item.id, item.quantity + 1)}
@@ -786,13 +755,14 @@ export default function CartNewPage() {
                 ))}
               </div>
 
-              {showFreePicker && (
+              {showBreakfastBanner && (
                 <div className="mt-3">
-                  <FreeRefreshmentPicker
-                    options={refreshmentOptions}
-                    selectedMenuItemId={selectedFreeMenuItemId}
-                    onPick={handlePickFreeRefreshment}
-                  />
+                  <BreakfastPromoBanner kind="coffee" options={breakfastCoffeeOptions} onPick={handlePickBreakfastCoffee} />
+                </div>
+              )}
+              {showBowlBanner && (
+                <div className="mt-3">
+                  <BreakfastPromoBanner kind="bowl" options={breakfastBowlOptions} onPick={setAddingMenuItem} />
                 </div>
               )}
             </section>
@@ -838,10 +808,10 @@ export default function CartNewPage() {
                     <span className="text-[15px] font-[600] text-[#323131]" style={JKT}>{formatCurrency(bagTotal)}</span>
                   </div>
                 )}
-                {autoPromoDiscount > 0 && (
+                {breakfastDiscount > 0 && (
                   <div className="flex justify-between items-center">
-                    <span className="text-[14px] text-[#0f7d3b]" style={JKT}>Promo Buy 1 Get 1</span>
-                    <span className="text-[15px] font-[600] text-[#0f7d3b]" style={JKT}>-{formatCurrency(autoPromoDiscount)}</span>
+                    <span className="text-[14px] text-[#0f7d3b]" style={JKT}>Promo Brunch</span>
+                    <span className="text-[15px] font-[600] text-[#0f7d3b]" style={JKT}>-{formatCurrency(breakfastDiscount)}</span>
                   </div>
                 )}
                 <div className="h-px bg-[#f3e0be] my-1" />
@@ -869,6 +839,11 @@ export default function CartNewPage() {
           </footer>
         )}
       </div>
+
+      {/* Add Modal — dari banner promo Breakfast */}
+      {addingMenuItem && (
+        <CustomizeModal item={addingMenuItem} onClose={() => setAddingMenuItem(null)} />
+      )}
 
       {/* Edit Modal — shared */}
       {editingMenuItem && editingCartItem && (

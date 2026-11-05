@@ -913,9 +913,7 @@ export async function getVouchers(): Promise<any[]> {
  * Uses Olsera's ?search= parameter to filter server-side.
  *
  * `silent` suppresses the failure log -- for a code that's expected to
- * sometimes not exist yet (e.g. computeAutoPromoDiscount's automatic promo
- * check, which runs on every order and legitimately 404s until that promo
- * is created in Olsera). Leave it on (the default) for a customer-typed
+ * sometimes not exist yet. Leave it on (the default) for a customer-typed
  * voucher code, where a 404 is worth seeing in logs.
  */
 export async function getVoucherByCode(code: string, silent = false): Promise<any | null> {

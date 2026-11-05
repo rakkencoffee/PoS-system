@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
-import { isAutoPromoActiveNow } from "@/lib/order-pricing";
+import { breakfastPromoRemainingMs, isBreakfastPromoActive } from "@/lib/promo-categories";
+
+export const dynamic = "force-dynamic";
 
 /**
  * GET /api/promo/status
  *
- * Tells the kiosk cart page whether the automatic "buy 1 drink, get a
- * Refreshment free" promo is currently active, so it knows whether to show
- * the free-item picker. The active window (AUTO_PROMO_START/AUTO_PROMO_END)
- * is server-only env vars, not exposed to the client directly.
+ * Kasih tahu kiosk apakah promo Breakfast lagi jam aktif + sisa waktunya.
+ * Dicek pakai jam server (bukan jam tablet kiosk yang bisa ngaco), lihat
+ * BREAKFAST_PROMO.
  */
 export async function GET() {
-  return NextResponse.json({ active: isAutoPromoActiveNow() });
+  return NextResponse.json({ active: isBreakfastPromoActive(), remainingMs: breakfastPromoRemainingMs() });
 }

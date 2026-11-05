@@ -172,15 +172,17 @@ export function useCreateOrder() {
   });
 }
 
-/** Whether the automatic "buy 1 drink, get a Refreshment free" promo is
-    currently in its active window -- see /api/promo/status. */
-export function useAutoPromoStatus() {
+/** Apakah promo Breakfast lagi jam aktif -- lihat /api/promo/status. */
+export function useBreakfastPromoStatus() {
   return useQuery({
-    queryKey: ['promo', 'auto-promo-status'],
-    queryFn: async (): Promise<{ active: boolean }> => {
+    queryKey: ['promo', 'breakfast-status'],
+    // endsAt = jam lokal tablet saat fetch + sisa waktu dari server, jadi
+    // hitungan mundur tetap akurat walau jam tablet beda dengan server.
+    queryFn: async (): Promise<{ active: boolean; endsAt: number }> => {
       const res = await fetch('/api/promo/status');
-      if (!res.ok) return { active: false };
-      return res.json();
+      if (!res.ok) return { active: false, endsAt: 0 };
+      const data: { active: boolean; remainingMs?: number } = await res.json();
+      return { active: data.active, endsAt: Date.now() + (data.remainingMs || 0) };
     },
     staleTime: 60_000,
     refetchInterval: 60_000, // window can start/end mid-session while a kiosk sits idle

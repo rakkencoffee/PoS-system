@@ -7,6 +7,8 @@ import { useDebouncedCallback } from 'use-debounce';
 import { useCategories, useMenuItems, Category, MenuItem } from '@/hooks/useMenu';
 import { KioskHeader } from '@/components/kiosk/KioskHeader';
 import { defaultVariantPrice } from '@/lib/menu-default-price';
+import { useBreakfastPromoStatus } from '@/hooks/useOrders';
+import { isBreakfastBowl, isBreakfastPromoVariant } from '@/lib/promo-categories';
 import dynamic from 'next/dynamic';
 const CustomizeModal = dynamic(() => import('@/components/kiosk/CustomizeModal'), {
   ssr: false,
@@ -43,7 +45,29 @@ function SoldOutBadge({ compact = false }: { compact?: boolean }) {
   );
 }
 
-function KioskProductCard({ item, onSelect, priority }: { item: MenuItem; onSelect: () => void; priority?: boolean }) {
+// Tulisan pita promo Breakfast buat kartu produk (bowl & kopi promo), null
+// kalau bukan item promo.
+function breakfastRibbon(item: MenuItem): string | null {
+  const isPromoItem =
+    isBreakfastBowl(item.name) || !!item.olseraVariants?.some((v) => isBreakfastPromoVariant(item.name, v.name));
+  return isPromoItem ? 'BRUNCH' : null;
+}
+
+// Pita miring di pojok kanan atas foto. Parent wajib `relative overflow-hidden`.
+function PromoRibbon({ text, compact = false }: { text: string; compact?: boolean }) {
+  return (
+    <span
+      className={`absolute z-10 rotate-45 bg-[#A8131E] text-white font-bold text-center shadow-md pointer-events-none ${
+        compact ? 'top-2.5 -right-7 w-24 text-[9px] py-0.5' : 'top-4 -right-9 w-32 text-[11px] py-1'
+      }`}
+      style={JKT}
+    >
+      {text}
+    </span>
+  );
+}
+
+function KioskProductCard({ item, onSelect, priority, ribbon }: { item: MenuItem; onSelect: () => void; priority?: boolean; ribbon?: string | null }) {
   const soldOut = !!item.isOutOfStock;
   return (
     <button
@@ -82,6 +106,7 @@ function KioskProductCard({ item, onSelect, priority }: { item: MenuItem; onSele
             Recommended
           </span>
         )}
+        {ribbon && !soldOut && <PromoRibbon text={ribbon} />}
       </div>
       <div className="p-3 flex-1 flex flex-col justify-between">
         <div>
@@ -117,7 +142,7 @@ function KioskProductCard({ item, onSelect, priority }: { item: MenuItem; onSele
   );
 }
 
-function MobileProductCard({ item, onSelect, priority }: { item: MenuItem; onSelect: () => void; priority?: boolean }) {
+function MobileProductCard({ item, onSelect, priority, ribbon }: { item: MenuItem; onSelect: () => void; priority?: boolean; ribbon?: string | null }) {
   const soldOut = !!item.isOutOfStock;
   return (
     <button
@@ -148,6 +173,7 @@ function MobileProductCard({ item, onSelect, priority }: { item: MenuItem; onSel
             Best
           </span>
         )}
+        {ribbon && !soldOut && <PromoRibbon text={ribbon} compact />}
       </div>
       <div className="px-1 pb-1 flex flex-col flex-grow">
         <span className="text-[11px] font-[500] text-[#998075] mb-0.5 truncate" style={JKT}>
@@ -267,6 +293,8 @@ function MenuPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { itemCount, totalAmount } = useCartStore();
+  const { data: breakfastStatus } = useBreakfastPromoStatus();
+  const ribbonFor = (item: MenuItem) => (breakfastStatus?.active ? breakfastRibbon(item) : null);
 
   const [selectedCategory, setSelectedCategory] = useState('');
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
@@ -325,7 +353,13 @@ function MenuPageContent() {
     const el = document.getElementById(`mnew-${slug}`);
     if (el) {
       window.scrollTo({
-        top: el.getBoundingClientRect().top + window.pageYOffset - 160,
+        // Tinggi header sticky kiosk diukur langsung (bisa nambah waktu bar
+        // Promo Breakfast tampil). Di layout mobile elemen itu hidden (0px),
+        // jadi tetap pakai 160 seperti sebelumnya.
+        top:
+          el.getBoundingClientRect().top +
+          window.pageYOffset -
+          Math.max(160, (document.getElementById('kiosk-sticky-top')?.offsetHeight || 0) + 24),
         behavior: 'smooth',
       });
     }
@@ -391,7 +425,7 @@ function MenuPageContent() {
             height, which silently drifted (and left a visible gap) the
             moment the header's own padding changed. Wrapping both together
             means there's no pixel offset to keep in sync at all. */}
-        <div className="sticky top-0 z-50">
+        <div id="kiosk-sticky-top" className="sticky top-0 z-50">
           <KioskHeader
             searchValue={searchQuery}
             onSearchChange={onSearchValueChange}
@@ -421,7 +455,7 @@ function MenuPageContent() {
               ) : (
                 <div className="grid grid-cols-4 gap-3">
                   {filteredItems.map((item: MenuItem, index: number) => (
-                    <KioskProductCard key={item.id} item={item} onSelect={() => setSelectedItem(item)} priority={index < 4} />
+                    <KioskProductCard key={item.id} item={item} onSelect={() => setSelectedItem(item)} priority={index < 4} ribbon={ribbonFor(item)} />
                   ))}
                 </div>
               )}
@@ -446,6 +480,7 @@ function MenuPageContent() {
                           item={item}
                           onSelect={() => setSelectedItem(item)}
                           priority={catIdx === 0 && itemIdx < 4}
+                          ribbon={ribbonFor(item)}
                         />
                       ))}
                     </div>
@@ -574,7 +609,7 @@ function MenuPageContent() {
               ) : (
                 <div className="grid grid-cols-2 gap-3">
                   {filteredItems.map((item: MenuItem, index: number) => (
-                    <MobileProductCard key={item.id} item={item} onSelect={() => setSelectedItem(item)} priority={index < 2} />
+                    <MobileProductCard key={item.id} item={item} onSelect={() => setSelectedItem(item)} priority={index < 2} ribbon={ribbonFor(item)} />
                   ))}
                 </div>
               )}
@@ -604,6 +639,7 @@ function MenuPageContent() {
                             item={item}
                             onSelect={() => setSelectedItem(item)}
                             priority={catIdx === 0 && itemIdx < 2}
+                            ribbon={ribbonFor(item)}
                           />
                         ))}
                       </div>

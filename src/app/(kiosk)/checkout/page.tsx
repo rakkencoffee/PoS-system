@@ -3,8 +3,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCartStore } from '@/stores/useCartStore';
-import { useCreateOrder, useValidateVoucher, useAutoPromoStatus } from '@/hooks/useOrders';
-import { AUTO_PROMO_TRIGGER_CATEGORY_SLUGS } from '@/lib/promo-categories';
+import { useCreateOrder, useValidateVoucher, useBreakfastPromoStatus } from '@/hooks/useOrders';
+import { computeBreakfastDiscounts } from '@/lib/promo-categories';
 import { db, encryptPendingOrder } from '@/lib/dexie';
 import { CartItem } from '@/lib/types';
 import { KioskHeader } from '@/components/kiosk/KioskHeader';
@@ -93,8 +93,8 @@ function formatCurrency(amount: number): string {
 
 export default function CheckoutNewPage() {
   const router = useRouter();
-  const { items, totalAmount, clearCart, itemCount, customerName, customerPhone, updateQuantity, removeItem, bagQuantities, freeRefreshmentCartItemId } = useCartStore();
-  const { data: autoPromoStatus } = useAutoPromoStatus();
+  const { items, totalAmount, clearCart, itemCount, customerName, customerPhone, updateQuantity, removeItem, bagQuantities } = useCartStore();
+  const { data: breakfastStatus } = useBreakfastPromoStatus();
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<string>('');
@@ -261,31 +261,26 @@ export default function CheckoutNewPage() {
     }
   };
 
-  // Preview-only mirror of order-pricing.ts's computeAutoPromoDiscount, so
-  // the total shown here BEFORE payment already matches what
-  // /api/payment/create will actually charge -- without this, a customer
-  // could see e.g. "Total: Rp50.000" on screen but the EDC terminal only
-  // asks for Rp30.000 once the free item is applied server-side, a
-  // confusing mismatch (caught before ever shipping, 2026-09-22). This does
-  // NOT decide the real discount -- the server always recomputes it from
-  // scratch and is the only source of truth for what gets charged.
-  const qualifyingDrinkUnits = items.reduce(
-    (sum, item) =>
-      AUTO_PROMO_TRIGGER_CATEGORY_SLUGS.includes(String(item.categorySlug || '').toLowerCase())
-        ? sum + item.quantity
-        : sum,
-    0,
-  );
-  const freeRefreshmentItem = freeRefreshmentCartItemId
-    ? items.find((i) => i.id === freeRefreshmentCartItemId)
-    : undefined;
-  const autoPromoDiscount =
-    autoPromoStatus?.active && qualifyingDrinkUnits >= 2 && freeRefreshmentItem
-      ? freeRefreshmentItem.subtotal / freeRefreshmentItem.quantity
-      : 0;
+  // Preview promo Breakfast, rumus sama persis dengan yang dipakai server
+  // (computeBreakfastDiscounts) supaya total di layar = yang ditagih EDC.
+  // Tetap server yang menentukan diskon sebenarnya.
+  const breakfastLines = breakfastStatus?.active
+    ? computeBreakfastDiscounts(
+        items.map((i) => ({ name: i.name, variantName: i.size, basePrice: i.price, quantity: i.quantity })),
+      )
+    : [];
+  const breakfastDiscount = breakfastLines.reduce((sum, d) => sum + d, 0);
+  const breakfastByItem: Record<string, number> = {};
+  items.forEach((it, i) => {
+    if (breakfastLines[i] > 0) breakfastByItem[it.id] = breakfastLines[i];
+  });
+  // Potongan per kartu item = voucher + Breakfast, di-clamp ke subtotal baris
+  // (server juga clamp begini). Cuma buat tampilan.
+  const lineDiscount = (item: CartItem) =>
+    Math.min(item.subtotal, (itemDiscounts[item.id] || 0) + (breakfastByItem[item.id] || 0));
 
   const subtotal = totalAmount;
-  const discount = appliedDiscount + autoPromoDiscount;
+  const discount = appliedDiscount + breakfastDiscount;
   const bagTotal = calculateBagTotal(bagQuantities);
   const total = Math.max(0, subtotal - discount) + bagTotal;
 
@@ -318,7 +313,7 @@ export default function CheckoutNewPage() {
           itemCount={itemCount}
         />
 
-        <main className="h-[calc(100dvh-76px)] flex">
+        <main className="flex-1 min-h-0 flex">
           {/* Left Section: Order Review (55%) */}
           <section className="w-[55%] h-full bg-background p-page-gutter flex flex-col overflow-y-auto">
             <div className="flex flex-col gap-standard mb-section-sep">
@@ -358,17 +353,18 @@ export default function CheckoutNewPage() {
                           )}
                         </div>
                         {item.notes && <p className="text-xs text-[#A8131E] mt-1 italic">"{item.notes}"</p>}
+                        {breakfastByItem[item.id] > 0 && (
+                          <p className="text-xs font-bold text-green-600 mt-1">Promo Brunch</p>
+                        )}
                       </div>
                       <div className="text-right flex flex-col items-end">
-                        {itemDiscounts[item.id] > 0 && (
-                          <span className="text-xs font-bold text-green-600 mb-0.5">
-                            -{formatCurrency(itemDiscounts[item.id])}
+                        {lineDiscount(item) > 0 && (
+                          <span className="text-xs text-taupe line-through mb-0.5">
+                            {formatCurrency(item.subtotal)}
                           </span>
                         )}
                         <span className="font-price text-body-lg text-primary">
-                          {itemDiscounts[item.id] > 0
-                            ? formatCurrency(item.subtotal - itemDiscounts[item.id])
-                            : formatCurrency(item.subtotal)}
+                          {formatCurrency(item.subtotal - lineDiscount(item))}
                         </span>
                       </div>
                     </div>
@@ -479,10 +475,10 @@ export default function CheckoutNewPage() {
                       <span>-{formatCurrency(appliedDiscount)}</span>
                     </div>
                   )}
-                  {autoPromoDiscount > 0 && (
+                  {breakfastDiscount > 0 && (
                     <div className="flex justify-between text-body-lg text-green-600 font-body-lg">
-                      <span>Promo Buy 1 Get 1</span>
-                      <span>-{formatCurrency(autoPromoDiscount)}</span>
+                      <span>Promo Brunch</span>
+                      <span>-{formatCurrency(breakfastDiscount)}</span>
                     </div>
                   )}
                   <div className="pt-standard border-t border-surface-variant flex justify-between items-center">
@@ -611,17 +607,18 @@ export default function CheckoutNewPage() {
                               <span>Ice: {item.iceLevel}</span>
                             )}
                           </div>
+                          {breakfastByItem[item.id] > 0 && (
+                            <p className="text-[11px] font-bold text-green-600 mt-0.5">Promo Brunch</p>
+                          )}
                         </div>
                         <div className="text-right flex flex-col items-end shrink-0">
-                          {itemDiscounts[item.id] > 0 && (
-                            <span className="text-xs font-bold text-green-600 mb-0.5">
-                              -{formatCurrency(itemDiscounts[item.id])}
+                          {lineDiscount(item) > 0 && (
+                            <span className="text-xs text-taupe line-through mb-0.5">
+                              {formatCurrency(item.subtotal)}
                             </span>
                           )}
                           <span className="font-price text-body-lg text-primary">
-                            {itemDiscounts[item.id] > 0
-                              ? formatCurrency(item.subtotal - itemDiscounts[item.id])
-                              : formatCurrency(item.subtotal)}
+                            {formatCurrency(item.subtotal - lineDiscount(item))}
                           </span>
                         </div>
                       </div>
@@ -717,10 +714,10 @@ export default function CheckoutNewPage() {
                 <span>-{formatCurrency(appliedDiscount)}</span>
               </div>
             )}
-            {autoPromoDiscount > 0 && (
+            {breakfastDiscount > 0 && (
               <div className="flex justify-between text-green-600">
-                <span>Promo Buy 1 Get 1</span>
-                <span>-{formatCurrency(autoPromoDiscount)}</span>
+                <span>Promo Brunch</span>
+                <span>-{formatCurrency(breakfastDiscount)}</span>
               </div>
             )}
             <div className="h-[1px] bg-surface-variant opacity-50"></div>

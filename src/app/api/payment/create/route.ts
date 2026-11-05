@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyOrderItems, computeVoucherDiscount, computeAutoPromoDiscount } from "@/lib/order-pricing";
+import { verifyOrderItems, computeVoucherDiscount, computeBreakfastPromoDiscount } from "@/lib/order-pricing";
 
 // The after() settlement callback below waits on createOrder()'s
 // itemSyncPromise (its own retry loop: up to 4 Olsera round-trips, ~1-2s
@@ -86,14 +86,12 @@ export async function POST(request: NextRequest) {
       Object.assign(itemDiscounts, discountCheck.itemDiscounts);
     }
 
-    // Automatic date-gated promo (no code typed by the customer) -- runs on
-    // every order regardless of voucherCode, see computeAutoPromoDiscount for
-    // how its active window is controlled from Olsera.
-    const autoPromo = await computeAutoPromoDiscount(discountableItems);
-    if (autoPromo.active) {
-      for (const [id, amount] of Object.entries(autoPromo.itemDiscounts)) {
-        itemDiscounts[id] = (itemDiscounts[id] || 0) + amount;
-      }
+    // Promo Breakfast otomatis (tanpa kode) -- jalan di tiap order, jam &
+    // aturannya di promo-categories.ts's BREAKFAST_PROMO. Key-nya index di
+    // priceCheck.items, sama dengan discountableItems' id.
+    const breakfastDiscounts = computeBreakfastPromoDiscount(priceCheck.items);
+    for (const [id, amount] of Object.entries(breakfastDiscounts)) {
+      itemDiscounts[id] = (itemDiscounts[id] || 0) + amount;
     }
 
     // Clamp each item's combined discount to its own line subtotal so a

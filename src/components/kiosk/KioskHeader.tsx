@@ -4,8 +4,39 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { KioskPrinterPairing } from './KioskPrinterPairing';
 import { getKioskDeviceId } from '@/lib/kiosk-device';
+import { useBreakfastPromoStatus } from '@/hooks/useOrders';
 
 const JKT = { fontFamily: 'var(--font-plus-jakarta-sans)' };
+
+const pad = (n: number) => String(n).padStart(2, '0');
+
+/**
+ * Bar merah "Promo Brunch" + hitungan mundur, tepat di bawah header.
+ * Cuma tampil selama jam promo; hilang sendiri begitu waktunya habis.
+ */
+function BreakfastPromoBar() {
+  const { data } = useBreakfastPromoStatus();
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!data?.active) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [data?.active]);
+
+  const left = data?.active ? data.endsAt - now : 0;
+  if (left <= 0) return null;
+
+  const s = Math.floor(left / 1000);
+  const countdown = `${pad(Math.floor(s / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`;
+
+  return (
+    <div className="px-12 py-2 bg-[#A8131E] text-white text-center text-[14px]" style={JKT}>
+      <span className="font-bold tracking-wide mr-3">PROMO BRUNCH</span>
+      Berakhir dalam <span className="font-bold tabular-nums">{countdown}</span>
+    </div>
+  );
+}
 
 interface KioskHeaderProps {
   searchValue: string;
@@ -52,6 +83,7 @@ export function KioskHeader({
   }, []);
 
   return (
+    <>
     <header className={`${disableSticky ? '' : 'sticky top-0 z-50'} flex justify-between items-center px-12 py-5 bg-white shadow-sm border-b border-[#f3e0be]/40`}>
       <button
         onClick={() => router.push('/menu')}
@@ -118,5 +150,7 @@ export function KioskHeader({
         </span>
       )}
     </header>
+    <BreakfastPromoBar />
+    </>
   );
 }

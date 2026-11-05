@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { CartItem, CartState } from '@/lib/types';
 import { BagKey } from '@/lib/bag-options';
-import { AUTO_PROMO_TRIGGER_CATEGORY_SLUGS } from '@/lib/promo-categories';
 
 interface CartStore extends CartState {
   addItem: (item: CartItem) => void;
@@ -15,14 +14,6 @@ interface CartStore extends CartState {
   clearCart: () => void;
   itemCount: number;
   bagQuantities: Record<BagKey, number>;
-  // Tracks which cart item (if any) is the customer's pick from the "buy 1
-  // drink, get a Refreshment free" picker on the cart page -- lets that
-  // picker show/let them swap their current choice instead of just adding
-  // duplicates, and lets the cart card badge it as free. Purely a client-side
-  // UI hint: the actual discount is still computed server-side by category,
-  // not by this id (see order-pricing.ts's computeAutoPromoDiscount).
-  freeRefreshmentCartItemId: string | null;
-  setFreeRefreshmentCartItemId: (id: string | null) => void;
 }
 
 const emptyBagQuantities: Record<BagKey, number> = {
@@ -42,40 +33,6 @@ function deriveCartMeta(items: CartItem[]) {
   };
 }
 
-function qualifyingDrinkUnits(items: CartItem[]): number {
-  return items.reduce(
-    (sum, item) =>
-      AUTO_PROMO_TRIGGER_CATEGORY_SLUGS.includes(String(item.categorySlug || '').toLowerCase())
-        ? sum + item.quantity
-        : sum,
-    0,
-  );
-}
-
-/**
- * The picked "free Refreshment" (see cart/page.tsx's FreeRefreshmentPicker)
- * is only free because of the qualifying drink(s) that earned it -- the
- * server-side discount needs 2+ qualifying drink units in the cart (see
- * order-pricing.ts's computeAutoPromoDiscount), which normally means the
- * free item itself plus at least 1 other. If removing/reducing an item
- * drops the cart below that threshold, the free item no longer qualifies
- * either, so it's removed along with whatever broke eligibility instead of
- * silently sitting in the cart still badged "Gratis" while actually being
- * charged full price (confirmed live 2026-09-22).
- */
-function dropFreeItemIfIneligible(
-  items: CartItem[],
-  freeRefreshmentCartItemId: string | null,
-): { items: CartItem[]; freeRefreshmentCartItemId: string | null } {
-  if (!freeRefreshmentCartItemId) return { items, freeRefreshmentCartItemId };
-  if (qualifyingDrinkUnits(items) >= 2) return { items, freeRefreshmentCartItemId };
-
-  return {
-    items: items.filter((item) => item.id !== freeRefreshmentCartItemId),
-    freeRefreshmentCartItemId: null,
-  };
-}
-
 export const useCartStore = create<CartStore>()(
   persist(
     (set, get) => ({
@@ -85,7 +42,6 @@ export const useCartStore = create<CartStore>()(
       customerPhone: '',
       itemCount: 0,
       bagQuantities: emptyBagQuantities,
-      freeRefreshmentCartItemId: null,
 
       addItem: (newItem: CartItem) => {
         const { items } = get();
@@ -121,13 +77,8 @@ export const useCartStore = create<CartStore>()(
       },
 
       removeItem: (id: string) => {
-        const { items, freeRefreshmentCartItemId } = get();
-        const afterRemove = items.filter((item) => item.id !== id);
-        const { items: newItems, freeRefreshmentCartItemId: newFreeId } = dropFreeItemIfIneligible(
-          afterRemove,
-          freeRefreshmentCartItemId === id ? null : freeRefreshmentCartItemId,
-        );
-        set({ items: newItems, ...deriveCartMeta(newItems), freeRefreshmentCartItemId: newFreeId });
+        const newItems = get().items.filter((item) => item.id !== id);
+        set({ items: newItems, ...deriveCartMeta(newItems) });
       },
 
       updateItem: (id: string, updatedItem: CartItem) => {
@@ -139,14 +90,10 @@ export const useCartStore = create<CartStore>()(
       },
 
       updateQuantity: (id: string, quantity: number) => {
-        const { items, freeRefreshmentCartItemId } = get();
+        const { items } = get();
         if (quantity <= 0) {
-          const afterRemove = items.filter((item) => item.id !== id);
-          const { items: newItems, freeRefreshmentCartItemId: newFreeId } = dropFreeItemIfIneligible(
-            afterRemove,
-            freeRefreshmentCartItemId === id ? null : freeRefreshmentCartItemId,
-          );
-          set({ items: newItems, ...deriveCartMeta(newItems), freeRefreshmentCartItemId: newFreeId });
+          const newItems = items.filter((item) => item.id !== id);
+          set({ items: newItems, ...deriveCartMeta(newItems) });
           return;
         }
 
@@ -174,10 +121,6 @@ export const useCartStore = create<CartStore>()(
         set({ bagQuantities: { ...bagQuantities, [key]: Math.max(0, quantity) } });
       },
 
-      setFreeRefreshmentCartItemId: (id: string | null) => {
-        set({ freeRefreshmentCartItemId: id });
-      },
-
       clearCart: () => {
         set({
           items: [],
@@ -186,7 +129,6 @@ export const useCartStore = create<CartStore>()(
           customerName: '',
           customerPhone: '',
           bagQuantities: emptyBagQuantities,
-          freeRefreshmentCartItemId: null,
         });
       },
     }),

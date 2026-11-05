@@ -702,7 +702,7 @@ export async function createOrder(
   voucherCode?: string,
   customerPhone?: string,
   // Per-item discount breakdown, keyed by the item's index in `items` above
-  // (order-pricing.ts's computeVoucherDiscount/computeAutoPromoDiscount both
+  // (order-pricing.ts's computeVoucherDiscount/computeBreakfastPromoDiscount both
   // already compute exactly this). When provided, it's used as-is for the
   // Olsera line-item sync below instead of re-deriving which items should be
   // discounted from category heuristics -- callers that don't have a
